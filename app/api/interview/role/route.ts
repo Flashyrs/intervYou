@@ -20,7 +20,9 @@ export async function GET(req: Request) {
 
     if (item.createdBy === userId) 
       return NextResponse.json({ role: "interviewer" }, { status: 200 });
-
+    type Participant = {
+  id: string;
+};
     if (item.participants.some((p: { id: string }) => p.id === userId)) 
       return NextResponse.json({ role: "interviewee" }, { status: 200 });
 
