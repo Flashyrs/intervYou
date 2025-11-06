@@ -86,9 +86,10 @@ export default function DashboardPage() {
     });
 
     return () => {
-      supabase.removeChannel(ch);
-      if (pres) supabase.removeChannel(pres);
-    };
+  supabase?.removeChannel(ch);
+  supabase?.removeChannel(pres);
+};
+
   }, [tempId, router, userId]);
 
   const startRandom = async () => {
