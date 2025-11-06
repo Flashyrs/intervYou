@@ -12,7 +12,10 @@ function InviteForm() {
   const [email, setEmail] = useState("");
 
   const send = async () => {
-    if (!session) { signIn(); return; }
+    if (!session) {
+      signIn();
+      return;
+    }
     try {
       const res = await fetch("/api/invite", {
         method: "POST",
@@ -20,8 +23,12 @@ function InviteForm() {
         body: JSON.stringify({ email }),
       });
       const data = await res.json();
-      if (!res.ok) push({ message: data?.error || "Invite failed", type: "error" });
-      else { push({ message: "Invite sent", type: "success" }); setEmail(""); }
+      if (!res.ok) {
+        push({ message: data?.error || "Invite failed", type: "error" });
+      } else {
+        push({ message: "Invite sent", type: "success" });
+        setEmail("");
+      }
     } catch {
       push({ message: "Invite failed", type: "error" });
     }
@@ -36,7 +43,12 @@ function InviteForm() {
         placeholder="email@example.com"
         className="flex-1 border rounded px-3 py-2"
       />
-      <button className="px-3 py-2 bg-black text-white rounded" onClick={send}>Send</button>
+      <button
+        className="px-3 py-2 bg-black text-white rounded"
+        onClick={send}
+      >
+        Send
+      </button>
     </div>
   );
 }
@@ -46,8 +58,8 @@ export default function DashboardPage() {
   const [incoming, setIncoming] = useState<{ from: string; tempId: string; initiatorId?: string } | null>(null);
   const [status, setStatus] = useState<string>("");
   const [tempId, setTempId] = useState<string | null>(null);
-  const channelRef = useRef<any>(null);   // Use 'any' to avoid supabase possibly null type issues
-  const presenceRef = useRef<any>(null);
+  const channelRef = useRef<any | null>(null);
+  const presenceRef = useRef<any | null>(null); 
   const [online, setOnline] = useState<string[]>([]);
   const router = useRouter();
   const { push } = useToast();
@@ -93,17 +105,19 @@ export default function DashboardPage() {
     });
 
     return () => {
-      if (ch && supabase) supabase.removeChannel(ch);
-      if (pres && supabase) supabase.removeChannel(pres);
+      if (channelRef.current && supabase) supabase.removeChannel(channelRef.current);
+      if (presenceRef.current && supabase) supabase.removeChannel(presenceRef.current);
     };
   }, [tempId, router, userId, push, session]);
 
   const startRandom = async () => {
     if (!session) { signIn(); return; }
     if (!supabase) { push({ message: "Realtime not configured", type: "error" }); return; }
+
     setStatus("Looking for interviewer...");
     const id = Math.random().toString(36).slice(2, 10);
     setTempId(id);
+
     channelRef.current?.send({
       type: "broadcast",
       event: "lobby",
@@ -121,7 +135,10 @@ export default function DashboardPage() {
       body: JSON.stringify({ tempId: incoming.tempId, initiatorId: incoming.initiatorId || "" }),
     });
     const data = await res.json();
-    if (!res.ok) { push({ message: data?.error || "Accept failed", type: "error" }); return; }
+    if (!res.ok) {
+      push({ message: data?.error || "Accept failed", type: "error" });
+      return;
+    }
 
     const sessionId = data.sessionId;
     channelRef.current?.send({
@@ -134,20 +151,30 @@ export default function DashboardPage() {
   };
 
   if (authStatus === "loading") return <div className="mx-auto max-w-3xl p-6 text-center text-gray-600">Loading…</div>;
-  if (!session) return (
-    <div className="mx-auto max-w-md p-8 mt-10 border rounded bg-white">
-      <h1 className="text-2xl font-semibold">Welcome</h1>
-      <p className="mt-2 text-gray-600">Sign in to start a random interview</p>
-      <button className="mt-6 w-full px-4 py-2 bg-black text-white rounded" onClick={() => signIn("google")}>Sign in with Google</button>
-    </div>
-  );
+
+  if (!session) {
+    return (
+      <div className="mx-auto max-w-md p-8 mt-10 border rounded bg-white">
+        <h1 className="text-2xl font-semibold">Welcome</h1>
+        <p className="mt-2 text-gray-600">Sign in to start a random interview</p>
+        <button
+          className="mt-6 w-full px-4 py-2 bg-black text-white rounded"
+          onClick={() => signIn("google")}
+        >
+          Sign in with Google
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto max-w-3xl p-4 space-y-4">
       <h1 className="text-2xl font-semibold">Dashboard</h1>
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <button className="px-4 py-2 bg-black text-white rounded" onClick={startRandom}>Random Interview</button>
+          <button className="px-4 py-2 bg-black text-white rounded" onClick={startRandom}>
+            Random Interview
+          </button>
           {status && <span className="text-sm text-gray-600">{status}</span>}
         </div>
         <div className="text-sm text-gray-600">Online interviewers: {online.length}</div>
@@ -162,7 +189,7 @@ export default function DashboardPage() {
         <div className="border rounded p-3 bg-white">
           <p className="font-medium mb-2">Online</p>
           <ul className="text-sm text-gray-700 list-disc pl-5">
-            {online.map((o) => (<li key={o}>{o}</li>))}
+            {online.map((o) => <li key={o}>{o}</li>)}
           </ul>
         </div>
       )}
@@ -180,7 +207,9 @@ export default function DashboardPage() {
         </div>
       )}
 
-      <p className="text-sm text-gray-600">Invites you send will appear in your email; use the link to join.</p>
+      <p className="text-sm text-gray-600">
+        Invites you send will appear in your email; use the link to join.
+      </p>
     </div>
   );
 }
