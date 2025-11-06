@@ -1,0 +1,91 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                String             @id @default(cuid())
+  name              String?
+  email             String?            @unique
+  emailVerified     DateTime?
+  image             String?
+  sessions          Session[]
+  accounts          Account[]
+  createdAt         DateTime           @default(now())
+  interviewSessions InterviewSession[] @relation("InterviewParticipants")
+}
+model InterviewState {
+        sessionId   String  @id
+        language    String?
+        code        String?
+        problemText String?
+        sampleTests String?
+        driver      String?   
+        createdAt   DateTime  @default(now())
+        updatedAt   DateTime  @updatedAt
+      }
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id            String   @id @default(cuid())
+  userId        String
+  sessionToken  String   @unique
+  interviewerId String?
+  intervieweeId String?
+  createdAt     DateTime @default(now())
+  expires       DateTime
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model InterviewSession {
+  id           String   @id @default(cuid())
+  createdBy    String
+  createdAt    DateTime @default(now())
+  problemId    String?
+  participants User[]   @relation("InterviewParticipants")
+}
+model Submission {
+  id         String   @id @default(cuid())
+  sessionId  String
+  problemId  String
+  userId     String
+  language   String
+  code       String
+  results    Json     // structured JSON object of per-case results
+  passed     Boolean
+  attempts   Int      @default(1)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([sessionId, problemId, userId])  // one row per user/problem/session
+  @@index([sessionId, userId])
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
