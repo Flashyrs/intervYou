@@ -3,13 +3,13 @@ import { useEffect, useRef, useState } from "react";
 import { applyAnswer, createAnswer, createOffer, setupPeerConnection } from "@/lib/webrtc";
 import { broadcast, onSignal } from "@/lib/realtime";
 
-export default function VideoCall({ 
-  room, 
-  role, 
-  autoStart = true 
-}: { 
-  room: string; 
-  role: "interviewer" | "interviewee"; 
+export default function VideoCall({
+  room,
+  role,
+  autoStart = true
+}: {
+  room: string;
+  role: "interviewer" | "interviewee";
   autoStart?: boolean;
 }) {
   const localRef = useRef<HTMLVideoElement>(null);
@@ -27,11 +27,11 @@ export default function VideoCall({
 
   useEffect(() => {
     let mounted = true;
-    
+
     (async () => {
       try {
         const { pc, localStream, remoteStream } = await setupPeerConnection();
-        
+
         if (!mounted) {
           // Cleanup if component unmounted during setup
           localStream?.getTracks().forEach(track => track.stop());
@@ -76,11 +76,11 @@ export default function VideoCall({
         // Handle ICE candidates
         pc.onicecandidate = (e) => {
           if (e.candidate) {
-            broadcast(room, { 
-              type: "ice-candidate", 
-              from: role, 
-              sessionId: room, 
-              candidate: e.candidate 
+            broadcast(room, {
+              type: "ice-candidate",
+              from: role,
+              sessionId: room,
+              candidate: e.candidate
             });
           }
         };
@@ -92,11 +92,11 @@ export default function VideoCall({
           try {
             if (payload.type === "call-offer" && role === "interviewer") {
               const answer = await createAnswer(pc, payload.sdp);
-              broadcast(room, { 
-                type: "call-answer", 
-                from: role, 
-                sessionId: room, 
-                sdp: answer 
+              broadcast(room, {
+                type: "call-answer",
+                from: role,
+                sessionId: room,
+                sdp: answer
               });
             } else if (payload.type === "call-answer" && role === "interviewee") {
               await applyAnswer(pc, payload.sdp);
@@ -139,7 +139,7 @@ export default function VideoCall({
 
     return () => {
       mounted = false;
-      
+
       // Cleanup channel
       if (channelRef.current) {
         try {
@@ -168,14 +168,14 @@ export default function VideoCall({
       setError("Connection not initialized");
       return;
     }
-    
+
     try {
       const offer = await createOffer(pcRef.current);
-      broadcast(room, { 
-        type: "call-offer", 
-        from: role, 
-        sessionId: room, 
-        sdp: offer 
+      broadcast(room, {
+        type: "call-offer",
+        from: role,
+        sessionId: room,
+        sdp: offer
       });
       setError("");
     } catch (e) {
@@ -186,7 +186,7 @@ export default function VideoCall({
 
   const switchDevices = async () => {
     if (!pcRef.current) return;
-    
+
     try {
       const constraints: MediaStreamConstraints = {
         video: videoDeviceId ? { deviceId: { exact: videoDeviceId } } : true,
@@ -196,22 +196,22 @@ export default function VideoCall({
       const newStream = await navigator.mediaDevices.getUserMedia(constraints);
       const videoTrack = newStream.getVideoTracks()[0];
       const audioTrack = newStream.getAudioTracks()[0];
-      
+
       const senders = pcRef.current.getSenders();
       const videoSender = senders.find((s) => s.track?.kind === "video");
       const audioSender = senders.find((s) => s.track?.kind === "audio");
-      
+
       if (videoSender && videoTrack) {
         await videoSender.replaceTrack(videoTrack);
       }
       if (audioSender && audioTrack) {
         await audioSender.replaceTrack(audioTrack);
       }
-      
+
       if (localRef.current) {
         localRef.current.srcObject = newStream;
       }
-      
+
       setError("");
     } catch (e) {
       console.error("Failed to switch devices", e);
@@ -240,32 +240,32 @@ export default function VideoCall({
   };
 
   return (
-    <div className="border rounded p-3 space-y-2 bg-gray-900">
+    <div className="border rounded p-3 space-y-2 bg-gray-900 h-full flex flex-col">
       {error && (
-        <div className="bg-red-100 border border-red-400 text-red-700 px-3 py-2 rounded text-sm">
+        <div className="bg-red-100 border border-red-400 text-red-700 px-3 py-2 rounded text-sm shrink-0">
           {error}
         </div>
       )}
-      
-      <div className="flex gap-2">
-        <div className="w-1/2 relative">
-          <video 
-            ref={localRef} 
-            autoPlay 
-            playsInline 
-            muted 
-            className="w-full bg-black rounded aspect-video object-cover" 
+
+      <div className="flex flex-row gap-4 flex-1 min-h-0">
+        <div className="flex-1 relative bg-black rounded-lg overflow-hidden">
+          <video
+            ref={localRef}
+            autoPlay
+            playsInline
+            muted
+            className="w-full h-full object-cover"
           />
           <div className="absolute bottom-2 left-2 bg-black/50 text-white text-xs px-2 py-1 rounded">
             You ({role})
           </div>
         </div>
-        <div className="w-1/2 relative">
-          <video 
-            ref={remoteRef} 
-            autoPlay 
-            playsInline 
-            className="w-full bg-black rounded aspect-video object-cover" 
+        <div className="flex-1 relative bg-black rounded-lg overflow-hidden">
+          <video
+            ref={remoteRef}
+            autoPlay
+            playsInline
+            className="w-full h-full object-cover"
           />
           <div className="absolute bottom-2 left-2 bg-black/50 text-white text-xs px-2 py-1 rounded">
             Remote
@@ -273,41 +273,39 @@ export default function VideoCall({
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-2 items-center">
+      <div className="flex flex-wrap gap-2 items-center shrink-0">
         {role === "interviewee" && !active && (
-          <button 
-            className="px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700 transition" 
+          <button
+            className="px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700 transition"
             onClick={startCall}
           >
             Start Call
           </button>
         )}
-        
-        <button 
-          className={`px-3 py-1 rounded transition ${
-            micOn 
-              ? "bg-gray-700 text-white hover:bg-gray-600" 
+
+        <button
+          className={`px-3 py-1 rounded transition ${micOn
+              ? "bg-gray-700 text-white hover:bg-gray-600"
               : "bg-red-600 text-white hover:bg-red-700"
-          }`}
+            }`}
           onClick={toggleMic}
         >
           {micOn ? "🎤 Mute" : "🔇 Unmute"}
         </button>
-        
-        <button 
-          className={`px-3 py-1 rounded transition ${
-            camOn 
-              ? "bg-gray-700 text-white hover:bg-gray-600" 
+
+        <button
+          className={`px-3 py-1 rounded transition ${camOn
+              ? "bg-gray-700 text-white hover:bg-gray-600"
               : "bg-red-600 text-white hover:bg-red-700"
-          }`}
+            }`}
           onClick={toggleCam}
         >
           {camOn ? "📹 Stop Cam" : "📷 Start Cam"}
         </button>
 
-        <select 
-          className="border rounded px-2 py-1 text-sm bg-gray-800 text-white" 
-          value={videoDeviceId} 
+        <select
+          className="border rounded px-2 py-1 text-sm bg-gray-800 text-white"
+          value={videoDeviceId}
           onChange={(e) => setVideoDeviceId(e.target.value)}
         >
           <option value="">Default Camera</option>
@@ -320,9 +318,9 @@ export default function VideoCall({
             ))}
         </select>
 
-        <select 
-          className="border rounded px-2 py-1 text-sm bg-gray-800 text-white" 
-          value={audioDeviceId} 
+        <select
+          className="border rounded px-2 py-1 text-sm bg-gray-800 text-white"
+          value={audioDeviceId}
           onChange={(e) => setAudioDeviceId(e.target.value)}
         >
           <option value="">Default Mic</option>
@@ -335,8 +333,8 @@ export default function VideoCall({
             ))}
         </select>
 
-        <button 
-          className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 transition text-sm" 
+        <button
+          className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 transition text-sm"
           onClick={switchDevices}
         >
           Apply Devices
@@ -348,7 +346,7 @@ export default function VideoCall({
             Connected
           </span>
         )}
-        
+
         {!active && connectionState !== "new" && (
           <span className="text-yellow-400 text-sm">
             {connectionState}

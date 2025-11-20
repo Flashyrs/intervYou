@@ -59,12 +59,13 @@ export default function DashboardPage() {
   const [status, setStatus] = useState<string>("");
   const [tempId, setTempId] = useState<string | null>(null);
   const channelRef = useRef<any | null>(null);
-  const presenceRef = useRef<any | null>(null); 
+  const presenceRef = useRef<any | null>(null);
   const [online, setOnline] = useState<string[]>([]);
   const router = useRouter();
   const { push } = useToast();
 
   const userId = (session?.user as any)?.id as string | undefined;
+  console.log("Dashboard Session:", session); // DEBUG
 
   useEffect(() => {
     if (!supabase) return;
@@ -75,6 +76,7 @@ export default function DashboardPage() {
     ch.on("broadcast", { event: "lobby" }, (payload: any) => {
       const msg = payload?.payload;
       if (msg?.type === "random-invite") {
+        console.log("Received invite:", msg); // DEBUG
         if (msg.initiatorId && userId && msg.initiatorId === userId) return;
         setIncoming({ from: msg.from, tempId: msg.tempId, initiatorId: msg.initiatorId });
       } else if (msg?.type === "random-accept") {
@@ -114,14 +116,23 @@ export default function DashboardPage() {
     if (!session) { signIn(); return; }
     if (!supabase) { push({ message: "Realtime not configured", type: "error" }); return; }
 
+    console.log("Starting random interview. UserId:", userId); // DEBUG
+    if (!userId) {
+      push({ message: "User ID missing. Please sign out and sign in again.", type: "error" });
+      return;
+    }
+
     setStatus("Looking for interviewer...");
     const id = Math.random().toString(36).slice(2, 10);
     setTempId(id);
 
+    const payload = { type: "random-invite", from: "interviewee", tempId: id, initiatorId: userId };
+    console.log("Sending payload:", payload); // DEBUG
+
     channelRef.current?.send({
       type: "broadcast",
       event: "lobby",
-      payload: { type: "random-invite", from: "interviewee", tempId: id, initiatorId: userId },
+      payload,
     });
   };
 

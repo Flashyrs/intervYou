@@ -18,13 +18,22 @@ export async function GET(req: Request) {
 
     if (!item) return NextResponse.json({ error: "not found" }, { status: 404 });
 
-    if (item.createdBy === userId) 
+    if (item.createdBy === userId)
       return NextResponse.json({ role: "interviewer" }, { status: 200 });
     type Participant = {
-  id: string;
-};
-    if (item.participants.some((p: { id: string }) => p.id === userId)) 
+      id: string;
+    };
+    if (item.participants.some((p: { id: string }) => p.id === userId))
       return NextResponse.json({ role: "interviewee" }, { status: 200 });
+
+    // Auto-join logic: if not full (1 interviewee max), add them
+    if (item.participants.length === 0) {
+      await prisma.interviewSession.update({
+        where: { id: sessionId },
+        data: { participants: { connect: { id: userId } } },
+      });
+      return NextResponse.json({ role: "interviewee" }, { status: 200 });
+    }
 
     return NextResponse.json({ error: "forbidden" }, { status: 403 });
   } catch (e: any) {
