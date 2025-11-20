@@ -3,6 +3,8 @@ import { PrismaClient } from "@prisma/client";
 const prismaClientSingleton = () => {
   // Use different adapters based on environment
   if (process.env.VERCEL || process.env.NODE_ENV === "production") {
+    const dbUrl = process.env.DATABASE_URL;
+    console.log("DB_URL Status:", dbUrl ? `Found (Length: ${dbUrl.length})` : "NOT FOUND or UNDEFINED");
     // For Vercel/production: use @neondatabase/serverless AND @prisma/adapter-neon
     const { Pool } = require("@neondatabase/serverless"); // Neon's Pool
     const { PrismaNeon } = require("@prisma/adapter-neon"); // 💡 Change to PrismaNeon
