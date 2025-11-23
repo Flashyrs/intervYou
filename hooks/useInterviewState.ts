@@ -6,16 +6,25 @@ export type Role = "interviewer" | "interviewee";
 
 export function useInterviewState(sessionId: string) {
     const [language, setLanguage] = useState("javascript");
-    const [code, setCode] = useState("// Start coding...\n");
+    const [codeMap, setCodeMap] = useState<Record<string, string>>({
+        javascript: "// Start coding...\n",
+        java: "// Start coding...\n",
+        cpp: "// Start coding...\n"
+    });
+    const [driverMap, setDriverMap] = useState<Record<string, string>>({});
+
     const [problemText, setProblemText] = useState("");
     const [sampleTests, setSampleTests] = useState("");
     const [privateTests, setPrivateTests] = useState("");
-    const [driver, setDriver] = useState("");
     const [role, setRole] = useState<Role>("interviewee");
     const [showAuthModal, setShowAuthModal] = useState(false);
 
     const channelRef = useRef<any>(null);
     const saveTimeout = useRef<any>(null);
+
+    // Helper to get current code/driver
+    const code = codeMap[language] || "";
+    const driver = driverMap[language] || "";
 
     // Initial fetch
     useEffect(() => {
@@ -33,17 +42,30 @@ export function useInterviewState(sessionId: string) {
                 const roleData = await roleRes.json();
                 if (roleRes.ok && (roleData.role === "interviewer" || roleData.role === "interviewee"))
                     setRole(roleData.role);
+
                 const stateData = await stateRes.json();
                 if (stateRes.ok && stateData) {
                     if (typeof stateData.language === "string") setLanguage(stateData.language);
-                    if (typeof stateData.code === "string") setCode(stateData.code);
+                    if (stateData.codeMap) setCodeMap(stateData.codeMap);
+                    else if (typeof stateData.code === "string") {
+                        // Migration from single code
+                        setCodeMap(prev => ({ ...prev, [stateData.language || 'javascript']: stateData.code }));
+                    }
+
+                    if (stateData.driverMap) setDriverMap(stateData.driverMap);
+                    else if (typeof stateData.driver === "string") {
+                        setDriverMap(prev => ({ ...prev, [stateData.language || 'javascript']: stateData.driver }));
+                    }
+
                     if (typeof stateData.problemText === "string") setProblemText(stateData.problemText);
                     if (typeof stateData.sampleTests === "string") setSampleTests(stateData.sampleTests);
-                    if (typeof stateData.driver === "string") setDriver(stateData.driver);
                 }
             } catch { }
         })();
     }, [sessionId]);
+
+    const broadcastTimeout = useRef<any>(null);
+    const lastUpdateRef = useRef<number>(0);
 
     // Realtime subscription
     useEffect(() => {
@@ -52,19 +74,20 @@ export function useInterviewState(sessionId: string) {
         channelRef.current = channel;
 
         channel.on("broadcast", { event: "state" }, (payload: any) => {
-            console.log("Received state update:", payload); // DEBUG
-            const { language, code, problemText, sampleTests, driver } = payload?.payload || {};
+            const { language, codeMap: newCodeMap, driverMap: newDriverMap, problemText, sampleTests, timestamp } = payload?.payload || {};
+
+            if (timestamp && timestamp < lastUpdateRef.current) {
+                return;
+            }
 
             if (language) setLanguage(language);
-            if (typeof code === "string") setCode(code);
+            if (newCodeMap) setCodeMap(prev => ({ ...prev, ...newCodeMap }));
+            if (newDriverMap) setDriverMap(prev => ({ ...prev, ...newDriverMap }));
             if (typeof problemText === "string") setProblemText(problemText);
             if (typeof sampleTests === "string") setSampleTests(sampleTests);
-            if (typeof driver === "string") setDriver(driver);
         });
 
-        channel.subscribe((status) => {
-            console.log("Supabase channel status:", status); // DEBUG
-        });
+        channel.subscribe();
 
         return () => {
             supabase?.removeChannel(channel);
@@ -72,8 +95,17 @@ export function useInterviewState(sessionId: string) {
     }, [sessionId]);
 
     const broadcast = (data: any) => {
-        console.log("Broadcasting update:", data); // DEBUG
-        channelRef.current?.send({ type: "broadcast", event: "state", payload: data });
+        if (broadcastTimeout.current) clearTimeout(broadcastTimeout.current);
+
+        broadcastTimeout.current = setTimeout(() => {
+            const timestamp = Date.now();
+            lastUpdateRef.current = timestamp;
+            channelRef.current?.send({
+                type: "broadcast",
+                event: "state",
+                payload: { ...data, timestamp }
+            });
+        }, 100);
     };
 
     const persist = (patch: any) => {
@@ -86,20 +118,46 @@ export function useInterviewState(sessionId: string) {
                     body: JSON.stringify({ sessionId, ...patch }),
                 });
             } catch { }
-        }, 400);
+        }, 1000);
     };
 
     const updateLanguage = (lang: string) => {
         setLanguage(lang);
-        setCode((prev) => maybeInjectSkeleton(prev, lang));
-        broadcast({ language: lang });
-        persist({ language: lang });
+        // Inject skeleton if empty
+        setCodeMap(prev => {
+            const current = prev[lang] || "";
+            const injected = maybeInjectSkeleton(current, lang);
+            if (injected !== current) {
+                const next = { ...prev, [lang]: injected };
+                broadcast({ language: lang, codeMap: next });
+                persist({ language: lang, codeMap: next });
+                return next;
+            }
+            broadcast({ language: lang });
+            persist({ language: lang });
+            return prev;
+        });
     };
 
     const updateCode = (newCode: string) => {
-        setCode(newCode);
-        broadcast({ code: newCode });
-        persist({ code: newCode });
+        setCodeMap(prev => {
+            const next = { ...prev, [language]: newCode };
+            broadcast({ codeMap: next });
+            persist({ codeMap: next });
+            return next;
+        });
+    };
+
+    const setCodeMapFull = (map: Record<string, string>) => {
+        setCodeMap(map);
+        broadcast({ codeMap: map });
+        persist({ codeMap: map });
+    };
+
+    const setDriverMapFull = (map: Record<string, string>) => {
+        setDriverMap(map);
+        broadcast({ driverMap: map });
+        persist({ driverMap: map });
     };
 
     const updateProblemText = (text: string) => {
@@ -115,25 +173,31 @@ export function useInterviewState(sessionId: string) {
     };
 
     const updateDriver = (text: string) => {
-        setDriver(text);
-        broadcast({ driver: text });
-        persist({ driver: text });
+        setDriverMap(prev => {
+            const next = { ...prev, [language]: text };
+            broadcast({ driverMap: next });
+            persist({ driverMap: next });
+            return next;
+        });
     };
 
     return {
         language,
         code,
+        codeMap,
         problemText,
         sampleTests,
         privateTests,
         driver,
+        driverMap,
         role,
         showAuthModal,
         setShowAuthModal,
         setPrivateTests,
-        setDriver, // Exposed for direct setting if needed (e.g. from AI gen)
         updateLanguage,
         updateCode,
+        setCodeMapFull,
+        setDriverMapFull,
         updateProblemText,
         updateSampleTests,
         updateDriver,

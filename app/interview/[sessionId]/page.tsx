@@ -26,11 +26,13 @@ export default function InterviewPage() {
     showAuthModal,
     setShowAuthModal,
     setPrivateTests,
-    setDriver,
     updateLanguage,
     updateCode,
     updateProblemText,
     updateSampleTests,
+    setCodeMapFull,
+    setDriverMapFull,
+    updateDriver,
   } = useInterviewState(sessionId);
 
   const {
@@ -65,7 +67,9 @@ export default function InterviewPage() {
           code={code}
           driver={driver}
           sessionId={sessionId}
-          setDriver={setDriver}
+          setDriver={updateDriver}
+          setCodeMapFull={setCodeMapFull}
+          setDriverMapFull={setDriverMapFull}
         />
       </div>
 
