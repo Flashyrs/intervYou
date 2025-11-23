@@ -65,15 +65,23 @@ function buildJS(userCode: string, driver: string, tests: any[]) {
 function buildJava(userCode: string, driver: string, tests: any[]) {
   const testStr = safeJSON(tests);
 
-  // Extract imports from userCode
+  let codeToProcess = userCode || '';
+
+  // If user wrapped their code in "class Solution { }", unwrap it
+  const classMatch = codeToProcess.match(/class\s+Solution\s*\{([\s\S]*)\}\s*$/);
+  if (classMatch) {
+    codeToProcess = classMatch[1].trim();
+  }
+
+  // Extract imports from anywhere in the code
   const importLines: string[] = [];
   const codeLines: string[] = [];
 
-  (userCode || '').split('\n').forEach(line => {
+  codeToProcess.split('\n').forEach(line => {
     const trimmed = line.trim();
     if (trimmed.startsWith('import ') && trimmed.endsWith(';')) {
       importLines.push(line);
-    } else {
+    } else if (trimmed.length > 0) { // Skip empty lines from unwrapping
       codeLines.push(line);
     }
   });
