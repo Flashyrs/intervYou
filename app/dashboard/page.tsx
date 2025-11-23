@@ -55,7 +55,7 @@ function InviteForm() {
 
 export default function DashboardPage() {
   const { data: session, status: authStatus } = useSession();
-  const [incoming, setIncoming] = useState<{ from: string; tempId: string; initiatorId?: string } | null>(null);
+  const [incoming, setIncoming] = useState<{ from: string; tempId: string; initiatorId?: string; name?: string } | null>(null);
   const [status, setStatus] = useState<string>("");
   const [tempId, setTempId] = useState<string | null>(null);
   const channelRef = useRef<any | null>(null);
@@ -65,7 +65,6 @@ export default function DashboardPage() {
   const { push } = useToast();
 
   const userId = (session?.user as any)?.id as string | undefined;
-  console.log("Dashboard Session:", session); // DEBUG
 
   useEffect(() => {
     if (!supabase) return;
@@ -76,9 +75,8 @@ export default function DashboardPage() {
     ch.on("broadcast", { event: "lobby" }, (payload: any) => {
       const msg = payload?.payload;
       if (msg?.type === "random-invite") {
-        console.log("Received invite:", msg); // DEBUG
         if (msg.initiatorId && userId && msg.initiatorId === userId) return;
-        setIncoming({ from: msg.from, tempId: msg.tempId, initiatorId: msg.initiatorId });
+        setIncoming({ from: msg.from, tempId: msg.tempId, initiatorId: msg.initiatorId, name: msg.name });
       } else if (msg?.type === "random-accept") {
         if (tempId && msg.tempId === tempId && msg.sessionId) {
           push({ message: "Matched! Redirecting…", type: "success" });
@@ -116,7 +114,6 @@ export default function DashboardPage() {
     if (!session) { signIn(); return; }
     if (!supabase) { push({ message: "Realtime not configured", type: "error" }); return; }
 
-    console.log("Starting random interview. UserId:", userId); // DEBUG
     if (!userId) {
       push({ message: "User ID missing. Please sign out and sign in again.", type: "error" });
       return;
@@ -126,8 +123,13 @@ export default function DashboardPage() {
     const id = Math.random().toString(36).slice(2, 10);
     setTempId(id);
 
-    const payload = { type: "random-invite", from: "interviewee", tempId: id, initiatorId: userId };
-    console.log("Sending payload:", payload); // DEBUG
+    const payload = {
+      type: "random-invite",
+      from: "interviewee",
+      tempId: id,
+      initiatorId: userId,
+      name: session.user?.name || "Unknown User"
+    };
 
     channelRef.current?.send({
       type: "broadcast",
@@ -178,8 +180,36 @@ export default function DashboardPage() {
     );
   }
 
+
   return (
     <div className="mx-auto max-w-3xl p-4 space-y-4">
+      {/* Random Interview Invite Modal */}
+      {incoming && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
+            <h2 className="text-xl font-semibold mb-4">Random Interview Request</h2>
+            <p className="text-gray-700 mb-6">
+              <span className="font-medium">{incoming.name || "A user"}</span> is looking for an interviewer.
+              Would you like to accept this random interview?
+            </p>
+            <div className="flex gap-3">
+              <button
+                className="flex-1 px-4 py-2 bg-black text-white rounded hover:bg-gray-800 transition"
+                onClick={accept}
+              >
+                Accept
+              </button>
+              <button
+                className="flex-1 px-4 py-2 border border-gray-300 rounded hover:bg-gray-50 transition"
+                onClick={() => setIncoming(null)}
+              >
+                Decline
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <h1 className="text-2xl font-semibold">Dashboard</h1>
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
@@ -204,23 +234,6 @@ export default function DashboardPage() {
           </ul>
         </div>
       )}
-
-      {incoming && (
-        <div className="border rounded p-3 flex items-center justify-between bg-white">
-          <div>
-            <p className="font-medium">Incoming random call</p>
-            <p className="text-sm text-gray-600">from: {incoming.from}</p>
-          </div>
-          <div className="flex gap-2">
-            <button className="px-3 py-1 bg-black text-white rounded" onClick={accept}>Accept</button>
-            <button className="px-3 py-1 bg-gray-200 rounded" onClick={() => setIncoming(null)}>Reject</button>
-          </div>
-        </div>
-      )}
-
-      <p className="text-sm text-gray-600">
-        Invites you send will appear in your email; use the link to join.
-      </p>
     </div>
   );
 }

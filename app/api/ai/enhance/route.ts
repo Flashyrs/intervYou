@@ -47,9 +47,11 @@ export async function POST(req: Request) {
       - "input" must be an array of arguments.
       - Skeletons should use a "Solution" class structure where appropriate (like LeetCode).
       - Drivers must be complete code that instantiates the Solution, runs the tests, and prints the results as a JSON array.
-      - For Java Driver: It must be a class named 'Driver' with a static method 'runTests'.
-      - For C++ Driver: It must be a function 'void runTests(...)'.
-      - For JS Driver: It must be a function 'runTests(...)'.
+      - CRITICAL: Drivers MUST NOT hardcode test cases. They must use the 'tests' argument passed to them.
+      - For Java Driver: It must be a class named 'Driver' with a static method 'public static List<String> runTests(List<Map<String,Object>> tests)'.
+      - For C++ Driver: It must be a function 'void runTests(const std::vector<std::map<std::string, std::string>>& tests)'.
+      - For JS Driver: It must be a function 'runTests(tests)'.
+      - Ensure all strings in the generated code are properly escaped.
       
       Do not wrap the JSON in markdown code blocks. Return raw JSON only.
     `;

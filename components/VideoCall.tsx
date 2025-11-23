@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { applyAnswer, createAnswer, createOffer, setupPeerConnection } from "@/lib/webrtc";
 import { broadcast, onSignal } from "@/lib/realtime";
 import { Mic, MicOff, Video, VideoOff, Settings, Monitor, PhoneOff } from "lucide-react";
@@ -27,6 +27,27 @@ export default function VideoCall({
   const [error, setError] = useState<string>("");
   const [showSettings, setShowSettings] = useState(false);
 
+  const startCall = useCallback(async () => {
+    if (!pcRef.current) {
+      setError("Connection not initialized");
+      return;
+    }
+
+    try {
+      const offer = await createOffer(pcRef.current);
+      broadcast(room, {
+        type: "call-offer",
+        from: role,
+        sessionId: room,
+        sdp: offer
+      });
+      setError("");
+    } catch (e) {
+      console.error("Failed to start call", e);
+      setError("Failed to start call");
+    }
+  }, [room, role]);
+
   useEffect(() => {
     let mounted = true;
 
@@ -41,13 +62,22 @@ export default function VideoCall({
         }
 
         pcRef.current = pc;
+        const pendingIceCandidates: RTCIceCandidate[] = [];
 
         if (localRef.current && localStream) {
           localRef.current.srcObject = localStream;
+          // Explicitly play the video to ensure it displays
+          localRef.current.play().catch((e) => {
+            console.warn("Local video autoplay failed, user interaction may be required", e);
+          });
         }
 
         if (remoteRef.current) {
           remoteRef.current.srcObject = remoteStream;
+          // Explicitly play remote video to ensure it displays
+          remoteRef.current.play().catch((e) => {
+            console.warn("Remote video autoplay failed", e);
+          });
         }
 
         try {
@@ -93,13 +123,42 @@ export default function VideoCall({
                 sessionId: room,
                 sdp: answer
               });
+              // Process queued ICE candidates after setting remote description
+              while (pendingIceCandidates.length > 0) {
+                const candidate = pendingIceCandidates.shift();
+                if (candidate) {
+                  try {
+                    await pc.addIceCandidate(candidate);
+                  } catch (e) {
+                    console.warn("Failed to add queued ICE candidate", e);
+                  }
+                }
+              }
             } else if (payload.type === "call-answer" && role === "interviewee") {
               await applyAnswer(pc, payload.sdp);
+              // Process queued ICE candidates after setting remote description
+              while (pendingIceCandidates.length > 0) {
+                const candidate = pendingIceCandidates.shift();
+                if (candidate) {
+                  try {
+                    await pc.addIceCandidate(candidate);
+                  } catch (e) {
+                    console.warn("Failed to add queued ICE candidate", e);
+                  }
+                }
+              }
             } else if (payload.type === "ice-candidate") {
-              try {
-                await pc.addIceCandidate(new RTCIceCandidate(payload.candidate));
-              } catch (e) {
-                console.warn("Failed to add ICE candidate", e);
+              const candidate = new RTCIceCandidate(payload.candidate);
+              // Only add ICE candidate if remote description is set
+              if (pc.remoteDescription) {
+                try {
+                  await pc.addIceCandidate(candidate);
+                } catch (e) {
+                  console.warn("Failed to add ICE candidate", e);
+                }
+              } else {
+                // Queue candidate until remote description is set
+                pendingIceCandidates.push(candidate);
               }
             }
           } catch (e) {
@@ -150,28 +209,9 @@ export default function VideoCall({
         }
       }
     };
-  }, [room, role, autoStart]);
+  }, [room, role, autoStart, startCall]);
 
-  const startCall = async () => {
-    if (!pcRef.current) {
-      setError("Connection not initialized");
-      return;
-    }
 
-    try {
-      const offer = await createOffer(pcRef.current);
-      broadcast(room, {
-        type: "call-offer",
-        from: role,
-        sessionId: room,
-        sdp: offer
-      });
-      setError("");
-    } catch (e) {
-      console.error("Failed to start call", e);
-      setError("Failed to start call");
-    }
-  };
 
   const switchDevices = async () => {
     if (!pcRef.current) return;
@@ -199,6 +239,9 @@ export default function VideoCall({
 
       if (localRef.current) {
         localRef.current.srcObject = newStream;
+        localRef.current.play().catch((e) => {
+          console.warn("Video play failed after device switch", e);
+        });
       }
 
       setError("");

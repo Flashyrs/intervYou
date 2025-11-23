@@ -16,12 +16,9 @@ export async function POST(req: Request) {
     if (!tempId) return NextResponse.json({ error: 'tempId required' }, { status: 400 });
     if (!initiatorId) return NextResponse.json({ error: 'initiatorId required' }, { status: 400 });
 
-    console.log("Accepting match:", { userId, initiatorId }); // DEBUG
-
     // Verify users exist
     const userExists = await prisma.user.count({ where: { id: userId } });
     const initiatorExists = await prisma.user.count({ where: { id: initiatorId } });
-    console.log("User existence check:", { userExists, initiatorExists }); // DEBUG
 
     if (userExists === 0 || initiatorExists === 0) {
       return NextResponse.json({ error: 'One or both users not found in DB' }, { status: 400 });
