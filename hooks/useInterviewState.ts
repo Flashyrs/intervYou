@@ -69,7 +69,27 @@ export function useInterviewState(sessionId: string) {
                 }
             } catch { }
         })();
-    }, [sessionId]);
+
+        // Track participant join
+        if (userId) {
+            fetch('/api/interview/presence', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ sessionId, action: 'join' }),
+            }).catch(() => { });
+        }
+
+        // Track participant leave on unmount
+        return () => {
+            if (userId) {
+                fetch('/api/interview/presence', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ sessionId, action: 'leave' }),
+                }).catch(() => { });
+            }
+        };
+    }, [sessionId, userId]);
 
     const [executionResult, setExecutionResult] = useState<any>(null);
 

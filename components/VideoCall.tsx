@@ -280,7 +280,7 @@ export default function VideoCall({
         </div>
       )}
 
-      <div className="flex-1 flex flex-row gap-2 p-2 min-h-0">
+      <div className="flex-1 flex flex-col md:flex-row gap-1 md:gap-2 p-1 md:p-2 min-h-0">
         {/* Local Video */}
         <div className="flex-1 relative bg-gray-900 rounded-lg overflow-hidden group">
           <video
@@ -318,12 +318,12 @@ export default function VideoCall({
         </div>
       </div>
 
-      {/* Controls Bar */}
-      <div className="h-16 bg-gray-900/90 backdrop-blur border-t border-white/10 flex items-center justify-between px-6 shrink-0">
+      {/* Controls Bar - Compact on mobile */}
+      <div className="h-12 md:h-16 bg-gray-900/90 backdrop-blur border-t border-white/10 flex items-center justify-between px-2 md:px-6 shrink-0">
         <div className="flex items-center gap-2">
           {role === "interviewee" && !active && (
             <button
-              className="px-4 py-2 bg-green-600 text-white rounded-full hover:bg-green-700 transition font-medium text-sm shadow-lg shadow-green-900/20"
+              className="px-2 md:px-4 py-1 md:py-2 bg-green-600 text-white rounded-full hover:bg-green-700 transition font-medium text-xs md:text-sm shadow-lg shadow-green-900/20"
               onClick={startCall}
             >
               Start Call
@@ -333,25 +333,25 @@ export default function VideoCall({
 
         <div className="flex items-center gap-3">
           <button
-            className={`p-3 rounded-full transition-all duration-200 ${micOn
+            className={`p-2 md:p-3 rounded-full transition-all duration-200 ${micOn
               ? "bg-gray-700 text-white hover:bg-gray-600 hover:scale-105"
               : "bg-red-500 text-white hover:bg-red-600 hover:scale-105 shadow-lg shadow-red-900/20"
               }`}
             onClick={toggleMic}
             title={micOn ? "Mute" : "Unmute"}
           >
-            {micOn ? <Mic className="w-5 h-5" /> : <MicOff className="w-5 h-5" />}
+            {micOn ? <Mic className="w-4 h-4 md:w-5 md:h-5" /> : <MicOff className="w-4 h-4 md:w-5 md:h-5" />}
           </button>
 
           <button
-            className={`p-3 rounded-full transition-all duration-200 ${camOn
+            className={`p-2 md:p-3 rounded-full transition-all duration-200 ${camOn
               ? "bg-gray-700 text-white hover:bg-gray-600 hover:scale-105"
               : "bg-red-500 text-white hover:bg-red-600 hover:scale-105 shadow-lg shadow-red-900/20"
               }`}
             onClick={toggleCam}
             title={camOn ? "Stop Camera" : "Start Camera"}
           >
-            {camOn ? <Video className="w-5 h-5" /> : <VideoOff className="w-5 h-5" />}
+            {camOn ? <Video className="w-4 h-4 md:w-5 md:h-5" /> : <VideoOff className="w-4 h-4 md:w-5 md:h-5" />}
           </button>
 
           <div className="w-px h-8 bg-gray-700 mx-1" />
@@ -364,7 +364,7 @@ export default function VideoCall({
             onClick={() => setShowSettings(!showSettings)}
             title="Settings"
           >
-            <Settings className="w-5 h-5" />
+            <Settings className="w-4 h-4 md:w-5 md:h-5" />
           </button>
         </div>
 

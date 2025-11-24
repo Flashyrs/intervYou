@@ -15,10 +15,14 @@ export async function POST(req: Request) {
     const inviterName = session.user?.name || null;
     const inviterEmail = session.user?.email || null;
 
-    const { email } = await req.json();
+    const { email, scheduledFor, isScheduled } = await req.json();
     if (!email || typeof email !== "string") {
       return NextResponse.json({ error: "email required" }, { status: 400 });
     }
+
+    // Parse scheduled date if provided
+    const scheduledDate = scheduledFor ? new Date(scheduledFor) : null;
+    const isScheduledInterview = isScheduled === true && scheduledDate !== null;
 
     if (!EXEMPT_EMAILS.has(inviterEmail || "")) {
       const since = new Date();
@@ -35,12 +39,17 @@ export async function POST(req: Request) {
       data: {
         createdBy: userId!,
         participants: userId ? { connect: [{ id: userId }] } : undefined,
+        scheduledFor: scheduledDate,
+        isScheduled: isScheduledInterview,
+        inviteeEmail: email,
+        status: isScheduledInterview ? "scheduled" : "active",
       },
     });
 
     const link = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/interview/${created.id}`;
 
-    await sendInviteEmail(email, link, { name: inviterName, email: inviterEmail });
+    // Send email to invitee with scheduling information
+    await sendInviteEmail(email, link, { name: inviterName, email: inviterEmail }, scheduledDate || undefined, isScheduledInterview);
 
     // Provide immediate redirect hint for interviewer
     const res = NextResponse.json({ id: created.id, link, redirect: link }, { status: 200 });

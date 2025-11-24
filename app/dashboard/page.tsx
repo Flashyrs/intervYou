@@ -5,53 +5,9 @@ import { useRouter } from "next/navigation";
 import { useSession, signIn } from "next-auth/react";
 import { presenceChannel } from "@/lib/presence";
 import { useToast } from "@/components/Toast";
+import { ScheduleModal } from "@/components/interview/ScheduleModal";
 
-function InviteForm() {
-  const { push } = useToast();
-  const { data: session } = useSession();
-  const [email, setEmail] = useState("");
 
-  const send = async () => {
-    if (!session) {
-      signIn();
-      return;
-    }
-    try {
-      const res = await fetch("/api/invite", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        push({ message: data?.error || "Invite failed", type: "error" });
-      } else {
-        push({ message: "Invite sent", type: "success" });
-        setEmail("");
-      }
-    } catch {
-      push({ message: "Invite failed", type: "error" });
-    }
-  };
-
-  return (
-    <div className="flex gap-2 items-center">
-      <input
-        type="email"
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
-        placeholder="email@example.com"
-        className="flex-1 border rounded px-3 py-2"
-      />
-      <button
-        className="px-3 py-2 bg-black text-white rounded"
-        onClick={send}
-      >
-        Send
-      </button>
-    </div>
-  );
-}
 
 export default function DashboardPage() {
   const { data: session, status: authStatus } = useSession();
@@ -61,6 +17,7 @@ export default function DashboardPage() {
   const channelRef = useRef<any | null>(null);
   const presenceRef = useRef<any | null>(null);
   const [online, setOnline] = useState<string[]>([]);
+  const [showScheduleModal, setShowScheduleModal] = useState(false);
   const router = useRouter();
   const { push } = useToast();
 
@@ -182,7 +139,7 @@ export default function DashboardPage() {
 
 
   return (
-    <div className="mx-auto max-w-3xl p-4 space-y-4">
+    <div className="mx-auto max-w-3xl p-2 md:p-4 space-y-3 md:space-y-4">
       {/* Random Interview Invite Modal */}
       {incoming && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -210,20 +167,42 @@ export default function DashboardPage() {
         </div>
       )}
 
-      <h1 className="text-2xl font-semibold">Dashboard</h1>
-      <div className="flex items-center justify-between gap-3">
+      <h1 className="text-xl md:text-2xl font-semibold">Dashboard</h1>
+      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-2 md:gap-3">
         <div className="flex items-center gap-3">
-          <button className="px-4 py-2 bg-black text-white rounded" onClick={startRandom}>
+          <button className="px-3 md:px-4 py-2 bg-black text-white rounded text-sm md:text-base" onClick={startRandom}>
             Random Interview
           </button>
-          {status && <span className="text-sm text-gray-600">{status}</span>}
+          {status && <span className="text-xs md:text-sm text-gray-600">{status}</span>}
         </div>
-        <div className="text-sm text-gray-600">Online interviewers: {online.length}</div>
+        <div className="text-xs md:text-sm text-gray-600">Online interviewers: {online.length}</div>
       </div>
+
+      {/* Schedule Modal */}
+      {showScheduleModal && (
+        <ScheduleModal
+          onClose={() => setShowScheduleModal(false)}
+          onSuccess={(sessionId, link) => {
+            setShowScheduleModal(false);
+            router.push(link);
+          }}
+        />
+      )}
 
       <div className="border rounded p-4 bg-white">
         <p className="font-medium mb-2">Invite by email</p>
-        <InviteForm />
+        <button
+          className="w-full px-4 py-2 bg-black text-white rounded hover:bg-gray-800 transition"
+          onClick={() => {
+            if (!session) {
+              signIn();
+              return;
+            }
+            setShowScheduleModal(true);
+          }}
+        >
+          Schedule Interview
+        </button>
       </div>
 
       {online.length > 0 && (

@@ -59,7 +59,52 @@ export function buildHarness(language: string, userCode: string, driver: string,
 function buildJS(userCode: string, driver: string, tests: any[]) {
   const testStr = safeJSON(tests);
   const drv = driver || `function runTests() { return []; }`;
-  return `"use strict";\n${userCode}\n\n${drv}\n\n(function(){\n  const results = [];\n  const tests = ${testStr};\n  try {\n    if (typeof runTests === 'function') {\n      const r = runTests(tests) || [];\n      if (Array.isArray(r)) { for (const x of r) results.push(x); } else { results.push(r); }\n    } else if (typeof solve === 'function') {\n      for (const t of tests) {\n        const inp = t.input;\n        const exp = t.output;\n        const got = Array.isArray(inp) ? solve(...inp) : solve(inp);\n        results.push({ got, exp, pass: JSON.stringify(got)===JSON.stringify(exp) });\n      }\n    } else {\n      results.push({ error: 'No solve() or runTests() defined' });\n    }\n  } catch (e) {\n    results.push({ error: String(e&&e.message||e) });\n  }\n  console.log(JSON.stringify(results));\n})();`;
+
+  // Extract imports
+  const lines = userCode.split('\n');
+  const imports: string[] = [];
+  const code: string[] = [];
+
+  lines.forEach(line => {
+    if (line.trim().startsWith('import ')) {
+      imports.push(line);
+    } else {
+      code.push(line);
+    }
+  });
+
+  const importsStr = imports.join('\n');
+  const codeStr = code.join('\n');
+
+  return `"use strict";
+${importsStr}
+
+${codeStr}
+
+${drv}
+
+(function(){
+  const results = [];
+  const tests = ${testStr};
+  try {
+    if (typeof runTests === 'function') {
+      const r = runTests(tests) || [];
+      if (Array.isArray(r)) { for (const x of r) results.push(x); } else { results.push(r); }
+    } else if (typeof solve === 'function') {
+      for (const t of tests) {
+        const inp = t.input;
+        const exp = t.output;
+        const got = Array.isArray(inp) ? solve(...inp) : solve(inp);
+        results.push({ got, exp, pass: JSON.stringify(got)===JSON.stringify(exp) });
+      }
+    } else {
+      results.push({ error: 'No solve() or runTests() defined' });
+    }
+  } catch (e) {
+    results.push({ error: String(e&&e.message||e) });
+  }
+  console.log(JSON.stringify(results));
+})();`;
 }
 
 function buildJava(userCode: string, driver: string, tests: any[]) {
@@ -73,15 +118,17 @@ function buildJava(userCode: string, driver: string, tests: any[]) {
     codeToProcess = classMatch[1].trim();
   }
 
-  // Extract imports from anywhere in the code
+  // Extract imports and remove package declarations
   const importLines: string[] = [];
   const codeLines: string[] = [];
 
   codeToProcess.split('\n').forEach(line => {
     const trimmed = line.trim();
-    if (trimmed.startsWith('import ') && trimmed.endsWith(';')) {
+    if (trimmed.startsWith('package ')) {
+      // Ignore package declarations
+    } else if (trimmed.startsWith('import ') && trimmed.endsWith(';')) {
       importLines.push(line);
-    } else if (trimmed.length > 0) { // Skip empty lines from unwrapping
+    } else if (trimmed.length > 0) {
       codeLines.push(line);
     }
   });
@@ -118,5 +165,33 @@ void runTests(const std::vector<std::string>& tests) {
   std::cout << "No driver provided; implement runTests or solve(...)" << std::endl;
 }
 `;
-  return `#include <bits/stdc++.h>\nusing namespace std;\n${userCode}\n${drv}\nint main(){\n  string json = "${testStr.replace(/"/g, '\\"')}";\n  cout<<json<<endl;\n  return 0;\n}\n`;
+
+  // Extract includes
+  const lines = userCode.split('\n');
+  const includes: string[] = [];
+  const code: string[] = [];
+
+  lines.forEach(line => {
+    if (line.trim().startsWith('#include')) {
+      includes.push(line);
+    } else {
+      code.push(line);
+    }
+  });
+
+  const includesStr = includes.join('\n');
+  const codeStr = code.join('\n');
+
+  return `#include <bits/stdc++.h>
+using namespace std;
+${includesStr}
+
+${codeStr}
+${drv}
+int main(){
+  string json = "${testStr.replace(/"/g, '\\"')}";
+  cout<<json<<endl;
+  return 0;
+}
+`;
 }

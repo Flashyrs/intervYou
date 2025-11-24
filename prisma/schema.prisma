@@ -4,6 +4,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 
@@ -59,11 +60,25 @@ model Session {
 }
 
 model InterviewSession {
-  id           String   @id @default(cuid())
-  createdBy    String
-  createdAt    DateTime @default(now())
-  problemId    String?
-  participants User[]   @relation("InterviewParticipants")
+  id                  String    @id @default(cuid())
+  createdBy           String
+  createdAt           DateTime  @default(now())
+  problemId           String?
+  participants        User[]    @relation("InterviewParticipants")
+  
+  // Scheduling fields
+  scheduledFor        DateTime?
+  isScheduled         Boolean   @default(false)
+  inviteeEmail        String?
+  
+  // Session expiration fields
+  status              String    @default("active") // "active", "expired", "scheduled"
+  expiresAt           DateTime?
+  participantJoinedAt Json?     // { userId: timestamp }
+  participantLeftAt   Json?     // { userId: timestamp }
+  
+  @@index([status])
+  @@index([scheduledFor])
 }
 model Submission {
   id         String   @id @default(cuid())

@@ -51,10 +51,10 @@ export default function InterviewPage() {
   });
 
   return (
-    <div className="flex h-screen w-screen bg-gray-100 overflow-hidden">
+    <div className="flex flex-col md:flex-row h-screen w-screen bg-gray-100 overflow-hidden">
 
-      {/* Left Column (40%) - Problem & Tests */}
-      <div className="w-[40%] flex flex-col bg-white border-r overflow-y-auto p-4 space-y-4">
+      {/* Left Column (40% on desktop, full width on mobile) - Problem & Tests */}
+      <div className="w-full md:w-[40%] flex flex-col bg-white border-r overflow-y-auto p-2 md:p-4 space-y-2 md:space-y-4">
         <TestPanel
           sampleTests={sampleTests}
           setSampleTests={updateSampleTests}
@@ -73,14 +73,14 @@ export default function InterviewPage() {
         />
       </div>
 
-      {/* Right Column (60%) - Video, Controls, Code, Output */}
-      <div className="w-[60%] flex flex-col h-full relative bg-gray-50">
+      {/* Right Column (60% on desktop, full width on mobile) - Video, Controls, Code, Output */}
+      <div className="w-full md:w-[60%] flex flex-col h-full relative bg-gray-50">
         {showAuthModal && (
           <AuthModal onClose={() => setShowAuthModal(false)} />
         )}
 
-        {/* Video Section (Top of Right) */}
-        <div className="h-64 bg-gray-900 p-2 shrink-0">
+        {/* Video Section (Top of Right) - Compact on mobile */}
+        <div className="h-32 md:h-64 bg-gray-900 p-1 md:p-2 shrink-0">
           <VideoCall room={`interview-${sessionId}`} role={role} />
         </div>
 
@@ -112,8 +112,8 @@ export default function InterviewPage() {
           />
         </div>
 
-        {/* Output Panel (Bottom) */}
-        <div className="h-48 border-t bg-gray-50 overflow-y-auto p-2 shrink-0">
+        {/* Output Panel (Bottom) - Compact on mobile */}
+        <div className="h-32 md:h-48 border-t bg-gray-50 overflow-y-auto p-1 md:p-2 shrink-0">
           <OutputPanel
             runOutput={runOutput}
             caseResults={caseResults}
