@@ -174,7 +174,7 @@ export async function checkAndExpireSession(sessionId: string) {
             },
         });
 
-        // Cleanup (archive) the session data
+        // Cleanup and archive the session data
         await cleanupExpiredSession(sessionId);
 
         return { expired: true };
