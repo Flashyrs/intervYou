@@ -4,8 +4,8 @@ export type RTCSetup = {
   remoteStream: MediaStream;
 };
 
-// Enhanced ICE server configuration with multiple STUN servers
-// For production, consider adding TURN servers for better connectivity
+
+
 const rtcConfig: RTCConfiguration = {
   iceServers: [
     { urls: "stun:stun.l.google.com:19302" },
@@ -13,13 +13,13 @@ const rtcConfig: RTCConfiguration = {
     { urls: "stun:stun2.l.google.com:19302" },
     { urls: "stun:stun3.l.google.com:19302" },
     { urls: "stun:stun4.l.google.com:19302" },
-    // Add TURN servers here for production (behind firewalls/NAT)
-    // Example:
-    // {
-    //   urls: "turn:your-turn-server.com:3478",
-    //   username: "username",
-    //   credential: "password"
-    // }
+    
+    
+    
+    
+    
+    
+    
   ],
   iceCandidatePoolSize: 10,
 };
@@ -29,14 +29,14 @@ export async function setupPeerConnection(): Promise<RTCSetup> {
   const remoteStream = new MediaStream();
   let localStream: MediaStream | null = null;
 
-  // Handle incoming tracks from remote peer
+  
   pc.ontrack = (event) => {
     event.streams[0].getTracks().forEach((track) => {
       remoteStream.addTrack(track);
     });
   };
 
-  // Handle connection state changes
+  
   pc.onconnectionstatechange = () => {
     console.log("Connection state:", pc.connectionState);
     if (pc.connectionState === "failed") {
@@ -44,7 +44,7 @@ export async function setupPeerConnection(): Promise<RTCSetup> {
     }
   };
 
-  // Handle ICE connection state changes
+  
   pc.oniceconnectionstatechange = () => {
     console.log("ICE connection state:", pc.iceConnectionState);
     if (pc.iceConnectionState === "failed") {
@@ -52,7 +52,7 @@ export async function setupPeerConnection(): Promise<RTCSetup> {
     }
   };
 
-  // Request user media with fallback options
+  
   try {
     localStream = await navigator.mediaDevices.getUserMedia({ 
       video: {
@@ -71,7 +71,7 @@ export async function setupPeerConnection(): Promise<RTCSetup> {
     });
   } catch (e) {
     console.warn("getUserMedia failed, trying audio only", e);
-    // Try audio only if video fails
+    
     try {
       localStream = await navigator.mediaDevices.getUserMedia({ 
         video: false, 
@@ -86,7 +86,7 @@ export async function setupPeerConnection(): Promise<RTCSetup> {
       });
     } catch (audioError) {
       console.warn("Audio also failed, continuing without media", audioError);
-      // Continue without media - connection can still work for data
+      
     }
   }
 

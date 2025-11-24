@@ -15,7 +15,7 @@ const EXEMPT_EMAILS = new Set(
 
 export async function POST(req: Request) {
   try {
-    // Require authenticated user
+    
     const session = await requireAuth();
     const userId = session.user.id;
     const email = session.user.email || "";
@@ -45,7 +45,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "source_code too large" }, { status: 413 });
     }
 
-    // Enforce per-user per-interview limit of 2 distinct problems (unless exempt)
+    
     if (sessionId && problemId && !EXEMPT_EMAILS.has(email)) {
       const existing = await prisma.executionLog.findFirst({
         where: { sessionId, userId, problemId },
@@ -70,7 +70,7 @@ export async function POST(req: Request) {
       }
     }
 
-    // Run code using Judge0
+    
     const result = await submitToJudge0({
       language_id,
       source_code,

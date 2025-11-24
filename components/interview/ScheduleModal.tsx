@@ -58,10 +58,10 @@ export function ScheduleModal({ onClose, onSuccess }: ScheduleModalProps) {
         }
     };
 
-    // Get minimum datetime (now)
+    
     const getMinDateTime = () => {
         const now = new Date();
-        now.setMinutes(now.getMinutes() + 15); // Minimum 15 minutes from now
+        now.setMinutes(now.getMinutes() + 15); 
         return now.toISOString().slice(0, 16);
     };
 
@@ -71,7 +71,7 @@ export function ScheduleModal({ onClose, onSuccess }: ScheduleModalProps) {
                 <h2 className="text-2xl font-semibold mb-4">Schedule Interview</h2>
 
                 <form onSubmit={handleSubmit} className="space-y-4">
-                    {/* Email Input */}
+                    {}
                     <div>
                         <label className="block text-sm font-medium mb-2">
                             Invitee Email <span className="text-red-500">*</span>
@@ -86,7 +86,7 @@ export function ScheduleModal({ onClose, onSuccess }: ScheduleModalProps) {
                         />
                     </div>
 
-                    {/* Schedule Type */}
+                    {}
                     <div>
                         <label className="block text-sm font-medium mb-2">Interview Type</label>
                         <div className="flex gap-4">
@@ -115,7 +115,7 @@ export function ScheduleModal({ onClose, onSuccess }: ScheduleModalProps) {
                         </div>
                     </div>
 
-                    {/* Date/Time Picker (only for scheduled) */}
+                    {}
                     {scheduleType === "scheduled" && (
                         <div>
                             <label className="block text-sm font-medium mb-2">
@@ -135,7 +135,7 @@ export function ScheduleModal({ onClose, onSuccess }: ScheduleModalProps) {
                         </div>
                     )}
 
-                    {/* Buttons */}
+                    {}
                     <div className="flex gap-3 pt-2">
                         <button
                             type="button"

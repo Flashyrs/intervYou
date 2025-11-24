@@ -1,79 +1,79 @@
-// import { NextResponse } from "next/server";
-// import { requireAuth } from "@/lib/utils";
 
-// export async function POST(req: Request) {
-//   try {
-//     await requireAuth();
-//     const { problemText, language } = await req.json();
 
-//     if (!process.env.GEMINI_API_KEY) {
-//       return NextResponse.json({ error: "Gemini not configured" }, { status: 501 });
-//     }
-//     if (!problemText || !language) {
-//       return NextResponse.json({ error: "problemText and language required" }, { status: 400 });
-//     }
 
-// const prompt = `
-// You are an assistant that generates a driver function and test cases for a coding interview problem.
 
-// Problem:
-// ${problemText}
 
-// Language: ${language}
 
-// Your task:
-// - Generate a valid driver function (as a string) that can run the solution for this problem.
-// - Generate 2 to 5 test cases.
-// - Each test case should be an object with "input" and "output" fields.
-// - Return ONLY a valid JSON object with the following structure:
 
-// {
-//   "driver": "string",
-//   "tests": [
-//     { "input": "...", "output": "..." },
-//     ...
-//   ]
-// }
 
-// Do NOT include any explanations, markdown, or comments.
-// Return only valid JSON.
-// `;
 
-//     const res = await fetch(
-//       "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent" +
-//         `?key=${process.env.GEMINI_API_KEY}`,
-//       {
-//         method: "POST",
-//         headers: { "Content-Type": "application/json" },
-//         body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
-//       }
-//     );
 
-//     if (!res.ok) {
-//       const t = await res.text();
-//       return NextResponse.json({ error: `Gemini error ${res.status}: ${t}` }, { status: 502 });
-//     }
 
-//     const data = await res.json();
-//     const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
 
-//     // Try to parse the JSON block from the response
-//     let parsed: any = null;
-//     try {
-//       const start = text.indexOf("{");
-//       const end = text.lastIndexOf("}");
-//       parsed = JSON.parse(text.slice(start, end + 1));
-//     } catch {}
 
-//     if (!parsed || !parsed.tests || !Array.isArray(parsed.tests) || typeof parsed.driver !== "string") {
-//       return NextResponse.json({ error: "Invalid response from Gemini" }, { status: 502 });
-//     }
 
-//     return NextResponse.json(parsed, { status: 200 });
-//   } catch (e: any) {
-//     return NextResponse.json({ error: e?.message || "Generation failed" }, { status: 500 });
-//   }
-// }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 import { NextResponse } from "next/server";
 import { requireAuth } from "@/lib/utils";
@@ -155,7 +155,7 @@ Important rules for driver:
 - Return only valid JSON.
 `;
     } else {
-      // Default / C++ (Basic fallback)
+      
       prompt = `
 You are an assistant that generates a driver function and test cases for a coding interview problem.
 
@@ -225,11 +225,11 @@ Return only valid JSON.
     const data = await response.json();
     const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
 
-    console.log("Gemini Raw Response Text:", text); // DEBUG
+    console.log("Gemini Raw Response Text:", text); 
 
-    // --- Robust JSON Extraction ---
+    
     let cleanText = text.trim();
-    // Find the first '{' and the last '}'
+    
     const firstBrace = cleanText.indexOf('{');
     const lastBrace = cleanText.lastIndexOf('}');
 

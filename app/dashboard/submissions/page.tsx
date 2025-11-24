@@ -9,7 +9,7 @@ type Submission = {
   userId: string;
   language: string;
   code: string;
-  results: string; // JSON string
+  results: string; 
   passed: boolean;
   attempts: number;
   createdAt: string;

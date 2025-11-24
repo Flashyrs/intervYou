@@ -66,7 +66,7 @@ export default function VideoCall({
 
         if (localRef.current && localStream) {
           localRef.current.srcObject = localStream;
-          // Explicitly play the video to ensure it displays
+          
           localRef.current.play().catch((e) => {
             console.warn("Local video autoplay failed, user interaction may be required", e);
           });
@@ -74,7 +74,7 @@ export default function VideoCall({
 
         if (remoteRef.current) {
           remoteRef.current.srcObject = remoteStream;
-          // Explicitly play remote video to ensure it displays
+          
           remoteRef.current.play().catch((e) => {
             console.warn("Remote video autoplay failed", e);
           });
@@ -123,7 +123,7 @@ export default function VideoCall({
                 sessionId: room,
                 sdp: answer
               });
-              // Process queued ICE candidates after setting remote description
+              
               while (pendingIceCandidates.length > 0) {
                 const candidate = pendingIceCandidates.shift();
                 if (candidate) {
@@ -136,7 +136,7 @@ export default function VideoCall({
               }
             } else if (payload.type === "call-answer" && role === "interviewee") {
               await applyAnswer(pc, payload.sdp);
-              // Process queued ICE candidates after setting remote description
+              
               while (pendingIceCandidates.length > 0) {
                 const candidate = pendingIceCandidates.shift();
                 if (candidate) {
@@ -149,7 +149,7 @@ export default function VideoCall({
               }
             } else if (payload.type === "ice-candidate") {
               const candidate = new RTCIceCandidate(payload.candidate);
-              // Only add ICE candidate if remote description is set
+              
               if (pc.remoteDescription) {
                 try {
                   await pc.addIceCandidate(candidate);
@@ -157,7 +157,7 @@ export default function VideoCall({
                   console.warn("Failed to add ICE candidate", e);
                 }
               } else {
-                // Queue candidate until remote description is set
+                
                 pendingIceCandidates.push(candidate);
               }
             }
@@ -281,7 +281,7 @@ export default function VideoCall({
       )}
 
       <div className="flex-1 flex flex-col md:flex-row gap-1 md:gap-2 p-1 md:p-2 min-h-0">
-        {/* Local Video */}
+        {}
         <div className="flex-1 relative bg-gray-900 rounded-lg overflow-hidden group">
           <video
             ref={localRef}
@@ -303,7 +303,7 @@ export default function VideoCall({
           </div>
         </div>
 
-        {/* Remote Video */}
+        {}
         <div className="flex-1 relative bg-gray-900 rounded-lg overflow-hidden">
           <video
             ref={remoteRef}
@@ -318,7 +318,7 @@ export default function VideoCall({
         </div>
       </div>
 
-      {/* Controls Bar - Compact on mobile */}
+      {}
       <div className="h-12 md:h-16 bg-gray-900/90 backdrop-blur border-t border-white/10 flex items-center justify-between px-2 md:px-6 shrink-0">
         <div className="flex items-center gap-2">
           {role === "interviewee" && !active && (
@@ -368,10 +368,10 @@ export default function VideoCall({
           </button>
         </div>
 
-        <div className="w-24" /> {/* Spacer for balance */}
+        <div className="w-24" /> {}
       </div>
 
-      {/* Settings Modal Overlay */}
+      {}
       {showSettings && (
         <div className="absolute inset-0 bg-black/80 backdrop-blur-sm z-40 flex items-center justify-center p-6 animate-in fade-in duration-200">
           <div className="bg-gray-900 border border-white/10 rounded-2xl p-6 w-full max-w-sm shadow-2xl">

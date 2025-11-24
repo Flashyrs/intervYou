@@ -1,7 +1,8 @@
 import { prisma } from "./db";
+import { sendSessionArchivedEmail } from "./email";
 
 export interface ParticipantTracking {
-    [userId: string]: number; // timestamp
+    [userId: string]: number; 
 }
 
 /**
@@ -20,7 +21,7 @@ export async function trackParticipantJoin(sessionId: string, userId: string) {
         const joinedAt = (session.participantJoinedAt as ParticipantTracking) || {};
         joinedAt[userId] = Date.now();
 
-        // Clear any previous "left" timestamp when rejoining (handle refreshes)
+        
         const leftAt = (session.participantLeftAt as ParticipantTracking) || {};
         delete leftAt[userId];
 
@@ -63,8 +64,8 @@ export async function trackParticipantLeave(sessionId: string, userId: string) {
             },
         });
 
-        // DON'T expire immediately - wait for grace period
-        // This handles page refreshes without locking users out
+        
+        
         scheduleExpirationCheck(sessionId);
 
         return { success: true };
@@ -79,9 +80,9 @@ export async function trackParticipantLeave(sessionId: string, userId: string) {
  * If users don't rejoin within 30 seconds, session expires
  */
 function scheduleExpirationCheck(sessionId: string) {
-    // In a real app, you'd use a job queue (Bull, BullMQ, etc.)
-    // For now, this is just a placeholder
-    // The actual check happens when users try to access the session
+    
+    
+    
     console.log(`Scheduled expiration check for session ${sessionId}`);
 }
 
@@ -99,7 +100,7 @@ export async function endSession(sessionId: string, userId: string) {
             throw new Error("Session not found");
         }
 
-        // Immediately expire the session
+        
         await prisma.interviewSession.update({
             where: { id: sessionId },
             data: {
@@ -108,7 +109,7 @@ export async function endSession(sessionId: string, userId: string) {
             },
         });
 
-        // Cleanup (archive) the session data
+        
         await cleanupExpiredSession(sessionId);
 
         return { success: true, expired: true };
@@ -140,32 +141,32 @@ export async function checkAndExpireSession(sessionId: string) {
 
         const joinedUserIds = Object.keys(joinedAt);
 
-        // Check if there are any participants who joined
+        
         if (joinedUserIds.length === 0) {
             return { expired: false };
         }
 
-        // Check if all participants have left
+        
         const allLeft = joinedUserIds.every((userId) => leftAt[userId] !== undefined);
 
         if (!allLeft) {
             return { expired: false };
         }
 
-        // Grace period: 30 seconds after last person left
-        const GRACE_PERIOD_MS = 30 * 1000; // 30 seconds
+        
+        const GRACE_PERIOD_MS = 30 * 1000; 
         const now = Date.now();
 
-        // Find the most recent leave time
+        
         const lastLeaveTime = Math.max(...joinedUserIds.map(id => leftAt[id] || 0));
         const timeSinceLastLeave = now - lastLeaveTime;
 
-        // Only expire if grace period has passed
+        
         if (timeSinceLastLeave < GRACE_PERIOD_MS) {
             return { expired: false, gracePeriodRemaining: GRACE_PERIOD_MS - timeSinceLastLeave };
         }
 
-        // Grace period passed - expire the session
+        
         await prisma.interviewSession.update({
             where: { id: sessionId },
             data: {
@@ -174,7 +175,7 @@ export async function checkAndExpireSession(sessionId: string) {
             },
         });
 
-        // Cleanup and archive the session data
+        
         await cleanupExpiredSession(sessionId);
 
         return { expired: true };
@@ -200,11 +201,17 @@ export async function cleanupExpiredSession(sessionId: string) {
             return;
         }
 
-        // Archive the interview state (just mark it, don't delete)
-        // The data remains in the database for reference
+        
+        
 
-        // Optional: Send notification emails to participants
-        // This can be implemented if needed
+        
+        const emails = session.participants
+            .map(p => p.email)
+            .filter((email): email is string => !!email);
+
+        if (emails.length > 0) {
+            await sendSessionArchivedEmail(emails, sessionId, session.createdAt);
+        }
 
         console.log(`Session ${sessionId} has been archived`);
 
@@ -234,9 +241,9 @@ export async function isSessionAccessible(sessionId: string): Promise<boolean> {
             return false;
         }
 
-        // If session is expired, check if we're still in grace period
+        
         if (session.status === "expired") {
-            // Check grace period
+            
             const leftAt = (session.participantLeftAt as ParticipantTracking) || {};
             const leaveTimestamps = Object.values(leftAt);
 
@@ -245,7 +252,7 @@ export async function isSessionAccessible(sessionId: string): Promise<boolean> {
                 const lastLeaveTime = Math.max(...leaveTimestamps);
                 const timeSinceLastLeave = Date.now() - lastLeaveTime;
 
-                // Allow access within grace period (for refreshes)
+                
                 if (timeSinceLastLeave < GRACE_PERIOD_MS) {
                     return true;
                 }
@@ -254,10 +261,10 @@ export async function isSessionAccessible(sessionId: string): Promise<boolean> {
             return false;
         }
 
-        // If session is scheduled, check if it's time yet
+        
         if (session.status === "scheduled" && session.scheduledFor) {
             const now = new Date();
-            // Allow joining 5 minutes before scheduled time
+            
             const allowedTime = new Date(session.scheduledFor.getTime() - 5 * 60 * 1000);
             if (now < allowedTime) {
                 return false;

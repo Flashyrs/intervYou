@@ -4,7 +4,7 @@ export type Problem = {
   difficulty: 'Easy' | 'Medium' | 'Hard';
   description: string;
   examples: { input: any; output: any; explanation?: string }[];
-  starterCode: Record<string, string>; // language -> code
+  starterCode: Record<string, string>; 
 };
 
 export const problems: Problem[] = [

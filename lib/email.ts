@@ -138,7 +138,7 @@ export async function sendScheduledReminderEmail(
     <p>Best regards,<br/>IntervYou Team</p>
   </div>`;
 
-  // Send to all recipients
+  
   for (const recipient of to) {
     try {
       await transporter.sendMail({
@@ -150,6 +150,61 @@ export async function sendScheduledReminderEmail(
       });
     } catch (error) {
       console.error(`Failed to send reminder to ${recipient}:`, error);
+    }
+  }
+}
+
+/**
+ * Send email notification when a session is archived/expired
+ */
+export async function sendSessionArchivedEmail(
+  to: string[],
+  sessionId: string,
+  startedAt?: Date
+) {
+  const user = process.env.EMAIL;
+  const pass = process.env.APP_PASSWORD;
+  if (!user || !pass) {
+    console.log(`EMAIL/APP_PASSWORD not set. Archive email skipped.`);
+    return;
+  }
+
+  const transporter = nodemailer.createTransport({
+    host: process.env.SMTP_HOST || "smtp.gmail.com",
+    port: Number(process.env.SMTP_PORT || 465),
+    secure: true,
+    auth: { user, pass },
+  });
+
+  const subject = "Interview Session Archived – IntervYou";
+  const dateStr = startedAt ? startedAt.toLocaleDateString() : new Date().toLocaleDateString();
+
+  const html = `
+  <div style="font-family: Arial, sans-serif; color: #111;">
+    <p>Hello,</p>
+    <p>The interview session you participated in on ${dateStr} has been ended and archived.</p>
+    <p>
+      <strong>Session ID:</strong> ${sessionId}<br/>
+    </p>
+    <p>
+      Thank you for using IntervYou.
+    </p>
+    <p>Best regards,<br/>IntervYou Team</p>
+  </div>`;
+
+  
+  for (const recipient of to) {
+    if (!recipient) continue;
+    try {
+      await transporter.sendMail({
+        from: user,
+        to: recipient,
+        subject,
+        text: `The interview session ${sessionId} on ${dateStr} has been archived.`,
+        html,
+      });
+    } catch (error) {
+      console.error(`Failed to send archive notification to ${recipient}:`, error);
     }
   }
 }

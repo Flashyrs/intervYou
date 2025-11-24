@@ -4,7 +4,7 @@ const prismaClientSingleton = () => {
   const dbUrl = process.env.DATABASE_URL;
   console.log("DB_URL Status:", dbUrl ? `Found (Length: ${dbUrl.length})` : "NOT FOUND or UNDEFINED");
 
-  // Use standard pg adapter for both dev and production (works with Supabase)
+  
   const { Pool } = require("pg");
   const { PrismaPg } = require("@prisma/adapter-pg");
 
@@ -29,7 +29,7 @@ if (process.env.NODE_ENV !== "production") {
   globalThis.prismaGlobal = prisma;
 }
 
-// Legacy function for backward compatibility
+
 export function getPrisma() {
   return prisma;
 }

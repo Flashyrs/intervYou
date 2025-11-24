@@ -36,7 +36,7 @@ function CaseCard({ result, idx, isPrivate, role }: { result: TestCaseResult, id
     const pass = !!result?.pass && !result?.error;
     const isError = !!result?.error;
     const locked = isPrivate && role === 'interviewee';
-    const [expanded, setExpanded] = useState(!pass); // Auto-expand failed tests
+    const [expanded, setExpanded] = useState(!pass); 
 
     return (
         <div className={`group border rounded-lg overflow-hidden transition-all duration-200 ${pass ? 'border-gray-200 hover:border-green-300' : 'border-red-200 bg-red-50/10'

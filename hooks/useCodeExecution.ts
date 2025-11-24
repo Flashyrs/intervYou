@@ -67,7 +67,7 @@ export function useCodeExecution({
     const onSubmitFinal = async () => {
         setSubmitting(true);
         try {
-            // Persist latest code first
+            
             await fetch("/api/interview/state", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },

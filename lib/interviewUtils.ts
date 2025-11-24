@@ -60,7 +60,7 @@ function buildJS(userCode: string, driver: string, tests: any[]) {
   const testStr = safeJSON(tests);
   const drv = driver || `function runTests() { return []; }`;
 
-  // Extract imports
+  
   const lines = userCode.split('\n');
   const imports: string[] = [];
   const code: string[] = [];
@@ -112,20 +112,20 @@ function buildJava(userCode: string, driver: string, tests: any[]) {
 
   let codeToProcess = userCode || '';
 
-  // If user wrapped their code in "class Solution { }", unwrap it
+  
   const classMatch = codeToProcess.match(/class\s+Solution\s*\{([\s\S]*)\}\s*$/);
   if (classMatch) {
     codeToProcess = classMatch[1].trim();
   }
 
-  // Extract imports and remove package declarations
+  
   const importLines: string[] = [];
   const codeLines: string[] = [];
 
   codeToProcess.split('\n').forEach(line => {
     const trimmed = line.trim();
     if (trimmed.startsWith('package ')) {
-      // Ignore package declarations
+      
     } else if (trimmed.startsWith('import ') && trimmed.endsWith(';')) {
       importLines.push(line);
     } else if (trimmed.length > 0) {
@@ -166,7 +166,7 @@ void runTests(const std::vector<std::string>& tests) {
 }
 `;
 
-  // Extract includes
+  
   const lines = userCode.split('\n');
   const includes: string[] = [];
   const code: string[] = [];

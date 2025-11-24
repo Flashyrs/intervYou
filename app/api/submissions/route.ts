@@ -33,7 +33,7 @@ export async function POST(req: Request) {
     const parsed = (() => { try { return JSON.parse(results); } catch { return []; } })();
     const passed = Array.isArray(parsed) && parsed.length > 0 && parsed.every((r: any) => r && r.pass && !r.error);
 
-    // Limit attempts unless exempt
+    
     const existing = await prisma.submission.findUnique({ where: { sessionId_problemId_userId: { sessionId, problemId, userId } } });
     if (existing && !EXEMPT_EMAILS.has(email) && existing.attempts >= 2) {
       return NextResponse.json({ error: "submission limit reached (2 per problem)" }, { status: 429 });

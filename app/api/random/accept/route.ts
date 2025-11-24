@@ -16,7 +16,7 @@ export async function POST(req: Request) {
     if (!tempId) return NextResponse.json({ error: 'tempId required' }, { status: 400 });
     if (!initiatorId) return NextResponse.json({ error: 'initiatorId required' }, { status: 400 });
 
-    // Verify users exist
+    
     const userExists = await prisma.user.count({ where: { id: userId } });
     const initiatorExists = await prisma.user.count({ where: { id: initiatorId } });
 
@@ -37,11 +37,11 @@ export async function POST(req: Request) {
 
     const created = await prisma.interviewSession.create({
       data: {
-        createdBy: userId!, // acceptor becomes interviewer
+        createdBy: userId!, 
         participants: {
           connect: [
-            { id: userId! }, // interviewer (acceptor)
-            { id: initiatorId }, // interviewee (initiator)
+            { id: userId! }, 
+            { id: initiatorId }, 
           ],
         },
       },

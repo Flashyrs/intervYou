@@ -26,7 +26,7 @@ export async function GET(req: Request) {
     if (item.participants.some((p: { id: string }) => p.id === userId))
       return NextResponse.json({ role: "interviewee" }, { status: 200 });
 
-    // Auto-join logic: if not full (1 interviewee max), add them
+    
     if (item.participants.length === 0) {
       await prisma.interviewSession.update({
         where: { id: sessionId },

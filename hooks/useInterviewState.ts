@@ -29,11 +29,11 @@ export function useInterviewState(sessionId: string) {
     const broadcastTimeout = useRef<any>(null);
     const lastUpdateRef = useRef<number>(0);
 
-    // Helper to get current code/driver
+    
     const code = codeMap[language] || "";
     const driver = driverMap[language] || "";
 
-    // Initial fetch
+    
     useEffect(() => {
         (async () => {
             try {
@@ -55,7 +55,7 @@ export function useInterviewState(sessionId: string) {
                     if (typeof stateData.language === "string") setLanguage(stateData.language);
                     if (stateData.codeMap) setCodeMap(stateData.codeMap);
                     else if (typeof stateData.code === "string") {
-                        // Migration from single code
+                        
                         setCodeMap(prev => ({ ...prev, [stateData.language || 'javascript']: stateData.code }));
                     }
 
@@ -70,7 +70,7 @@ export function useInterviewState(sessionId: string) {
             } catch { }
         })();
 
-        // Track participant join
+        
         if (userId) {
             fetch('/api/interview/presence', {
                 method: 'POST',
@@ -79,7 +79,7 @@ export function useInterviewState(sessionId: string) {
             }).catch(() => { });
         }
 
-        // Track participant leave on unmount
+        
         return () => {
             if (userId) {
                 fetch('/api/interview/presence', {
@@ -93,7 +93,7 @@ export function useInterviewState(sessionId: string) {
 
     const [executionResult, setExecutionResult] = useState<any>(null);
 
-    // Realtime subscription
+    
     useEffect(() => {
         if (!supabase) return;
         const channel = supabase.channel(`interview-${sessionId}`);
@@ -102,12 +102,12 @@ export function useInterviewState(sessionId: string) {
         channel.on("broadcast", { event: "state" }, (payload: any) => {
             const { userId: senderId, language, codeMap: newCodeMap, driverMap: newDriverMap, problemText, sampleTests, timestamp } = payload?.payload || {};
 
-            // Ignore own broadcasts to prevent self-update loops
+            
             if (senderId && userId && senderId === userId) {
                 return;
             }
 
-            // Still check timestamp but less aggressively
+            
             if (timestamp && timestamp < lastUpdateRef.current) {
                 return;
             }
@@ -124,7 +124,7 @@ export function useInterviewState(sessionId: string) {
         });
 
         channel.subscribe((status) => {
-            // Subscription callback ensures proper channel connection
+            
         });
 
         return () => {

@@ -140,7 +140,7 @@ export default function DashboardPage() {
 
   return (
     <div className="mx-auto max-w-3xl p-2 md:p-4 space-y-3 md:space-y-4">
-      {/* Random Interview Invite Modal */}
+      {}
       {incoming && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
@@ -178,7 +178,7 @@ export default function DashboardPage() {
         <div className="text-xs md:text-sm text-gray-600">Online interviewers: {online.length}</div>
       </div>
 
-      {/* Schedule Modal */}
+      {}
       {showScheduleModal && (
         <ScheduleModal
           onClose={() => setShowScheduleModal(false)}

@@ -20,7 +20,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "email required" }, { status: 400 });
     }
 
-    // Parse scheduled date if provided
+    
     const scheduledDate = scheduledFor ? new Date(scheduledFor) : null;
     const isScheduledInterview = isScheduled === true && scheduledDate !== null;
 
@@ -48,10 +48,10 @@ export async function POST(req: Request) {
 
     const link = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/interview/${created.id}`;
 
-    // Send email to invitee with scheduling information
+    
     await sendInviteEmail(email, link, { name: inviterName, email: inviterEmail }, scheduledDate || undefined, isScheduledInterview);
 
-    // Provide immediate redirect hint for interviewer
+    
     const res = NextResponse.json({ id: created.id, link, redirect: link }, { status: 200 });
     res.headers.set("X-Interview-Redirect", link);
     return res;

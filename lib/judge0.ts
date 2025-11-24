@@ -13,7 +13,7 @@ export async function submitToJudge0(body: any) {
     method: "POST",
     headers,
     body: JSON.stringify(body),
-    // do not cache, server only
+    
     cache: "no-store",
   });
   if (!res.ok) {

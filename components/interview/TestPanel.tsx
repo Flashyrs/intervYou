@@ -72,7 +72,7 @@ export function TestPanel({
                 if (data.enhancedProblem) setProblemText(data.enhancedProblem);
                 if (data.testCases) {
                     const tests = Array.isArray(data.testCases) ? data.testCases : [];
-                    // Split into sample (first 2) and private (rest)
+                    
                     const sample = tests.slice(0, 2);
                     const privateT = tests.slice(2);
                     setSampleTests(JSON.stringify(sample, null, 2));
@@ -97,7 +97,7 @@ export function TestPanel({
 
     return (
         <div className="space-y-4 h-full flex flex-col">
-            {/* Problem Section */}
+            {}
             <div className="flex-1 flex flex-col min-h-0">
                 <div className="flex items-center justify-between mb-2 shrink-0">
                     <h2 className="font-semibold flex items-center gap-2">
@@ -132,7 +132,7 @@ export function TestPanel({
                 )}
             </div>
 
-            {/* Tests Section */}
+            {}
             <div className="shrink-0 border-t pt-4 space-y-4">
                 <div>
                     <h3 className="font-semibold mb-2 flex items-center gap-2 text-sm">
@@ -232,10 +232,10 @@ function TestCaseEditor({ json, onChange }: { json: string; onChange: (v: string
     const updateCase = (index: number, field: 'input' | 'output', value: string) => {
         const newCases = [...cases];
         try {
-            // Try to parse as JSON if possible, otherwise string
-            // Actually, for input it MUST be an array of args.
-            // For output it can be anything.
-            // To keep it simple, we let user type JSON string and we try to parse it.
+            
+            
+            
+            
             let parsedVal = value;
             try {
                 parsedVal = JSON.parse(value);
@@ -244,7 +244,7 @@ function TestCaseEditor({ json, onChange }: { json: string; onChange: (v: string
             newCases[index] = { ...newCases[index], [field]: parsedVal };
             onChange(JSON.stringify(newCases, null, 2));
         } catch (e) {
-            // If we can't stringify, ignore
+            
         }
     };
 

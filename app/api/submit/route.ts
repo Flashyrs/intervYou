@@ -24,7 +24,7 @@ export async function POST(req: Request) {
       }
     }
 
-    // Record a submission event using ExecutionLog as minimal persistence (no code/result storage here)
+    
     await prisma.executionLog.create({ data: { sessionId, userId: userId!, problemId } });
     return NextResponse.json({ ok: true }, { status: 200 });
   } catch (e: any) {

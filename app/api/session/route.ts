@@ -13,7 +13,7 @@ export async function POST(req: Request) {
     const userId = (session.user as any)?.id as string | undefined;
     const email = session.user?.email || "";
 
-    // Rate limit: 1 interview per day per user (exempt some emails)
+    
     if (!EXEMPT_EMAILS.has(email)) {
       const since = new Date();
       since.setHours(0, 0, 0, 0);

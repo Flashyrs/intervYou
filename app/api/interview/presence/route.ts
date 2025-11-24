@@ -24,7 +24,7 @@ export async function POST(req: Request) {
             const result = await trackParticipantLeave(sessionId, userId);
             return NextResponse.json({ success: true, message: "Leave tracked" });
         } else if (action === "end") {
-            // Explicit end - user clicked "End Interview" button
+            
             const result = await endSession(sessionId, userId);
             return NextResponse.json(result);
         } else {

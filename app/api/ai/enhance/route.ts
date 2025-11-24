@@ -103,7 +103,7 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: "No response from AI" }, { status: 500 });
         }
 
-        // Clean up potential markdown code blocks if the model ignores instructions
+        
         const cleanJson = text.replace(/```json/g, "").replace(/```/g, "").trim();
 
         try {

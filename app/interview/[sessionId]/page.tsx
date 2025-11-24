@@ -53,7 +53,7 @@ export default function InterviewPage() {
   return (
     <div className="flex flex-col md:flex-row h-screen w-screen bg-gray-100 overflow-hidden">
 
-      {/* Left Column (40% on desktop, full width on mobile) - Problem & Tests */}
+      {}
       <div className="w-full md:w-[40%] flex flex-col bg-white border-r overflow-y-auto p-2 md:p-4 space-y-2 md:space-y-4">
         <TestPanel
           sampleTests={sampleTests}
@@ -73,18 +73,18 @@ export default function InterviewPage() {
         />
       </div>
 
-      {/* Right Column (60% on desktop, full width on mobile) - Video, Controls, Code, Output */}
+      {}
       <div className="w-full md:w-[60%] flex flex-col h-full relative bg-gray-50">
         {showAuthModal && (
           <AuthModal onClose={() => setShowAuthModal(false)} />
         )}
 
-        {/* Video Section (Top of Right) - Compact on mobile */}
+        {}
         <div className="h-32 md:h-64 bg-gray-900 p-1 md:p-2 shrink-0">
           <VideoCall room={`interview-${sessionId}`} role={role} />
         </div>
 
-        {/* Control Bar */}
+        {}
         <div className="p-2 border-b bg-white shrink-0">
           <ControlBar
             language={language}
@@ -96,7 +96,7 @@ export default function InterviewPage() {
           />
         </div>
 
-        {/* Editor Area */}
+        {}
         <div className="flex-1 relative min-h-0">
           <MonacoEditor
             height="100%"
@@ -107,12 +107,12 @@ export default function InterviewPage() {
             options={{
               minimap: { enabled: false },
               scrollBeyondLastLine: false,
-              readOnly: false // Explicitly ensure not read-only
+              readOnly: false 
             }}
           />
         </div>
 
-        {/* Output Panel (Bottom) - Compact on mobile */}
+        {}
         <div className="h-32 md:h-48 border-t bg-gray-50 overflow-y-auto p-1 md:p-2 shrink-0">
           <OutputPanel
             runOutput={runOutput}
