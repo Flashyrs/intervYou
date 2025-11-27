@@ -27,11 +27,30 @@ export function maybeInjectSkeleton(current: string, lang: string) {
   if (!looksEmpty) return current;
   switch ((lang || '').toLowerCase()) {
     case 'javascript':
-      return `// Implement solve(...) and use tests to validate\nfunction solve() {\n  // TODO\n}\n`;
+      return `// Implement solve(...) and use tests to validate
+function solve(input) {
+  // TODO: Implement solution
+  return input;
+}
+`;
     case 'java':
-      return `class Solution {\n  // TODO: implement methods\n}\n`;
+      return `class Solution {
+    public Object solve(Object input) {
+        // TODO: Implement solution
+        return input;
+    }
+}
+`;
     case 'cpp':
-      return `#include <bits/stdc++.h>\nusing namespace std;\n// TODO: implement solution functions\n`;
+      return `class Solution {
+public:
+    // Adjust return type and arguments as needed
+    int solve(vector<int>& nums) {
+        // TODO: Implement solution
+        return 0;
+    }
+};
+`;
     default:
       return current;
   }
@@ -60,13 +79,13 @@ function buildJS(userCode: string, driver: string, tests: any[]) {
   const testStr = safeJSON(tests);
   const drv = driver || `function runTests() { return []; }`;
 
-  
+
   const lines = userCode.split('\n');
   const imports: string[] = [];
   const code: string[] = [];
 
   lines.forEach(line => {
-    if (line.trim().startsWith('import ')) {
+    if (line.trim().startsWith('import ') || line.trim().startsWith('require(')) {
       imports.push(line);
     } else {
       code.push(line);
@@ -76,8 +95,8 @@ function buildJS(userCode: string, driver: string, tests: any[]) {
   const importsStr = imports.join('\n');
   const codeStr = code.join('\n');
 
-  return `"use strict";
-${importsStr}
+  return `${importsStr}
+"use strict";
 
 ${codeStr}
 
@@ -103,6 +122,7 @@ ${drv}
   } catch (e) {
     results.push({ error: String(e&&e.message||e) });
   }
+  console.log("___JSON_RESULT___");
   console.log(JSON.stringify(results));
 })();`;
 }
@@ -110,64 +130,424 @@ ${drv}
 function buildJava(userCode: string, driver: string, tests: any[]) {
   const testStr = safeJSON(tests);
 
-  let codeToProcess = userCode || '';
-
-  
-  const classMatch = codeToProcess.match(/class\s+Solution\s*\{([\s\S]*)\}\s*$/);
-  if (classMatch) {
-    codeToProcess = classMatch[1].trim();
-  }
-
-  
-  const importLines: string[] = [];
+  // 1. Extract Imports
+  const importLines: Set<string> = new Set();
   const codeLines: string[] = [];
 
-  codeToProcess.split('\n').forEach(line => {
+  // Default imports
+  importLines.add("import java.util.*;");
+  importLines.add("import java.io.*;");
+
+  const processLine = (line: string) => {
     const trimmed = line.trim();
     if (trimmed.startsWith('package ')) {
-      
+      // Ignore packages
     } else if (trimmed.startsWith('import ') && trimmed.endsWith(';')) {
-      importLines.push(line);
-    } else if (trimmed.length > 0) {
+      if (!trimmed.includes('org.json')) { // Strip external JSON libs
+        importLines.add(trimmed);
+      }
+    } else {
       codeLines.push(line);
+    }
+  };
+
+  (userCode || '').split('\n').forEach(processLine);
+
+  const userCodeWithoutImports = codeLines.join('\n');
+
+  // 2. Check for existing classes
+  const hasSolutionClass = /class\s+Solution\b/.test(userCodeWithoutImports);
+  const hasPairClass = /class\s+Pair\b/.test(userCodeWithoutImports);
+
+  // 3. Process Driver Code
+  let driverCode = (driver && driver.trim().length) ? driver : '';
+
+  // Remove "public" from Driver class
+  driverCode = driverCode.replace(/public\s+class\s+Driver/g, 'class Driver');
+
+  // More robust Solution class removal using brace counting
+  function removeSolutionClass(code: string): string {
+    const lines = code.split('\n');
+    const result: string[] = [];
+    let inSolutionClass = false;
+    let braceDepth = 0;
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+
+      // Check if this line starts a Solution class
+      if (trimmed.startsWith('class Solution')) {
+        inSolutionClass = true;
+        braceDepth = 0;
+      }
+
+      if (inSolutionClass) {
+        // Count braces to track class boundaries
+        for (const char of line) {
+          if (char === '{') braceDepth++;
+          if (char === '}') braceDepth--;
+        }
+
+        // If we've closed all braces, we're done with the Solution class
+        if (braceDepth === 0 && line.includes('}')) {
+          inSolutionClass = false;
+        }
+      } else {
+        result.push(line);
+      }
+    }
+
+    return result.join('\n');
+  }
+
+  driverCode = removeSolutionClass(driverCode);
+
+  const driverLines: string[] = [];
+  driverCode.split('\n').forEach(line => {
+    const trimmed = line.trim();
+    if (trimmed.startsWith('import ') && trimmed.endsWith(';')) {
+      if (!trimmed.includes('org.json')) {
+        importLines.add(trimmed);
+      }
+    } else if (!trimmed.startsWith('package ')) {
+      driverLines.push(line);
     }
   });
 
-  const userCodeWithoutImports = codeLines.join('\n');
-  const userImports = importLines.length > 0 ? importLines.join('\n') + '\n' : '';
+  const driverWithoutImports = driverLines.join('\n');
+  const allImports = Array.from(importLines).join('\n') + '\n';
 
-  const drv = (driver && driver.trim().length)
-    ? driver
-    : `// Provide either runTests(List<Map<String,Object>> tests) or solve(...)
-import java.util.*;
+  // 4. Construct Final Code
+  const expectsString = driverCode.includes('runTests(String') || driverCode.includes('runTests(java.lang.String');
+
+  const finalDriver = driverWithoutImports || `
 class Driver {
   public static List<String> runTests(List<Map<String,Object>> tests) {
     List<String> out = new ArrayList<>();
-    try {
-      // If user implemented solve, try to invoke reflectively assumptions kept simple for primitives/arrays
-      out.add("No driver provided; implement runTests or ensure solve(...) exists.");
-    } catch (Exception e) {
-      out.add("Error: "+e.getMessage());
-    }
+    out.add("No driver provided.");
     return out;
   }
 }`;
 
-  return `import java.io.*;\nimport java.util.*;\n${userImports}class Solution {\n${userCodeWithoutImports}\n}\n${drv}\nclass Main {\n  public static void main(String[] args) throws Exception {\n    List<Map<String,Object>> tests = new ArrayList<>();\n    String json = "${testStr.replace(/"/g, '\\"')}";\n    tests = parseTests(json);\n    List<Map<String,Object>> results = new ArrayList<>();\n    try {\n      List<String> lines = null;\n      try {\n        lines = Driver.runTests(tests);\n      } catch (Throwable ignore) { }\n      if (lines != null) {\n        for (String s: lines) { System.out.println(s); }\n        return;\n      } else {\n        for (int i = 0; i < tests.size(); i++) {\n          Map<String,Object> r = new LinkedHashMap<>();\n          r.put("error", "No driver provided; implement Driver.runTests");\n          r.put("pass", false);\n          results.add(r);\n        }\n      }\n    } catch (Throwable t) {\n      Map<String,Object> r = new LinkedHashMap<>();\n      r.put("error", "Driver error: "+t.getMessage());\n      r.put("pass", false);\n      results.add(r);\n    }\n    System.out.println(toJson(results));\n  }\n  static String toJson(List<Map<String,Object>> list){\n    StringBuilder sb = new StringBuilder();\n    sb.append("[");\n    for (int i=0;i<list.size();i++){ if (i>0) sb.append(","); sb.append(objToJson(list.get(i))); }\n    sb.append("]");\n    return sb.toString();\n  }\n  static String objToJson(Map<String,Object> m){\n    StringBuilder sb = new StringBuilder(); sb.append("{"); boolean first=true;\n    for (Map.Entry<String,Object> e: m.entrySet()){ if (!first) sb.append(","); first=false; sb.append(quote(e.getKey())).append(":" ).append(valToJson(e.getValue())); }\n    sb.append("}"); return sb.toString();\n  }\n  static String quote(String s){ return "\\""+s.replace("\\\\","\\\\\\\\").replace("\\"","\\\\\\"")+"\\"";}  static String valToJson(Object v){ if (v==null) return "null"; if (v instanceof String) return quote((String)v); if (v instanceof Number || v instanceof Boolean) return String.valueOf(v); return quote(String.valueOf(v)); }\n  static List<Map<String,Object>> parseTests(String json){\n    List<Map<String,Object>> list = new ArrayList<>();\n    try{ String arr = json.trim(); if (!arr.startsWith("[")) return list; arr = arr.substring(1, arr.length()-1).trim(); if (arr.isEmpty()) return list; String[] parts = arr.split("\\\\},\\\\s*\\\\{"); for (int i=0;i<parts.length;i++){ String p = parts[i]; if (!p.startsWith("{")) p = "{"+p; if (!p.endsWith("}")) p = p+"}"; Map<String,Object> m = new LinkedHashMap<>(); m.put("raw", p); list.add(m);} }catch(Exception e){}\n    return list;\n  }\n}\n`;
+  // Polyfills
+  const pairPolyfill = hasPairClass ? '' : `
+class Pair<K, V> {
+    public K key;
+    public V value;
+    public K first; // Alias
+    public V second; // Alias
+    public Pair(K key, V value) {
+        this.key = key;
+        this.value = value;
+        this.first = key;
+        this.second = value;
+    }
+}`;
+
+  const jsonPolyfills = `
+class JSONObject extends java.util.LinkedHashMap<String, Object> {
+    public Object get(Object key) { return super.get(key); }
+    public String toJSONString() { return Main.objToJson(this); }
+    public String toString() { return toJSONString(); }
+}
+class JSONArray extends java.util.ArrayList<Object> {
+    public Object get(int index) { return super.get(index); }
+    public String toJSONString() { return Main.listToJson(this); }
+    public String toString() { return toJSONString(); }
+}
+class JSONParser {
+    public Object parse(String s) throws ParseException {
+        try {
+            return Main.parseJson(s);
+        } catch (Exception e) {
+            throw new ParseException(e.toString());
+        }
+    }
+}
+class ParseException extends Exception {
+    public ParseException(String s) { super(s); }
+}`;
+
+  // Wrap user code if Solution class is missing
+  // Also ensure all code is inside the Solution class  
+  let finalUserCode: string;
+  if (hasSolutionClass) {
+    // Check if there's any code after the Solution class that needs to be moved inside
+    const lines = userCodeWithoutImports.split('\n');
+    let inSolutionClass = false;
+    let solutionClassDepth = 0;
+    let solutionEndLine = -1;
+    const solutionLines: string[] = [];
+    const orphanedLines: string[] = [];
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      const trimmed = line.trim();
+
+      // Detect Solution class start
+      if (trimmed.includes('class Solution')) {
+        inSolutionClass = true;
+        solutionClassDepth = 0;
+      }
+
+      if (inSolutionClass) {
+        // Count braces
+        for (const char of line) {
+          if (char === '{') solutionClassDepth++;
+          if (char === '}') solutionClassDepth--;
+        }
+
+        solutionLines.push(line);
+
+        // Check if Solution class ended
+        if (solutionClassDepth === 0 && line.includes('}')) {
+          inSolutionClass = false;
+          solutionEndLine = i;
+        }
+      } else if (solutionEndLine !== -1) {
+        // Code after Solution class ended - this is orphaned
+        if (trimmed && !trimmed.startsWith('//') && !trimmed.startsWith('/*')) {
+          orphanedLines.push(line);
+        }
+      }
+    }
+
+    // If we found orphaned code, inject it back into Solution class
+    if (orphanedLines.length > 0 && solutionLines.length > 0) {
+      // Remove the last closing brace from Solution
+      let lastBraceIndex = -1;
+      for (let i = solutionLines.length - 1; i >= 0; i--) {
+        if (solutionLines[i].includes('}')) {
+          lastBraceIndex = i;
+          break;
+        }
+      }
+
+      if (lastBraceIndex !== -1) {
+        // Insert orphaned code before the closing brace
+        const beforeClose = solutionLines.slice(0, lastBraceIndex);
+        const indentedOrphaned = orphanedLines.map(line =>
+          line.trim() ? '    ' + line : line
+        );
+        finalUserCode = [...beforeClose, ...indentedOrphaned, solutionLines[lastBraceIndex]].join('\n');
+      } else {
+        finalUserCode = userCodeWithoutImports;
+      }
+    } else {
+      // No orphaned code - use as is
+      finalUserCode = userCodeWithoutImports;
+    }
+  } else {
+    // Need to wrap user code in Solution class
+    const indentedCode = userCodeWithoutImports.split('\n')
+      .map(line => line.trim() ? '    ' + line : line)
+      .join('\n');
+    finalUserCode = `class Solution {\n${indentedCode}\n}`;
+  }
+
+  return `${allImports}
+
+${pairPolyfill}
+${jsonPolyfills}
+
+${finalUserCode}
+
+${finalDriver}
+
+class Main {
+  public static void main(String[] args) throws Exception {
+    String json = "${testStr.replace(/"/g, '\\"')}";
+    
+    List<Map<String,Object>> results = new ArrayList<>();
+    try {
+        List<String> lines = null;
+        ${expectsString
+      ? 'lines = Driver.runTests(json);'
+      : 'List<Map<String,Object>> tests = Main.parseTests(json); lines = Driver.runTests(tests);'
+    }
+        
+        if (lines != null) {
+            System.out.println("___JSON_RESULT___");
+            System.out.print("[");
+            for (int i = 0; i < lines.size(); i++) {
+                if (i > 0) System.out.print(",");
+                System.out.print(lines.get(i));
+            }
+            System.out.println("]");
+            // Driver should return lines of JSON, but if it returns raw strings, we might need to handle it.
+            // Actually, the Java driver in buildJava seems to return List<String> which are printed.
+            // Wait, the Java driver logic is a bit complex.
+            // Let's look at lines 352-355:
+            // lines = Driver.runTests(json);
+            // The default driver returns a List<String> where the first element is the JSON array string?
+            // No, look at line 225: out.add("No driver provided.");
+            // Look at line 495 in C++: cout << json.dump()
+            // In Java, we need to make sure we print the delimiter.
+            // The current Java driver implementation seems to assume Driver.runTests returns a list of strings to print.
+            // If the user uses the default driver, it returns a list.
+            // If we inject a delimiter, we should do it in Main.
+        } else {
+            System.out.println("___JSON_RESULT___");
+            System.out.println("[{\\"error\\":\\"Driver returned null\\"}]");
+        }
+    } catch (Throwable t) {
+        java.io.StringWriter sw = new java.io.StringWriter();
+        java.io.PrintWriter pw = new java.io.PrintWriter(sw);
+        t.printStackTrace(pw);
+        
+        Map<String,Object> r = new LinkedHashMap<>();
+        r.put("error", "Runtime Error: " + sw.toString());
+        results.add(r);
+        System.out.println("___JSON_RESULT___");
+        System.out.println(toJson(results));
+    }
+  }
+
+  static List<Map<String,Object>> parseTests(String json) {
+      Object o = parseJson(json);
+      if (o instanceof List) {
+          List<Object> l = (List<Object>)o;
+          List<Map<String,Object>> res = new ArrayList<>();
+          for(Object i : l) {
+              if (i instanceof Map) res.add((Map<String,Object>)i);
+          }
+          return res;
+      }
+      return new ArrayList<>();
+  }
+
+  static double asDouble(Object o) { return ((Number)o).doubleValue(); }
+  static int asInt(Object o) { return ((Number)o).intValue(); }
+  static long asLong(Object o) { return ((Number)o).longValue(); }
+
+  static Object parseJson(String json) {
+      json = json.trim();
+      if (json.startsWith("{")) {
+          JSONObject map = new JSONObject();
+          if (json.equals("{}")) return map;
+          String inner = json.substring(1, json.length()-1);
+          List<String> parts = splitJson(inner);
+          for(String part : parts) {
+              int colon = part.indexOf(':');
+              String key = unquote(part.substring(0, colon).trim());
+              Object val = parseJson(part.substring(colon+1));
+              map.put(key, val);
+          }
+          return map;
+      } else if (json.startsWith("[")) {
+          JSONArray list = new JSONArray();
+          if (json.equals("[]")) return list;
+          String inner = json.substring(1, json.length()-1);
+          List<String> parts = splitJson(inner);
+          for(String part : parts) list.add(parseJson(part));
+          return list;
+      } else if (json.startsWith("\\"")) {
+          return unquote(json);
+      } else if (json.equals("true")) return true;
+      else if (json.equals("false")) return false;
+      else if (json.equals("null")) return null;
+      else {
+          try { return Long.parseLong(json); } catch(Exception e){}
+          try { return Double.parseDouble(json); } catch(Exception e){}
+          return json;
+      }
+  }
+
+  static List<String> splitJson(String inner) {
+      List<String> res = new ArrayList<>();
+      int depth = 0;
+      boolean inQuote = false;
+      int start = 0;
+      for(int i=0; i<inner.length(); i++) {
+          char c = inner.charAt(i);
+          if (c == '\\"' && (i==0 || inner.charAt(i-1) != '\\\\')) inQuote = !inQuote;
+          else if (!inQuote) {
+              if (c == '{' || c == '[') depth++;
+              else if (c == '}' || c == ']') depth--;
+              else if (c == ',' && depth == 0) {
+                  res.add(inner.substring(start, i).trim());
+                  start = i+1;
+              }
+          }
+      }
+      res.add(inner.substring(start).trim());
+      return res;
+  }
+
+  static String unquote(String s) {
+      if (s.startsWith("\\"") && s.endsWith("\\"")) return s.substring(1, s.length()-1).replace("\\\\n", "\\n").replace("\\\\\\"", "\\"");
+      return s;
+  }
+
+  static String toJson(List<Map<String,Object>> list){
+    return listToJson(list);
+  }
+  static String listToJson(List<?> list){
+    StringBuilder sb = new StringBuilder();
+    sb.append("[");
+    for (int i=0;i<list.size();i++){ if (i>0) sb.append(","); sb.append(valToJson(list.get(i))); }
+    sb.append("]");
+    return sb.toString();
+  }
+  static String objToJson(Map<String,Object> m){
+    StringBuilder sb = new StringBuilder(); sb.append("{"); boolean first=true;
+    for (Map.Entry<String,Object> e: m.entrySet()){ if (!first) sb.append(","); first=false; sb.append(quote(e.getKey())).append(":" ).append(valToJson(e.getValue())); }
+    sb.append("}"); return sb.toString();
+  }
+  static String quote(String s){ return "\\""+s.replace("\\\\","\\\\\\\\").replace("\\"","\\\\\\"")+"\\"";}  
+  static String valToJson(Object v){ 
+      if (v==null) return "null"; 
+      if (v instanceof String) return quote((String)v); 
+      if (v instanceof Number || v instanceof Boolean) return String.valueOf(v); 
+      if (v instanceof Map) return objToJson((Map<String,Object>)v);
+      if (v instanceof List) return listToJson((List<?>)v);
+      return quote(String.valueOf(v)); 
+  }
+}
+`;
 }
 
 function buildCpp(userCode: string, driver: string, tests: any[]) {
   const testStr = safeJSON(tests);
+  // Default driver if none provided - assumes int solve(vector<int>) for demo purposes
+  // In reality, the driver should match the problem signature.
   const drv = (driver && driver.trim().length)
     ? driver
-    : `// Provide either void runTests(const std::vector<nlohmann::json>& tests) or solve(...)
-void runTests(const std::vector<std::string>& tests) {
-  std::cout << "No driver provided; implement runTests or solve(...)" << std::endl;
-}
-`;
+    : `
+  // Default Driver for int solve(vector<int>&)
+  // Requires nlohmann/json.hpp
+  void runTests(const std::string& jsonTests) {
+    try {
+      auto tests = nlohmann::json::parse(jsonTests);
+      Solution sol;
+      std::vector<std::map<std::string, nlohmann::json>> results;
 
-  
-  const lines = userCode.split('\n');
+      for (const auto& t : tests) {
+        std::map<std::string, nlohmann::json> result;
+        try {
+          // Parse input - assuming single vector<int> arg for demo
+          std::vector<int> input = t["input"].get<std::vector<int>>();
+          auto output = sol.solve(input);
+
+          result["got"] = output;
+          result["exp"] = t["output"];
+          result["pass"] = (output == t["output"].get<int>()); // Assuming int return
+        } catch (const std::exception& e) {
+          result["error"] = e.what();
+          result["pass"] = false;
+        }
+        results.push_back(result);
+      }
+      std::cout << "___JSON_RESULT___" << std::endl;
+      std::cout << nlohmann::json(results).dump() << std::endl;
+    } catch (const std::exception& e) {
+      std::cout << "___JSON_RESULT___" << std::endl;
+      std::cout << "[{\\"error\\":\\"" << e.what() << "\\"}]" << std::endl;
+    }
+  }
+  `;
+
+  const lines = userCode.split('\\n');
   const includes: string[] = [];
   const code: string[] = [];
 
@@ -179,18 +559,36 @@ void runTests(const std::vector<std::string>& tests) {
     }
   });
 
-  const includesStr = includes.join('\n');
-  const codeStr = code.join('\n');
+  const includesStr = includes.join('\\n');
+  const codeStr = code.join('\\n');
 
-  return `#include <bits/stdc++.h>
+  return `#include <iostream>
+#include <vector>
+#include <string>
+#include <sstream>
+#include <map>
+#include <algorithm>
+// Assuming nlohmann/json is available in the environment
+#include <nlohmann/json.hpp>
+
 using namespace std;
+
 ${includesStr}
 
+// User Solution
 ${codeStr}
+
+// Driver (must implement void runTests(string jsonTests))
 ${drv}
-int main(){
+
+int main() {
+  // Pass raw JSON string to driver's runTests
   string json = "${testStr.replace(/"/g, '\\"')}";
-  cout<<json<<endl;
+  try {
+    runTests(json);
+  } catch (...) {
+    cout << "[{\\"error\\":\\"Unknown runtime error\\"}]" << endl;
+  }
   return 0;
 }
 `;

@@ -106,7 +106,7 @@ Language: JavaScript
 Your task:
 - Generate a valid JavaScript driver function named runTests(tests) that executes the user's solution and returns an array of results.
 - Assume the user's solution is a function named 'solve'.
-- Generate 2 to 5 test cases.
+- Generate 20 to 25 diverse test cases covering edge cases, typical cases, and boundary conditions.
 - Each test case should be an object with "input" and "output" fields.
 - Return ONLY a valid JSON object with the following structure:
 
@@ -135,7 +135,7 @@ Language: Java
 
 Your task:
 - Generate a valid Java driver function named Driver.runTests(List<Map<String,Object>> tests) that executes the user's solution and RETURNS a JSON array string.
-- Generate 2 to 5 test cases.
+- Generate 20 to 25 diverse test cases covering edge cases, typical cases, and boundary conditions.
 - Each test case should be an object with "input" and "output" fields.
 - Return ONLY a valid JSON object with the following structure:
 
@@ -155,7 +155,7 @@ Important rules for driver:
 - Return only valid JSON.
 `;
     } else {
-      
+
       prompt = `
 You are an assistant that generates a driver function and test cases for a coding interview problem.
 
@@ -165,7 +165,7 @@ ${problemText}
 Language: ${language}
 
 Your task:
-- Generate a driver function and 2-5 test cases.
+- Generate a driver function and 20-25 diverse test cases covering edge cases, typical cases, and boundary conditions.
 - Return ONLY a valid JSON object with the following structure:
 
 {
@@ -225,11 +225,11 @@ Return only valid JSON.
     const data = await response.json();
     const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
 
-    console.log("Gemini Raw Response Text:", text); 
+    console.log("Gemini Raw Response Text:", text);
 
-    
+
     let cleanText = text.trim();
-    
+
     const firstBrace = cleanText.indexOf('{');
     const lastBrace = cleanText.lastIndexOf('}');
 

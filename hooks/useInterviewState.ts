@@ -29,11 +29,11 @@ export function useInterviewState(sessionId: string) {
     const broadcastTimeout = useRef<any>(null);
     const lastUpdateRef = useRef<number>(0);
 
-    
+
     const code = codeMap[language] || "";
     const driver = driverMap[language] || "";
 
-    
+
     useEffect(() => {
         (async () => {
             try {
@@ -55,7 +55,7 @@ export function useInterviewState(sessionId: string) {
                     if (typeof stateData.language === "string") setLanguage(stateData.language);
                     if (stateData.codeMap) setCodeMap(stateData.codeMap);
                     else if (typeof stateData.code === "string") {
-                        
+
                         setCodeMap(prev => ({ ...prev, [stateData.language || 'javascript']: stateData.code }));
                     }
 
@@ -70,7 +70,7 @@ export function useInterviewState(sessionId: string) {
             } catch { }
         })();
 
-        
+
         if (userId) {
             fetch('/api/interview/presence', {
                 method: 'POST',
@@ -79,7 +79,7 @@ export function useInterviewState(sessionId: string) {
             }).catch(() => { });
         }
 
-        
+
         return () => {
             if (userId) {
                 fetch('/api/interview/presence', {
@@ -93,21 +93,23 @@ export function useInterviewState(sessionId: string) {
 
     const [executionResult, setExecutionResult] = useState<any>(null);
 
-    
+
+    const clientIdRef = useRef<string>(Math.random().toString(36).substring(7));
+
     useEffect(() => {
         if (!supabase) return;
         const channel = supabase.channel(`interview-${sessionId}`);
         channelRef.current = channel;
 
         channel.on("broadcast", { event: "state" }, (payload: any) => {
-            const { userId: senderId, language, codeMap: newCodeMap, driverMap: newDriverMap, problemText, sampleTests, timestamp } = payload?.payload || {};
+            const { clientId: senderClientId, language, codeMap: newCodeMap, driverMap: newDriverMap, problemText, sampleTests, timestamp } = payload?.payload || {};
 
-            
-            if (senderId && userId && senderId === userId) {
+            // Echo cancellation using clientId
+            if (senderClientId && senderClientId === clientIdRef.current) {
                 return;
             }
 
-            
+            // Simple timestamp check to avoid out-of-order updates (optional, but good)
             if (timestamp && timestamp < lastUpdateRef.current) {
                 return;
             }
@@ -124,7 +126,9 @@ export function useInterviewState(sessionId: string) {
         });
 
         channel.subscribe((status) => {
-            
+            if (status === 'SUBSCRIBED') {
+                // Optional: Request initial state or announce presence
+            }
         });
 
         return () => {
@@ -141,14 +145,19 @@ export function useInterviewState(sessionId: string) {
             const timestamp = Date.now();
             lastUpdateRef.current = timestamp;
 
-            const payload = { ...pendingBroadcastRef.current, userId, timestamp };
+            const payload = {
+                ...pendingBroadcastRef.current,
+                userId,
+                clientId: clientIdRef.current, // Send clientId
+                timestamp
+            };
             pendingBroadcastRef.current = {};
 
             channelRef.current?.send({
                 type: "broadcast",
                 event: "state",
                 payload
-            });
+            }).catch((e: any) => console.error("Broadcast failed", e));
         }, 100);
     };
 

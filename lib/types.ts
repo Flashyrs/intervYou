@@ -7,3 +7,8 @@ export interface TestCaseResult {
     exp?: any;
     [key: string]: any;
 }
+
+export interface ExecutionMetrics {
+    time?: number; // milliseconds
+    memory?: number; // kilobytes
+}

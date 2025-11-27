@@ -22,11 +22,11 @@ export function broadcast(room: string, payload: SignalPayload) {
     console.warn("Cannot broadcast - channel not available");
     return;
   }
-  
-  ch.send({ 
-    type: "broadcast", 
-    event: "signal", 
-    payload 
+
+  ch.send({
+    type: "broadcast",
+    event: "signal",
+    payload
   }).catch((error) => {
     console.error("Broadcast error:", error);
   });
@@ -39,13 +39,26 @@ export function onSignal(room: string, handler: (payload: SignalPayload) => void
     return null;
   }
 
-  ch.on("broadcast", { event: "signal" }, (msg: any) => {
+  const handleSignal = (msg: any) => {
     try {
       handler(msg?.payload);
     } catch (error) {
       console.error("Signal handler error:", error);
     }
-  });
+  };
+
+  ch.on("broadcast", { event: "signal" }, handleSignal);
+
+  // Ensure subscription is active
+  if (ch.state !== 'joined' && ch.state !== 'joining') {
+    ch.subscribe((status) => {
+      if (status === 'SUBSCRIBED') {
+        console.log(`Subscribed to signal channel: ${room}`);
+      } else if (status === 'CHANNEL_ERROR') {
+        console.error(`Failed to subscribe to signal channel: ${room}`);
+      }
+    });
+  }
 
   return ch;
 }

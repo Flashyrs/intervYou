@@ -66,7 +66,7 @@ export default function VideoCall({
 
         if (localRef.current && localStream) {
           localRef.current.srcObject = localStream;
-          
+
           localRef.current.play().catch((e) => {
             console.warn("Local video autoplay failed, user interaction may be required", e);
           });
@@ -74,7 +74,7 @@ export default function VideoCall({
 
         if (remoteRef.current) {
           remoteRef.current.srcObject = remoteStream;
-          
+
           remoteRef.current.play().catch((e) => {
             console.warn("Remote video autoplay failed", e);
           });
@@ -123,7 +123,7 @@ export default function VideoCall({
                 sessionId: room,
                 sdp: answer
               });
-              
+
               while (pendingIceCandidates.length > 0) {
                 const candidate = pendingIceCandidates.shift();
                 if (candidate) {
@@ -136,7 +136,7 @@ export default function VideoCall({
               }
             } else if (payload.type === "call-answer" && role === "interviewee") {
               await applyAnswer(pc, payload.sdp);
-              
+
               while (pendingIceCandidates.length > 0) {
                 const candidate = pendingIceCandidates.shift();
                 if (candidate) {
@@ -149,7 +149,7 @@ export default function VideoCall({
               }
             } else if (payload.type === "ice-candidate") {
               const candidate = new RTCIceCandidate(payload.candidate);
-              
+
               if (pc.remoteDescription) {
                 try {
                   await pc.addIceCandidate(candidate);
@@ -157,7 +157,7 @@ export default function VideoCall({
                   console.warn("Failed to add ICE candidate", e);
                 }
               } else {
-                
+
                 pendingIceCandidates.push(candidate);
               }
             }
@@ -193,7 +193,9 @@ export default function VideoCall({
       mounted = false;
       if (channelRef.current) {
         try {
-          channelRef.current.unsubscribe?.();
+          // Don't unsubscribe immediately to avoid race conditions on quick re-renders
+          // but do clean up listeners if possible
+          channelRef.current.unsubscribe();
         } catch (e) {
           console.warn("Channel cleanup error", e);
         }
@@ -210,6 +212,17 @@ export default function VideoCall({
       }
     };
   }, [room, role, autoStart, startCall]);
+
+  const handleReconnect = async () => {
+    setError("");
+    setConnectionState("new");
+    if (pcRef.current) {
+      pcRef.current.close();
+      pcRef.current = null;
+    }
+    // Force re-mount effect
+    window.location.reload(); // Simple but effective for full reset
+  };
 
 
 
@@ -273,16 +286,17 @@ export default function VideoCall({
   };
 
   return (
-    <div className="relative h-full flex flex-col bg-black rounded-xl overflow-hidden shadow-2xl ring-1 ring-white/10">
+    <div className="relative w-full max-w-[600px] flex flex-col bg-black rounded-xl overflow-hidden shadow-2xl ring-1 ring-white/10 mx-auto">
       {error && (
-        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 bg-red-500/90 text-white px-4 py-2 rounded-full text-sm backdrop-blur-sm shadow-lg animate-in fade-in slide-in-from-top-2">
-          {error}
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 bg-red-500/90 text-white px-4 py-2 rounded-full text-sm backdrop-blur-sm shadow-lg animate-in fade-in slide-in-from-top-2 flex items-center gap-2">
+          <span>{error}</span>
+          <button onClick={handleReconnect} className="bg-white/20 hover:bg-white/30 px-2 py-0.5 rounded text-xs font-bold">Retry</button>
         </div>
       )}
 
-      <div className="flex-1 flex flex-col md:flex-row gap-1 md:gap-2 p-1 md:p-2 min-h-0">
-        {}
-        <div className="flex-1 relative bg-gray-900 rounded-lg overflow-hidden group">
+      <div className="flex-1 flex flex-row gap-2 p-2 min-h-0 justify-center items-center">
+        {/* Local Video */}
+        <div className="relative w-1/2 aspect-square bg-gray-900 rounded-lg overflow-hidden group">
           <video
             ref={localRef}
             autoPlay
@@ -292,33 +306,33 @@ export default function VideoCall({
           />
           {!camOn && (
             <div className="absolute inset-0 flex items-center justify-center text-gray-500">
-              <div className="w-20 h-20 rounded-full bg-gray-800 flex items-center justify-center">
-                <span className="text-2xl font-bold text-gray-400">You</span>
+              <div className="w-12 h-12 rounded-full bg-gray-800 flex items-center justify-center">
+                <span className="text-xs font-bold text-gray-400">You</span>
               </div>
             </div>
           )}
-          <div className="absolute bottom-3 left-3 bg-black/60 backdrop-blur-md text-white text-xs px-3 py-1.5 rounded-full flex items-center gap-2">
-            <div className={`w-2 h-2 rounded-full ${micOn ? 'bg-green-500' : 'bg-red-500'}`} />
-            You ({role})
+          <div className="absolute bottom-2 left-2 bg-black/60 backdrop-blur-md text-white text-[10px] px-2 py-0.5 rounded-full flex items-center gap-1.5">
+            <div className={`w-1.5 h-1.5 rounded-full ${micOn ? 'bg-green-500' : 'bg-red-500'}`} />
+            You
           </div>
         </div>
 
-        {}
-        <div className="flex-1 relative bg-gray-900 rounded-lg overflow-hidden">
+        {/* Remote Video */}
+        <div className="relative w-1/2 aspect-square bg-gray-900 rounded-lg overflow-hidden">
           <video
             ref={remoteRef}
             autoPlay
             playsInline
             className="w-full h-full object-cover"
           />
-          <div className="absolute bottom-3 left-3 bg-black/60 backdrop-blur-md text-white text-xs px-3 py-1.5 rounded-full flex items-center gap-2">
-            <div className={`w-2 h-2 rounded-full ${active ? 'bg-green-500' : 'bg-yellow-500 animate-pulse'}`} />
+          <div className="absolute bottom-2 left-2 bg-black/60 backdrop-blur-md text-white text-[10px] px-2 py-0.5 rounded-full flex items-center gap-1.5">
+            <div className={`w-1.5 h-1.5 rounded-full ${active ? 'bg-green-500' : 'bg-yellow-500 animate-pulse'}`} />
             {active ? "Remote" : connectionState === "new" ? "Connecting..." : "Disconnected"}
           </div>
         </div>
       </div>
 
-      {}
+      { }
       <div className="h-12 md:h-16 bg-gray-900/90 backdrop-blur border-t border-white/10 flex items-center justify-between px-2 md:px-6 shrink-0">
         <div className="flex items-center gap-2">
           {role === "interviewee" && !active && (
@@ -368,10 +382,10 @@ export default function VideoCall({
           </button>
         </div>
 
-        <div className="w-24" /> {}
+        <div className="w-24" /> { }
       </div>
 
-      {}
+      { }
       {showSettings && (
         <div className="absolute inset-0 bg-black/80 backdrop-blur-sm z-40 flex items-center justify-center p-6 animate-in fade-in duration-200">
           <div className="bg-gray-900 border border-white/10 rounded-2xl p-6 w-full max-w-sm shadow-2xl">

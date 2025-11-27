@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { useParams } from "next/navigation";
 import dynamic from "next/dynamic";
 import VideoCall from "@/components/VideoCall";
@@ -33,14 +34,20 @@ export default function InterviewPage() {
     setCodeMapFull,
     setDriverMapFull,
     updateDriver,
+    executionResult,
+    broadcastExecutionResult,
   } = useInterviewState(sessionId);
 
   const {
     runOutput,
     caseResults,
     submitting,
+    metrics,
     onRun,
     onSubmitFinal,
+    setRunOutput,
+    setCaseResults,
+    setMetrics,
   } = useCodeExecution({
     sessionId,
     language,
@@ -48,55 +55,81 @@ export default function InterviewPage() {
     driver,
     sampleTests,
     privateTests,
+    problemText,
   });
+
+  // Sync execution results from other participants
+  useEffect(() => {
+    if (executionResult) {
+      if (executionResult.runOutput !== undefined) setRunOutput(executionResult.runOutput);
+      if (executionResult.caseResults !== undefined) setCaseResults(executionResult.caseResults);
+      if (executionResult.metrics !== undefined) setMetrics(executionResult.metrics);
+    }
+  }, [executionResult, setRunOutput, setCaseResults, setMetrics]);
+
+  const handleRun = async () => {
+    const result = await onRun();
+    if (result) {
+      broadcastExecutionResult(result);
+    }
+  };
 
   return (
     <div className="flex flex-col md:flex-row h-screen w-screen bg-gray-100 overflow-hidden">
 
-      {}
-      <div className="w-full md:w-[40%] flex flex-col bg-white border-r overflow-y-auto p-2 md:p-4 space-y-2 md:space-y-4">
-        <TestPanel
-          sampleTests={sampleTests}
-          setSampleTests={updateSampleTests}
-          privateTests={privateTests}
-          setPrivateTests={setPrivateTests}
-          problemText={problemText}
-          setProblemText={updateProblemText}
-          role={role}
-          language={language}
-          code={code}
-          driver={driver}
-          sessionId={sessionId}
-          setDriver={updateDriver}
-          setCodeMapFull={setCodeMapFull}
-          setDriverMapFull={setDriverMapFull}
-        />
+      { }
+      {/* Left Pane */}
+      <div className="w-full md:w-[40%] flex flex-col bg-white border-r h-full overflow-hidden">
+        {/* Video Section - Fixed at top */}
+        <div className="bg-gray-900 p-2 shrink-0 flex justify-center border-b border-gray-700">
+          <div className="w-full max-w-[400px]">
+            <VideoCall room={`interview-${sessionId}`} role={role} />
+          </div>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-2 md:p-4 space-y-2 md:space-y-4">
+          <TestPanel
+            sampleTests={sampleTests}
+            setSampleTests={updateSampleTests}
+            privateTests={privateTests}
+            setPrivateTests={setPrivateTests}
+            problemText={problemText}
+            setProblemText={updateProblemText}
+            role={role}
+            language={language}
+            code={code}
+            driver={driver}
+            sessionId={sessionId}
+            setDriver={updateDriver}
+            setCodeMapFull={setCodeMapFull}
+            setDriverMapFull={setDriverMapFull}
+          />
+        </div>
       </div>
 
-      {}
+      { }
       <div className="w-full md:w-[60%] flex flex-col h-full relative bg-gray-50">
         {showAuthModal && (
           <AuthModal onClose={() => setShowAuthModal(false)} />
         )}
 
-        {}
-        <div className="h-32 md:h-64 bg-gray-900 p-1 md:p-2 shrink-0">
-          <VideoCall room={`interview-${sessionId}`} role={role} />
-        </div>
+        {showAuthModal && (
+          <AuthModal onClose={() => setShowAuthModal(false)} />
+        )}
 
-        {}
+        { }
         <div className="p-2 border-b bg-white shrink-0">
           <ControlBar
             language={language}
             setLanguage={updateLanguage}
-            onRun={onRun}
+            onRun={handleRun}
             onSubmitFinal={onSubmitFinal}
             submitting={submitting}
             role={role}
           />
         </div>
 
-        {}
+        { }
         <div className="flex-1 relative min-h-0">
           <MonacoEditor
             height="100%"
@@ -107,18 +140,19 @@ export default function InterviewPage() {
             options={{
               minimap: { enabled: false },
               scrollBeyondLastLine: false,
-              readOnly: false 
+              readOnly: false
             }}
           />
         </div>
 
-        {}
-        <div className="h-32 md:h-48 border-t bg-gray-50 overflow-y-auto p-1 md:p-2 shrink-0">
+        { }
+        <div className="shrink-0 z-10">
           <OutputPanel
             runOutput={runOutput}
             caseResults={caseResults}
             sampleTests={sampleTests}
             role={role}
+            metrics={metrics}
           />
         </div>
       </div>

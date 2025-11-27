@@ -32,7 +32,7 @@ export async function POST(req: Request) {
           ...
         ],
         "skeletons": {
-          "javascript": "class Solution { ... }",
+          "javascript": "function solve(args) { ... }",
           "java": "class Solution { ... }",
           "cpp": "class Solution { ... };"
         },
@@ -45,12 +45,13 @@ export async function POST(req: Request) {
       
       Details:
       - "input" must be an array of arguments.
-      - Skeletons should use a "Solution" class structure where appropriate (like LeetCode).
-      - Drivers must be complete code that instantiates the Solution, runs the tests, and prints the results as a JSON array.
+      - Skeletons should use a "Solution" class structure where appropriate (Java, C++) or function (JS).
+      - Drivers must be complete code that instantiates the Solution, runs the tests, and returns the results.
       - CRITICAL: Drivers MUST NOT hardcode test cases. They must use the 'tests' argument passed to them.
-      - For Java Driver: It must be a class named 'Driver' with a static method 'public static List<String> runTests(List<Map<String,Object>> tests)'.
-      - For C++ Driver: It must be a function 'void runTests(const std::vector<std::map<std::string, std::string>>& tests)'.
-      - For JS Driver: It must be a function 'runTests(tests)'.
+      - For Java Driver: It must be a class named 'Driver' with a static method 'public static List<String> runTests(String jsonTests)'. The driver must parse the JSON and RETURN a list of JSON strings (e.g. "{\"pass\":true}"). DO NOT print to stdout.
+      - IMPORTANT for Java: When casting numeric inputs from the parsed JSON map (which are Objects), ALWAYS cast to Number first and then use .doubleValue(), .longValue(), or .intValue(). Example: ((Number) args.get(0)).doubleValue(). DO NOT cast directly to Double or Integer as the underlying type might be Long.
+      - For C++ Driver: It must be a function 'void runTests(const std::string& jsonTests)'. The driver must parse the JSON.
+      - For JS Driver: It must be a function 'runTests(tests)'. (JS receives parsed object).
       - Ensure all strings in the generated code are properly escaped.
       
       Do not wrap the JSON in markdown code blocks. Return raw JSON only.
@@ -103,7 +104,7 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: "No response from AI" }, { status: 500 });
         }
 
-        
+
         const cleanJson = text.replace(/```json/g, "").replace(/```/g, "").trim();
 
         try {

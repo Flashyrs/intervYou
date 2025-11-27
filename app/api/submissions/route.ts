@@ -26,14 +26,14 @@ export async function POST(req: Request) {
     const session = await requireAuth();
     const userId = (session.user as any)?.id as string;
     const email = session.user?.email || "";
-    const { sessionId, problemId, language, code, results } = await req.json();
+    const { sessionId, problemId, language, code, results, time, memory, problemText } = await req.json();
     if (!sessionId || !problemId || !language || typeof code !== 'string' || typeof results !== 'string') {
       return NextResponse.json({ error: "sessionId, problemId, language, code, results required" }, { status: 400 });
     }
     const parsed = (() => { try { return JSON.parse(results); } catch { return []; } })();
     const passed = Array.isArray(parsed) && parsed.length > 0 && parsed.every((r: any) => r && r.pass && !r.error);
 
-    
+
     const existing = await prisma.submission.findUnique({ where: { sessionId_problemId_userId: { sessionId, problemId, userId } } });
     if (existing && !EXEMPT_EMAILS.has(email) && existing.attempts >= 2) {
       return NextResponse.json({ error: "submission limit reached (2 per problem)" }, { status: 429 });
@@ -47,6 +47,9 @@ export async function POST(req: Request) {
         results,
         passed,
         attempts: { increment: 1 },
+        time: time !== undefined ? time : undefined,
+        memory: memory !== undefined ? memory : undefined,
+        problemText: problemText || undefined,
       },
       create: {
         sessionId,
@@ -56,6 +59,9 @@ export async function POST(req: Request) {
         code,
         results,
         passed,
+        time: time !== undefined ? time : undefined,
+        memory: memory !== undefined ? memory : undefined,
+        problemText: problemText || undefined,
       },
     });
 

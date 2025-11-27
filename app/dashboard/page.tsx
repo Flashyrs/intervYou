@@ -140,7 +140,7 @@ export default function DashboardPage() {
 
   return (
     <div className="mx-auto max-w-3xl p-2 md:p-4 space-y-3 md:space-y-4">
-      {}
+      { }
       {incoming && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
@@ -173,12 +173,18 @@ export default function DashboardPage() {
           <button className="px-3 md:px-4 py-2 bg-black text-white rounded text-sm md:text-base" onClick={startRandom}>
             Random Interview
           </button>
+          <button
+            className="px-3 md:px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded text-sm md:text-base hover:bg-gray-50 transition"
+            onClick={() => router.push('/submissions')}
+          >
+            My Submissions
+          </button>
           {status && <span className="text-xs md:text-sm text-gray-600">{status}</span>}
         </div>
         <div className="text-xs md:text-sm text-gray-600">Online interviewers: {online.length}</div>
       </div>
 
-      {}
+      { }
       {showScheduleModal && (
         <ScheduleModal
           onClose={() => setShowScheduleModal(false)}

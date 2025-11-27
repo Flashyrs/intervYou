@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { buildHarness, mergeTests } from "@/lib/interviewUtils";
+import { ExecutionMetrics } from "@/lib/types";
+import { useToast } from "@/components/Toast";
 
 interface UseCodeExecutionProps {
     sessionId: string;
@@ -8,6 +10,7 @@ interface UseCodeExecutionProps {
     driver: string;
     sampleTests: string;
     privateTests: string;
+    problemText?: string;
 }
 
 export function useCodeExecution({
@@ -17,10 +20,13 @@ export function useCodeExecution({
     driver,
     sampleTests,
     privateTests,
+    problemText,
 }: UseCodeExecutionProps) {
     const [runOutput, setRunOutput] = useState<string>("");
     const [caseResults, setCaseResults] = useState<any[]>([]);
     const [submitting, setSubmitting] = useState(false);
+    const [metrics, setMetrics] = useState<{ time?: number; memory?: number }>({});
+    const { push } = useToast();
 
     const onRun = async () => {
         try {
@@ -32,42 +38,71 @@ export function useCodeExecution({
                 body: JSON.stringify({ language, source_code: harness, sessionId, problemId: "run" }),
             });
             const out = await res.json();
+
+            // Extract metrics from Judge0 response
+            const executionTime = out?.time ? parseFloat(out.time) * 1000 : undefined;
+            const memoryUsed = out?.memory ? parseInt(out.memory) : undefined;
+            setMetrics({ time: executionTime, memory: memoryUsed });
+
             const compileErr = out?.compile_output;
             const stderr = out?.stderr;
-            if (compileErr || stderr) {
-                setRunOutput(String(compileErr || stderr));
-                return;
+            const stdout = out?.stdout || "";
+            const delimiter = "___JSON_RESULT___";
+
+            // If we have the delimiter, it means code ran successfully (even if there are warnings)
+            if (stdout.includes(delimiter)) {
+                let jsonStr = stdout;
+                let debugOutput = "";
+
+                const parts = stdout.split(delimiter);
+                debugOutput = parts[0].trim();
+                jsonStr = parts[1].trim();
+
+                // Append stderr/warnings to debug output if present
+                if (compileErr || stderr) {
+                    debugOutput = (debugOutput ? debugOutput + "\n\n" : "") + "--- Stderr/Warnings ---\n" + (compileErr || "") + (stderr || "");
+                }
+
+                try {
+                    const parsed = JSON.parse(jsonStr);
+                    if (Array.isArray(parsed)) {
+                        setCaseResults(parsed);
+                        setRunOutput(debugOutput);
+                        return { caseResults: parsed, runOutput: debugOutput, metrics: { time: executionTime, memory: memoryUsed } };
+                    }
+                } catch {
+                    // Fallthrough to error handling if parse fails
+                }
             }
 
-            const stdout = out?.stdout || "";
+            // If no delimiter or parse failed, treat as error if there is stderr/compile_output
+            if (compileErr || stderr) {
+                const rawErr = (compileErr || "") + "\n" + (stderr || "");
+                setRunOutput(rawErr.trim());
+                return { caseResults: [], runOutput: rawErr.trim(), metrics: { time: executionTime, memory: memoryUsed } };
+            }
+
+            // No output and no error?
             if (!stdout) {
                 setRunOutput("No output");
                 setCaseResults([]);
-                return;
+                return { caseResults: [], runOutput: "No output", metrics: { time: executionTime, memory: memoryUsed } };
             }
 
-            try {
-                const parsed = JSON.parse(stdout);
-                if (Array.isArray(parsed)) {
-                    setCaseResults(parsed);
-                    setRunOutput("");
-                } else {
-                    setRunOutput(stdout);
-                    setCaseResults([]);
-                }
-            } catch {
-                setRunOutput(stdout);
-                setCaseResults([]);
-            }
+            // Stdout but no delimiter (shouldn't happen with our driver, but fallback)
+            setRunOutput(stdout);
+            setCaseResults([]);
+            return { caseResults: [], runOutput: stdout, metrics: { time: executionTime, memory: memoryUsed } };
         } catch (e: any) {
             setRunOutput("Run error");
+            return { caseResults: [], runOutput: "Run error", metrics: {} };
         }
     };
 
     const onSubmitFinal = async () => {
         setSubmitting(true);
         try {
-            
+
             await fetch("/api/interview/state", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -78,15 +113,26 @@ export function useCodeExecution({
             const r = await fetch("/api/submissions", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ sessionId, problemId: "custom", language, code, results: resultsStr }),
+                body: JSON.stringify({
+                    sessionId,
+                    problemId: "custom",
+                    language,
+                    code,
+                    results: resultsStr,
+                    time: metrics.time,
+                    memory: metrics.memory,
+                    problemText: problemText || ""
+                }),
             });
             const j = await r.json();
             if (!r.ok) {
-                alert(j?.error || "Submit failed");
+                push({ message: j?.error || "Submit failed", type: "error" });
             } else {
-                alert("Submitted!");
+                push({ message: "Solution submitted successfully!", type: "success" });
             }
-        } catch { }
+        } catch {
+            push({ message: "Network error during submission", type: "error" });
+        }
         setSubmitting(false);
     };
 
@@ -94,9 +140,11 @@ export function useCodeExecution({
         runOutput,
         caseResults,
         submitting,
+        metrics,
         onRun,
         onSubmitFinal,
         setRunOutput,
-        setCaseResults
+        setCaseResults,
+        setMetrics
     };
 }

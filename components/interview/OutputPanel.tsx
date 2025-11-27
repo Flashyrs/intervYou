@@ -1,33 +1,58 @@
-import { useState } from "react";
-import { Role, TestCaseResult } from "@/lib/types";
+import { useState, useEffect } from "react";
+import { Role, TestCaseResult, ExecutionMetrics } from "@/lib/types";
 import { stringifyCompact } from "@/lib/interviewUtils";
-import { CheckCircle2, XCircle, Lock, AlertCircle, Terminal } from "lucide-react";
+import { CheckCircle2, XCircle, Lock, AlertCircle, Terminal, ChevronUp, ChevronDown, Clock, HardDrive } from "lucide-react";
 
 interface OutputPanelProps {
     runOutput: string;
     caseResults: TestCaseResult[];
     sampleTests: string;
     role: Role;
+    metrics?: ExecutionMetrics;
 }
 
-function RunSummary({ results }: { results: TestCaseResult[] }) {
+
+function RunSummary({ results, metrics }: { results: TestCaseResult[], metrics?: ExecutionMetrics }) {
     const total = results?.length || 0;
     const passed = (results || []).filter((r) => r && r.pass && !r.error).length;
     if (total === 0) return null;
     const allPass = passed === total;
 
     return (
-        <div className={`flex items-center gap-2 p-3 rounded-lg border mb-4 ${allPass
-                ? 'bg-green-50/50 border-green-200 text-green-700'
-                : 'bg-red-50/50 border-red-200 text-red-700'
+        <div className={`rounded-lg border mb-4 ${allPass
+            ? 'bg-green-50/50 border-green-200'
+            : 'bg-red-50/50 border-red-200'
             }`}>
-            {allPass ? <CheckCircle2 className="w-5 h-5" /> : <XCircle className="w-5 h-5" />}
-            <div className="font-medium">
-                {allPass ? 'Accepted' : 'Wrong Answer'}
+            {/* Status & Test Count */}
+            <div className="flex items-center gap-2 p-3">
+                <div className={`flex items-center gap-2 ${allPass ? 'text-green-700' : 'text-red-700'}`}>
+                    {allPass ? <CheckCircle2 className="w-5 h-5" /> : <XCircle className="w-5 h-5" />}
+                    <div className="font-medium">
+                        {allPass ? 'Accepted' : 'Wrong Answer'}
+                    </div>
+                </div>
+                <div className={`text-sm opacity-80 ml-auto ${allPass ? 'text-green-700' : 'text-red-700'}`}>
+                    {passed}/{total} test cases passed
+                </div>
             </div>
-            <div className="text-sm opacity-80 ml-auto">
-                {passed}/{total} test cases passed
-            </div>
+
+            {/* Metrics */}
+            {(metrics?.time !== undefined || metrics?.memory !== undefined) && (
+                <div className="px-3 pb-3 flex gap-4">
+                    {metrics.time !== undefined && (
+                        <div className="flex items-center gap-1.5 text-xs bg-white px-2.5 py-1.5 rounded border border-gray-200">
+                            <Clock className="w-3.5 h-3.5 text-gray-500" />
+                            <span className="font-medium text-gray-700">{metrics.time.toFixed(2)} ms</span>
+                        </div>
+                    )}
+                    {metrics.memory !== undefined && (
+                        <div className="flex items-center gap-1.5 text-xs bg-white px-2.5 py-1.5 rounded border border-gray-200">
+                            <HardDrive className="w-3.5 h-3.5 text-gray-500" />
+                            <span className="font-medium text-gray-700">{(metrics.memory / 1024).toFixed(2)} MB</span>
+                        </div>
+                    )}
+                </div>
+            )}
         </div>
     );
 }
@@ -36,7 +61,7 @@ function CaseCard({ result, idx, isPrivate, role }: { result: TestCaseResult, id
     const pass = !!result?.pass && !result?.error;
     const isError = !!result?.error;
     const locked = isPrivate && role === 'interviewee';
-    const [expanded, setExpanded] = useState(!pass); 
+    const [expanded, setExpanded] = useState(!pass);
 
     return (
         <div className={`group border rounded-lg overflow-hidden transition-all duration-200 ${pass ? 'border-gray-200 hover:border-green-300' : 'border-red-200 bg-red-50/10'
@@ -47,8 +72,8 @@ function CaseCard({ result, idx, isPrivate, role }: { result: TestCaseResult, id
             >
                 <div className="flex items-center gap-3">
                     <div className={`flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold ${pass
-                            ? 'bg-green-100 text-green-700'
-                            : isError ? 'bg-red-100 text-red-700' : 'bg-red-100 text-red-700'
+                        ? 'bg-green-100 text-green-700'
+                        : isError ? 'bg-red-100 text-red-700' : 'bg-red-100 text-red-700'
                         }`}>
                         {pass ? '✓' : '✕'}
                     </div>
@@ -106,48 +131,80 @@ function CaseCard({ result, idx, isPrivate, role }: { result: TestCaseResult, id
     );
 }
 
-export function OutputPanel({ runOutput, caseResults, sampleTests, role }: OutputPanelProps) {
+export function OutputPanel({ runOutput, caseResults, sampleTests, role, metrics }: OutputPanelProps) {
+    const [minimized, setMinimized] = useState(true);
     const sampleCount = (() => { try { return JSON.parse(sampleTests || '[]').length; } catch { return 0; } })();
 
-    if (runOutput) {
-        return (
-            <div className="h-full flex flex-col">
-                <div className="flex items-center gap-2 px-4 py-2 border-b bg-gray-50 text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    <Terminal className="w-4 h-4" />
-                    Console Output
-                </div>
-                <div className="flex-1 p-4 overflow-auto bg-white">
-                    <pre className="font-mono text-sm text-gray-800 whitespace-pre-wrap">{runOutput}</pre>
-                </div>
-            </div>
-        );
-    }
+    // Auto-expand when results come in
+    useEffect(() => {
+        if (runOutput || (caseResults && caseResults.length > 0)) {
+            setMinimized(false);
+        }
+    }, [runOutput, caseResults]);
 
-    if (!caseResults || caseResults.length === 0) {
+    if (minimized) {
         return (
-            <div className="h-full flex flex-col items-center justify-center text-gray-400 text-sm">
-                <Terminal className="w-8 h-8 mb-2 opacity-20" />
-                <p>Run code to see results</p>
+            <div className="bg-white border-t shadow-lg">
+                <button
+                    onClick={() => setMinimized(false)}
+                    className="w-full flex items-center justify-between px-4 py-2 bg-gray-50 hover:bg-gray-100 transition"
+                >
+                    <div className="flex items-center gap-2 text-xs font-medium text-gray-600 uppercase tracking-wider">
+                        <Terminal className="w-4 h-4" />
+                        Output / Console
+                    </div>
+                    <ChevronUp className="w-4 h-4 text-gray-400" />
+                </button>
             </div>
         );
     }
 
     return (
-        <div className="h-full flex flex-col bg-white">
-            <div className="p-4 pb-0">
-                <h3 className="font-semibold text-gray-900 mb-4">Test Results</h3>
-                <RunSummary results={caseResults} />
+        <div className="flex flex-col bg-white border-t shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] h-[40vh] transition-all duration-300">
+            <div className="flex items-center justify-between px-4 py-2 bg-gray-50 border-b shrink-0">
+                <div className="flex items-center gap-2 text-xs font-medium text-gray-600 uppercase tracking-wider">
+                    <Terminal className="w-4 h-4" />
+                    Output / Console
+                </div>
+                <button
+                    onClick={() => setMinimized(true)}
+                    className="p-1 hover:bg-gray-200 rounded text-gray-500"
+                >
+                    <ChevronDown className="w-4 h-4" />
+                </button>
             </div>
-            <div className="flex-1 overflow-y-auto p-4 pt-0 space-y-3">
-                {caseResults.map((r, idx) => (
-                    <CaseCard
-                        key={idx}
-                        result={r}
-                        idx={idx}
-                        isPrivate={idx >= sampleCount}
-                        role={role}
-                    />
-                ))}
+
+            <div className="flex-1 overflow-y-auto p-4">
+                {runOutput && (
+                    <div className="mb-4 pb-4 border-b border-gray-100">
+                        <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Debug Output</div>
+                        <pre className="font-mono text-xs text-gray-600 whitespace-pre-wrap bg-gray-50 p-2 rounded">{runOutput}</pre>
+                    </div>
+                )}
+
+                {(!caseResults || caseResults.length === 0) ? (
+                    !runOutput && (
+                        <div className="h-full flex flex-col items-center justify-center text-gray-400 text-sm py-8">
+                            <Terminal className="w-8 h-8 mb-2 opacity-20" />
+                            <p>Run code to see results</p>
+                        </div>
+                    )
+                ) : (
+                    <div className="space-y-4">
+                        <RunSummary results={caseResults} metrics={metrics} />
+                        <div className="space-y-3">
+                            {caseResults.map((r, idx) => (
+                                <CaseCard
+                                    key={idx}
+                                    result={r}
+                                    idx={idx}
+                                    isPrivate={idx >= sampleCount}
+                                    role={role}
+                                />
+                            ))}
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     );

@@ -80,17 +80,20 @@ model InterviewSession {
   @@index([scheduledFor])
 }
 model Submission {
-  id         String   @id @default(cuid())
-  sessionId  String
-  problemId  String
-  userId     String
-  language   String
-  code       String
-  results    Json     // structured JSON object of per-case results
-  passed     Boolean
-  attempts   Int      @default(1)
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  id          String   @id @default(cuid())
+  sessionId   String
+  problemId   String
+  userId      String
+  language    String
+  code        String
+  problemText String?  // Store the problem description
+  results     Json     // structured JSON object of per-case results
+  passed      Boolean
+  attempts    Int      @default(1)
+  time        Float?   // Execution time in milliseconds
+  memory      Float?   // Memory used in kilobytes
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   @@unique([sessionId, problemId, userId])  // one row per user/problem/session
   @@index([sessionId, userId])

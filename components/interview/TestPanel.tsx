@@ -72,7 +72,7 @@ export function TestPanel({
                 if (data.enhancedProblem) setProblemText(data.enhancedProblem);
                 if (data.testCases) {
                     const tests = Array.isArray(data.testCases) ? data.testCases : [];
-                    
+
                     const sample = tests.slice(0, 2);
                     const privateT = tests.slice(2);
                     setSampleTests(JSON.stringify(sample, null, 2));
@@ -97,7 +97,7 @@ export function TestPanel({
 
     return (
         <div className="space-y-4 h-full flex flex-col">
-            {}
+            { }
             <div className="flex-1 flex flex-col min-h-0">
                 <div className="flex items-center justify-between mb-2 shrink-0">
                     <h2 className="font-semibold flex items-center gap-2">
@@ -132,7 +132,7 @@ export function TestPanel({
                 )}
             </div>
 
-            {}
+            { }
             <div className="shrink-0 border-t pt-4 space-y-4">
                 <div>
                     <h3 className="font-semibold mb-2 flex items-center gap-2 text-sm">
@@ -191,23 +191,7 @@ export function TestPanel({
                     </div>
                 )}
 
-                <div className="flex gap-2 pt-2">
-                    <button
-                        className="flex-1 px-3 py-2 bg-gray-800 text-white rounded-md text-sm font-medium hover:bg-gray-900 transition flex items-center justify-center gap-2"
-                        onClick={() => runTests('sample')}
-                    >
-                        <Play className="w-3 h-3" /> Run Sample
-                    </button>
 
-                    {role === 'interviewer' && (
-                        <button
-                            className="flex-1 px-3 py-2 bg-purple-600 text-white rounded-md text-sm font-medium hover:bg-purple-700 transition flex items-center justify-center gap-2"
-                            onClick={() => runTests('private')}
-                        >
-                            <Lock className="w-3 h-3" /> Run Private
-                        </button>
-                    )}
-                </div>
             </div>
         </div>
     );
@@ -232,10 +216,10 @@ function TestCaseEditor({ json, onChange }: { json: string; onChange: (v: string
     const updateCase = (index: number, field: 'input' | 'output', value: string) => {
         const newCases = [...cases];
         try {
-            
-            
-            
-            
+
+
+
+
             let parsedVal = value;
             try {
                 parsedVal = JSON.parse(value);
@@ -244,7 +228,7 @@ function TestCaseEditor({ json, onChange }: { json: string; onChange: (v: string
             newCases[index] = { ...newCases[index], [field]: parsedVal };
             onChange(JSON.stringify(newCases, null, 2));
         } catch (e) {
-            
+
         }
     };
 
