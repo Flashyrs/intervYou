@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { useParams } from "next/navigation";
 import dynamic from "next/dynamic";
+import { CheckCircle2 } from "lucide-react";
 import VideoCall from "@/components/VideoCall";
 import { useInterviewState } from "@/hooks/useInterviewState";
 import { useCodeExecution } from "@/hooks/useCodeExecution";
@@ -38,7 +39,9 @@ export default function InterviewPage() {
     broadcastExecutionResult,
     remoteCursors,
     broadcastCursor,
-    lastEditor
+    lastEditor,
+    isFrozen,
+    toggleFreeze
   } = useInterviewState(sessionId);
 
   const {
@@ -160,11 +163,30 @@ export default function InterviewPage() {
             submitting={submitting}
             role={role}
             lastEditor={lastEditor}
+            isFrozen={isFrozen}
+            onToggleFreeze={toggleFreeze}
           />
         </div>
 
-        { }
-        <div className="flex-1 relative min-h-0">
+        {/* Editor Area */}
+        <div className="flex-1 relative">
+          {/* Frozen State Overlay */}
+          {isFrozen && role === 'interviewee' && (
+            <div className="absolute inset-0 z-50 bg-gray-50/80 backdrop-blur-sm flex items-center justify-center">
+              <div className="bg-white p-6 rounded-lg shadow-xl border border-blue-100 text-center max-w-md">
+                <div className="mb-4 flex justify-center">
+                  <div className="p-3 bg-blue-50 rounded-full">
+                    <CheckCircle2 className="w-8 h-8 text-blue-600" />
+                  </div>
+                </div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">Session Paused</h3>
+                <p className="text-gray-500">
+                  The interviewer has paused editing to explain a concept. Please listen to the instructions.
+                </p>
+              </div>
+            </div>
+          )}
+
           <MonacoEditor
             key={`${language}-${sessionId}`}
             height="100%"
@@ -188,12 +210,12 @@ export default function InterviewPage() {
             options={{
               minimap: { enabled: false },
               scrollBeyondLastLine: false,
-              readOnly: false
+              readOnly: isFrozen && role === 'interviewee', // Soft lock for interviewee
             }}
           />
         </div>
 
-        { }
+        {/* Output Panel */}
         <div className="shrink-0 z-10">
           <OutputPanel
             runOutput={runOutput}

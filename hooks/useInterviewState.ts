@@ -24,6 +24,7 @@ export function useInterviewState(sessionId: string) {
     const [showAuthModal, setShowAuthModal] = useState(false);
     const [remoteCursors, setRemoteCursors] = useState<Record<string, any>>({});
     const [lastEditor, setLastEditor] = useState<{ name: string, role: string, timestamp: number } | null>(null);
+    const [isFrozen, setIsFrozen] = useState(false);
 
     const channelRef = useRef<any>(null);
     const saveTimeout = useRef<any>(null);
@@ -205,6 +206,11 @@ export function useInterviewState(sessionId: string) {
             if (cursor && senderClientId) {
                 setRemoteCursors(prev => ({ ...prev, [senderClientId]: cursor }));
             }
+
+            // 5. Freeze State Update
+            if (payload?.payload?.isFrozen !== undefined) {
+                setIsFrozen(payload.payload.isFrozen);
+            }
         });
 
         channel.on("broadcast", { event: "execution_result" }, (payload: any) => {
@@ -370,6 +376,12 @@ export function useInterviewState(sessionId: string) {
         });
     };
 
+    const toggleFreeze = () => {
+        const newState = !isFrozen;
+        setIsFrozen(newState);
+        broadcast({ isFrozen: newState });
+    };
+
     return {
         language,
         code,
@@ -396,6 +408,8 @@ export function useInterviewState(sessionId: string) {
         broadcastExecutionResult,
         remoteCursors,
         broadcastCursor,
-        lastEditor
+        lastEditor,
+        isFrozen,
+        toggleFreeze
     };
 }

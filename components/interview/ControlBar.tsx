@@ -1,6 +1,6 @@
 import { Role } from "@/lib/types";
 import { useState, useEffect } from "react";
-import { Play, Send, Code2, ChevronDown } from "lucide-react";
+import { Play, Send, Code2, ChevronDown, RotateCcw, CheckCircle2 } from "lucide-react";
 
 interface ControlBarProps {
     language: string;
@@ -10,6 +10,8 @@ interface ControlBarProps {
     submitting: boolean;
     role: Role;
     lastEditor?: { name: string, role: string, timestamp: number } | null;
+    isFrozen?: boolean;
+    onToggleFreeze?: () => void;
 }
 
 const allowedLangs = [
@@ -26,6 +28,8 @@ export function ControlBar({
     submitting,
     role,
     lastEditor,
+    isFrozen,
+    onToggleFreeze
 }: ControlBarProps) {
     const [showEditorParams, setShowEditorParams] = useState(false);
 
@@ -70,6 +74,21 @@ export function ControlBar({
             </div>
 
             <div className="flex items-center gap-2">
+                {/* Freeze Toggle (Interviewer Only) */}
+                {role === "interviewer" && onToggleFreeze && (
+                    <button
+                        onClick={onToggleFreeze}
+                        className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition border ${isFrozen
+                            ? "bg-blue-100 text-blue-700 border-blue-200 hover:bg-blue-200"
+                            : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50"
+                            }`}
+                        title="Pause session for explanation"
+                    >
+                        {isFrozen ? <RotateCcw className="w-4 h-4" /> : <CheckCircle2 className="w-4 h-4" />}
+                        {isFrozen ? "Resume Session" : "Pause Session"}
+                    </button>
+                )}
+
                 <button
                     className="flex items-center gap-2 px-4 py-1.5 bg-gray-100 text-gray-700 rounded-md text-sm font-medium hover:bg-gray-200 transition border border-gray-200"
                     onClick={onRun}

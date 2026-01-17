@@ -9,11 +9,14 @@ A Next.js (App Router) platform for conducting live technical interviews with co
     - **Bidirectional Editing**: Both authentication users can type simultaneously.
     - **Real-time Cursor Sync**: See your peer's cursor position in real-time.
     - **Smart De-bouncing**: Updates are ignored while you type (300ms) to prevent cursor jitter.
-    - **Patch Updates**: Only modified lines are broadcast to save bandwidth.
+    - **Language-Scoped Patches**: Broadcasts strictly limited to the changed language buffer (LWW per buffer).
     - **"Last Edited By"**: Visual indicator to show who made the last change.
-- **Role-Based Security**:
-    - **Skeleton Injection**: Only the **Interviewee** can trigger code skeletons on language switch, preventing accidental overwrites by the interviewer.
+- **Role-Aware Editor Behavior**:
+    - **Skeleton Injection**: Only the **Interviewee** can trigger code skeletons on language switch, ensuring the driver controls the boilerplate.
 - **Multi-Language Support**: JavaScript, Java, C++ with instant switching.
+- **Interviewer Freeze (Soft Pause)**:
+    - Interviewer can temporarily pause the session (read-only mode) to explain concepts.
+    - Displays a "Session Paused" overlay to the candidate.
 - **Judge0 Integration**: One-call multi-test harness to conserve API quota.
 - **AI Assistance**: Google Gemini integration for generating problem descriptions, test cases, and private edge cases.
 - **Authentication**: Secure Google OAuth via NextAuth.js.
@@ -31,13 +34,13 @@ A Next.js (App Router) platform for conducting live technical interviews with co
 
 ## Real-time Sync Architecture
 
-IntervYou uses a robust "Last Write Wins" (LWW) strategy per language buffer, enhanced for pair programming:
+IntervYou uses a robust "Last Write Wins" (LWW) strategy per language buffer, optimized for pair programming stability:
 
-1.  **Broadcasts**: Code changes are broadcast via Supabase channels as "patch" updates (only `{[lang]: code}`).
-2.  **Concurrency**:
-    -   Incoming updates are applied immediately unless the local user is typing.
-    -   **Debounce**: If the local user has typed within the last 300ms, incoming remote updates are skipped to maintain typing flow.
-3.  **Cursors**: Cursor positions (`lineNumber`, `column`) are broadcast on every change and rendered as colored carets.
+1.  **Broadcasts**: Code changes are immediately broadcast as "language-scoped patches" (replacing the full buffer for that specific language).
+2.  **Conflict Handling**:
+    -   Conflicts are resolved naturally by the "Last Write Wins" model.
+    -   **Typing Pause Resolution**: If both users type, the final state settles to the latest broadcast received *after* a user stops typing (due to the 300ms local debounce).
+3.  **Cursors**: Cursor positions are independently broadcast to maintain visual presence even availability of edits is debounced.
 
 ## Prerequisites
 
