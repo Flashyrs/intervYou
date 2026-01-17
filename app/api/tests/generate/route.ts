@@ -10,98 +10,49 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Gemini not configured" }, { status: 501 });
     }
 
-    if (!problemText || !language) {
-      return NextResponse.json({ error: "problemText and language required" }, { status: 400 });
+    if (!problemText) {
+      return NextResponse.json({ error: "problemText required" }, { status: 400 });
     }
 
-    let prompt = "";
-    const lang = (language || "").toLowerCase();
-
-    if (lang === "javascript" || lang === "js") {
-      prompt = `
-You are an assistant that generates a driver function and test cases for a coding interview problem.
+    const prompt = `
+You are an expert at generating comprehensive test cases for coding interview problems.
 
 Problem:
 ${problemText}
 
-Language: JavaScript
-
 Your task:
-- Generate a valid JavaScript driver function named runTests(tests) that executes the user's solution and returns an array of results.
-- Assume the user's solution is a function named 'solve'.
-- Generate 20 to 25 diverse test cases covering edge cases, typical cases, and boundary conditions.
-- Each test case should be an object with "input" and "output" fields.
-- Return ONLY a valid JSON object with the following structure:
+- Generate EXACTLY 29 diverse test cases covering all scenarios
+- Categorize them as follows:
+  * 4 test cases with category: "sample" (basic examples)
+  * 5 test cases with category: "edge" (edge cases and boundary conditions)
+  * 20 test cases with category: "hidden" (comprehensive hidden test cases)
+- Each test case must have: "input" (array of arguments), "output" (expected result), and "category"
 
+Return ONLY valid JSON with this exact structure:
 {
-  "driver": "string", // JavaScript code for function runTests(tests) { ... }
   "tests": [
-    { "input": "...", "output": "..." }
+    { "input": [...], "output": ..., "category": "sample" },
+    { "input": [...], "output": ..., "category": "sample" },
+    { "input": [...], "output": ..., "category": "sample" },
+    { "input": [...], "output": ..., "category": "sample" },
+    { "input": [...], "output": ..., "category": "edge" },
+    { "input": [...], "output": ..., "category": "edge" },
+    { "input": [...], "output": ..., "category": "edge" },
+    { "input": [...], "output": ..., "category": "edge" },
+    { "input": [...], "output": ..., "category": "edge" },
+    { "input": [...], "output": ..., "category": "hidden" },
+    ... (20 total hidden test cases)
   ]
 }
 
-Important rules for driver:
-- Must define: function runTests(tests) { ... }
-- It should iterate over 'tests', call solve(t.input), and compare with t.output.
-- Return the array of results.
-- Do NOT include any explanations.
-- Return only valid JSON.
+Important:
+- Total test cases: EXACTLY 29
+- Categories: 4 sample + 5 edge + 20 hidden
+- "input" must always be an array
+- Do NOT include explanations
+- Do NOT wrap in markdown code blocks
+- Return raw JSON only
 `;
-    } else if (lang === "java") {
-      prompt = `
-You are an assistant that generates a driver function and test cases for a coding interview problem.
-
-Problem:
-${problemText}
-
-Language: Java
-
-Your task:
-- Generate a valid Java driver function named Driver.runTests(List<Map<String,Object>> tests) that executes the user's solution and RETURNS a JSON array string.
-- Generate 20 to 25 diverse test cases covering edge cases, typical cases, and boundary conditions.
-- Each test case should be an object with "input" and "output" fields.
-- Return ONLY a valid JSON object with the following structure:
-
-{
-  "driver": "string", // Java code snippet implementing class Driver
-  "tests": [
-    { "input": "...", "output": "..." }
-  ]
-}
-
-Important rules for driver:
-- Must define: class Driver { public static List<String> runTests(List<Map<String,Object>> tests) { ... } }
-- It MUST compute pass = deep equality between got and exp.
-- It MUST return a single-element List<String> where the only element is the JSON array string of results.
-- Do NOT print inside driver.
-- Do NOT include any explanations.
-- Return only valid JSON.
-`;
-    } else {
-
-      prompt = `
-You are an assistant that generates a driver function and test cases for a coding interview problem.
-
-Problem:
-${problemText}
-
-Language: ${language}
-
-Your task:
-- Generate a driver function and 20-25 diverse test cases covering edge cases, typical cases, and boundary conditions.
-- Return ONLY a valid JSON object with the following structure:
-
-{
-  "driver": "string",
-  "tests": [
-    { "input": "...", "output": "..." }
-  ]
-}
-
-Do NOT include any explanations.
-Return only valid JSON.
-`;
-    }
 
     const models = [
       "gemini-2.0-flash",
@@ -148,9 +99,6 @@ Return only valid JSON.
     const data = await response.json();
     const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
 
-    console.log("Gemini Raw Response Text:", text);
-
-
     let cleanText = text.trim();
 
     const firstBrace = cleanText.indexOf('{');
@@ -170,10 +118,21 @@ Return only valid JSON.
 
     if (
       !parsed ||
-      typeof parsed.driver !== "string" ||
-      !Array.isArray(parsed.tests)
+      !Array.isArray(parsed.tests) ||
+      parsed.tests.length !== 29
     ) {
-      return NextResponse.json({ error: "Incomplete Gemini response" }, { status: 502 });
+      return NextResponse.json({
+        error: `Expected exactly 29 test cases, got ${parsed?.tests?.length || 0}`
+      }, { status: 502 });
+    }
+
+    // Validate categories
+    const sampleCount = parsed.tests.filter((t: any) => t.category === "sample").length;
+    const edgeCount = parsed.tests.filter((t: any) => t.category === "edge").length;
+    const hiddenCount = parsed.tests.filter((t: any) => t.category === "hidden").length;
+
+    if (sampleCount !== 4 || edgeCount !== 5 || hiddenCount !== 20) {
+      console.warn(`Test category mismatch: ${sampleCount} sample, ${edgeCount} edge, ${hiddenCount} hidden`);
     }
 
     return NextResponse.json(parsed, { status: 200 });

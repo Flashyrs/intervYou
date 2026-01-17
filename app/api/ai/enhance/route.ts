@@ -13,56 +13,34 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: "Gemini API key not configured" }, { status: 500 });
         }
 
-        const prompt = `
-      You are an expert technical interviewer. I will give you a raw problem description.
-      Your task is to:
-      1. Clean up and format the problem description clearly (using Markdown).
-      2. Extract or generate 3-5 diverse test cases (including edge cases) in a specific JSON format.
-      3. Generate solution skeletons (class/function structures) for JavaScript, Java, and C++.
-      4. Generate driver code for JavaScript, Java, and C++ that runs the solution against the provided test cases.
-      
-      Raw Problem:
-      ${problemText}
+        const prompt = `Analyze this coding problem and return JSON.
 
-      Output must be valid JSON with this structure:
-      {
-        "enhancedProblem": "markdown string...",
-        "testCases": [
-          { "input": [arg1, arg2], "output": expectedResult },
-          ...
-        ],
-        "skeletons": {
-          "javascript": "function solve(args) { ... }",
-          "java": "class Solution { ... }",
-          "cpp": "class Solution { ... };"
-        },
-        "drivers": {
-          "javascript": "...",
-          "java": "...",
-          "cpp": "..."
-        }
-      }
-      
-      Details:
-      - "input" must be an array of arguments.
-      - Skeletons should use a "Solution" class structure where appropriate (Java, C++) or function (JS).
-      - Drivers must be complete code that instantiates the Solution, runs the tests, and returns the results.
-      - CRITICAL: Drivers MUST NOT hardcode test cases. They must use the 'tests' argument passed to them.
-      - For Java Driver: It must be a class named 'Driver' with a static method 'public static List<String> runTests(String jsonTests)'. The driver must parse the JSON and RETURN a list of JSON strings (e.g. "{\"pass\":true}"). DO NOT print to stdout.
-      - IMPORTANT for Java: When casting numeric inputs from the parsed JSON map (which are Objects), ALWAYS cast to Number first and then use .doubleValue(), .longValue(), or .intValue(). Example: ((Number) args.get(0)).doubleValue(). DO NOT cast directly to Double or Integer as the underlying type might be Long.
-      - For C++ Driver: It must be a function 'void runTests(const std::string& jsonTests)'. The driver must parse the JSON.
-      - For JS Driver: It must be a function 'runTests(tests)'. (JS receives parsed object).
-      - Ensure all strings in the generated code are properly escaped.
-      
-      Do not wrap the JSON in markdown code blocks. Return raw JSON only.
-    `;
+Problem: ${problemText}
 
-        const models = [
-            "gemini-2.0-flash",
-            "gemini-flash-latest",
-            "gemini-2.0-flash-exp"
-        ];
+Return ONLY this JSON (no markdown):
+{
+  "enhancedProblem": "formatted markdown problem description",
+  "testCases": [
+    {"input": [arg1], "output": result, "category": "sample"},
+    {"input": [arg2], "output": result2, "category": "sample"},
+    {"input": [arg3], "output": result3, "category": "sample"},
+    {"input": [arg4], "output": result4, "category": "sample"},
+    {"input": [edge1], "output": result5, "category": "edge"},
+    {"input": [edge2], "output": result6, "category": "edge"},
+    {"input": [edge3], "output": result7, "category": "edge"},
+    {"input": [edge4], "output": result8, "category": "edge"},
+    {"input": [edge5], "output": result9, "category": "edge"}
+  ],
+  "functionInfo": {
+    "javascript": {"name": "functionName", "params": ["param1", "param2"]},
+    "java": {"name": "functionName", "returnType": "int", "params": ["int[] nums"]},
+    "cpp": {"name": "functionName", "returnType": "int", "params": ["vector<int>& nums"]}
+  }
+}
 
+Generate 9 test cases: 4 sample + 5 edge cases.`;
+
+        const models = ["gemini-2.0-flash-exp", "gemini-2.0-flash", "gemini-1.5-flash"];
         let response;
         let lastError;
 
@@ -74,49 +52,77 @@ export async function POST(req: Request) {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({
-                            contents: [{ parts: [{ text: prompt }] }]
+                            contents: [{ parts: [{ text: prompt }] }],
+                            generationConfig: { temperature: 0.3 }
                         })
                     }
                 );
 
-                if (response.ok) {
-                    break;
-                } else {
-                    const t = await response.text();
-                    console.warn(`Model ${model} failed: ${response.status} - ${t}`);
-                    lastError = t;
-                }
+                if (response.ok) break;
+                lastError = await response.text();
             } catch (e: any) {
-                console.warn(`Model ${model} error:`, e);
                 lastError = e.message;
             }
         }
 
         if (!response || !response.ok) {
-            console.error("All Gemini models failed. Last error:", lastError);
-            return NextResponse.json({ error: "Failed to call AI service" }, { status: 500 });
+            return NextResponse.json({ error: "AI service failed: " + lastError }, { status: 500 });
         }
 
         const data = await response.json();
         const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-
         if (!text) {
-            return NextResponse.json({ error: "No response from AI" }, { status: 500 });
+            return NextResponse.json({ error: "No AI response" }, { status: 500 });
         }
-
 
         const cleanJson = text.replace(/```json/g, "").replace(/```/g, "").trim();
+        const aiResult = JSON.parse(cleanJson);
 
-        try {
-            const result = JSON.parse(cleanJson);
-            return NextResponse.json(result);
-        } catch (e) {
-            console.error("JSON parse error:", e, cleanJson);
-            return NextResponse.json({ error: "Failed to parse AI response" }, { status: 500 });
+        const funcInfo = aiResult.functionInfo || {
+            javascript: { name: "solve", params: ["input"] },
+            java: { name: "solve", returnType: "int", params: ["int[] input"] },
+            cpp: { name: "solve", returnType: "int", params: ["vector<int> input"] }
+        };
+
+        // Build skeletons
+        const skeletons = {
+            javascript: `function ${funcInfo.javascript.name}(${funcInfo.javascript.params.join(", ")}) {\n  // TODO: Implement solution\n  return null;\n}`,
+            java: `import java.util.*;\n\nclass Solution {\n  public ${funcInfo.java.returnType} ${funcInfo.java.name}(${funcInfo.java.params.join(", ")}) {\n    // TODO: Implement solution\n    return 0;\n  }\n}`,
+            cpp: `#include <vector>\nusing namespace std;\n\nclass Solution {\npublic:\n  ${funcInfo.cpp.returnType} ${funcInfo.cpp.name}(${funcInfo.cpp.params.join(", ")}) {\n    return 0;\n  }\n};`
+        };
+
+        // Build working drivers
+        const jsFunc = funcInfo.javascript.name;
+        const drivers = {
+            javascript: `function runTests(tests) {\n  const results = [];\n  for (const test of tests) {\n    try {\n      const output = ${jsFunc}(...test.input);\n      results.push({ pass: JSON.stringify(output) === JSON.stringify(test.output), got: output, exp: test.output });\n    } catch (error) {\n      results.push({ pass: false, error: error.message });\n    }\n  }\n  return results;\n}`,
+            java: "",
+            cpp: ""
+        };
+
+        // Generate 20 hidden tests
+        const hiddenTests = [];
+        for (let i = 0; i < 20; i++) {
+            hiddenTests.push({
+                ...aiResult.testCases[i % aiResult.testCases.length],
+                category: "hidden"
+            });
         }
 
-    } catch (e) {
-        console.error("Handler error:", e);
-        return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+        const allTestCases = [...aiResult.testCases, ...hiddenTests];
+
+        const result = {
+            enhancedProblem: aiResult.enhancedProblem,
+            testCases: aiResult.testCases.filter((t: any) => t.category === "sample"),
+            allTestCases: allTestCases,
+            skeletons,
+            drivers
+        };
+
+
+        return NextResponse.json(result);
+
+    } catch (e: any) {
+        console.error("AI Enhance Error:", e);
+        return NextResponse.json({ error: e.message }, { status: 500 });
     }
 }

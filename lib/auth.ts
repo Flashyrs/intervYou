@@ -19,23 +19,17 @@ export const authOptions: NextAuthOptions = {
   },
   callbacks: {
     async jwt({ token, user, account }) {
-      try {
-        if (account) token.provider = account.provider;
+      if (account) token.provider = account.provider;
 
-        if (user) {
-          token.id = user.id;
-        }
+      if (user) {
+        token.id = user.id;
+      }
 
-        if (token.email) {
-          // Verify database connection during auth
-          const dbUser = await prisma.user.findUnique({ where: { email: token.email } });
-          if (dbUser) {
-            token.id = dbUser.id;
-          }
+      if (token.email) {
+        const dbUser = await prisma.user.findUnique({ where: { email: token.email } });
+        if (dbUser) {
+          token.id = dbUser.id;
         }
-      } catch (error) {
-        console.error("JWT Callback Error:", error);
-        // We don't throw here to avoid completely killing the token, but the session might be incomplete
       }
       return token;
     },
@@ -50,5 +44,4 @@ export const authOptions: NextAuthOptions = {
       return session;
     },
   },
-  debug: true,
 };

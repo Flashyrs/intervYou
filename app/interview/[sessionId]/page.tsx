@@ -132,6 +132,7 @@ export default function InterviewPage() {
         { }
         <div className="flex-1 relative min-h-0">
           <MonacoEditor
+            key={`${language}-${sessionId}`}
             height="100%"
             defaultLanguage="javascript"
             language={language}
@@ -151,6 +152,7 @@ export default function InterviewPage() {
             runOutput={runOutput}
             caseResults={caseResults}
             sampleTests={sampleTests}
+            privateTests={privateTests}
             role={role}
             metrics={metrics}
           />

@@ -75,6 +75,7 @@ export function buildHarness(language: string, userCode: string, driver: string,
   }
 }
 
+
 function buildJS(userCode: string, driver: string, tests: any[]) {
   const testStr = safeJSON(tests);
   const drv = driver || `function runTests() { return []; }`;
@@ -224,7 +225,8 @@ function buildJava(userCode: string, driver: string, tests: any[]) {
 class Driver {
   public static List<String> runTests(List<Map<String,Object>> tests) {
     List<String> out = new ArrayList<>();
-    out.add("No driver provided.");
+    // Return a valid JSON result indicating no driver
+    out.add("{\\\"pass\\\":false,\\\"error\\\":\\\"No driver implementation provided\\\"}");
     return out;
   }
 }`;

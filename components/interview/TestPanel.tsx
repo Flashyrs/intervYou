@@ -70,14 +70,30 @@ export function TestPanel({
             const data = await res.json();
             if (res.ok) {
                 if (data.enhancedProblem) setProblemText(data.enhancedProblem);
-                if (data.testCases) {
-                    const tests = Array.isArray(data.testCases) ? data.testCases : [];
 
-                    const sample = tests.slice(0, 2);
-                    const privateT = tests.slice(2);
+                // Handle all test cases (29 total: 4 sample + 5 edge + 20 hidden)
+                if (data.allTestCases) {
+                    const all = Array.isArray(data.allTestCases) ? data.allTestCases : [];
+
+                    // Sample tests: first 4 (visible to both)
+                    const sample = all.filter((t: any) => t.category === "sample");
+
+                    // Private tests: edge + hidden (visible to interviewer only)
+                    const privateT = all.filter((t: any) => t.category === "edge" || t.category === "hidden");
+
+                    setSampleTests(JSON.stringify(sample, null, 2));
+                    setPrivateTests(JSON.stringify(privateT, null, 2));
+
+
+                } else if (data.testCases) {
+                    // Fallback to old format
+                    const tests = Array.isArray(data.testCases) ? data.testCases : [];
+                    const sample = tests.slice(0, 4);
+                    const privateT = tests.slice(4);
                     setSampleTests(JSON.stringify(sample, null, 2));
                     setPrivateTests(JSON.stringify(privateT, null, 2));
                 }
+
                 if (data.skeletons) {
                     setCodeMapFull(data.skeletons);
                 }

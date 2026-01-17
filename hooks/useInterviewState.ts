@@ -97,37 +97,105 @@ export function useInterviewState(sessionId: string) {
     const clientIdRef = useRef<string>(Math.random().toString(36).substring(7));
 
     useEffect(() => {
-        if (!supabase) return;
+        if (!supabase) {
+            // Fallback: Poll for state updates every 2 seconds if Supabase isn't configured
+            console.warn("Supabase not configured, using polling fallback for sync");
+            const pollInterval = setInterval(async () => {
+                try {
+                    const res = await fetch(`/api/interview/state?sessionId=${sessionId}`);
+                    if (res.ok) {
+                        const stateData = await res.json();
+                        if (stateData) {
+                            // Only update if data is newer (basic check)
+                            if (typeof stateData.language === "string" && stateData.language !== language) {
+                                setLanguage(stateData.language);
+                            }
+                            if (stateData.codeMap) {
+                                setCodeMap(prev => {
+                                    const hasChanges = Object.keys(stateData.codeMap).some(
+                                        key => stateData.codeMap[key] !== prev[key]
+                                    );
+                                    return hasChanges ? stateData.codeMap : prev;
+                                });
+                            }
+                            if (stateData.driverMap) {
+                                setDriverMap(prev => {
+                                    const hasChanges = Object.keys(stateData.driverMap).some(
+                                        key => stateData.driverMap[key] !== prev[key]
+                                    );
+                                    return hasChanges ? stateData.driverMap : prev;
+                                });
+                            }
+                            if (typeof stateData.problemText === "string") {
+                                setProblemText(prev => stateData.problemText !== prev ? stateData.problemText : prev);
+                            }
+                            if (typeof stateData.sampleTests === "string") {
+                                setSampleTests(prev => stateData.sampleTests !== prev ? stateData.sampleTests : prev);
+                            }
+                        }
+                    }
+                } catch (err) {
+                    console.error("Polling error:", err);
+                }
+            }, 2000); // Poll every 2 seconds
+
+            return () => clearInterval(pollInterval);
+        }
+
+        // Original Supabase real-time logic
         const channel = supabase.channel(`interview-${sessionId}`);
         channelRef.current = channel;
 
         channel.on("broadcast", { event: "state" }, (payload: any) => {
             const { clientId: senderClientId, language, codeMap: newCodeMap, driverMap: newDriverMap, problemText, sampleTests, timestamp } = payload?.payload || {};
 
-            // Echo cancellation using clientId
+            // Echo cancellation: only skip if it's from THIS exact client
             if (senderClientId && senderClientId === clientIdRef.current) {
+                console.log("⏭️ Skipping self-echo");
                 return;
             }
 
-            // Simple timestamp check to avoid out-of-order updates (optional, but good)
+            console.log("📨 Received broadcast from another participant:", { language, hasCodeMap: !!newCodeMap, hasProblemText: !!problemText });
+
+            // Simple timestamp check to avoid out-of-order updates
             if (timestamp && timestamp < lastUpdateRef.current) {
+                console.log("⏭️ Skipping old update");
                 return;
             }
 
-            if (language) setLanguage(language);
-            if (newCodeMap) setCodeMap(prev => ({ ...prev, ...newCodeMap }));
-            if (newDriverMap) setDriverMap(prev => ({ ...prev, ...newDriverMap }));
-            if (typeof problemText === "string") setProblemText(problemText);
-            if (typeof sampleTests === "string") setSampleTests(sampleTests);
+            // Update state from broadcast
+            if (language) {
+                console.log(`🔄 Updating language to: ${language}`);
+                setLanguage(language);
+            }
+            if (newCodeMap) {
+                console.log("🔄 Updating code map");
+                setCodeMap(prev => ({ ...prev, ...newCodeMap }));
+            }
+            if (newDriverMap) {
+                console.log("🔄 Updating driver map");
+                setDriverMap(prev => ({ ...prev, ...newDriverMap }));
+            }
+            if (typeof problemText === "string") {
+                console.log("🔄 Updating problem text");
+                setProblemText(problemText);
+            }
+            if (typeof sampleTests === "string") {
+                console.log("🔄 Updating sample tests");
+                setSampleTests(sampleTests);
+            }
         });
 
         channel.on("broadcast", { event: "execution_result" }, (payload: any) => {
+            console.log("📨 Received execution result broadcast");
             setExecutionResult(payload.payload);
         });
 
         channel.subscribe((status) => {
             if (status === 'SUBSCRIBED') {
-                // Optional: Request initial state or announce presence
+                console.log("✅ Supabase channel subscribed");
+            } else if (status === 'CHANNEL_ERROR') {
+                console.error("❌ Supabase channel error");
             }
         });
 
@@ -148,25 +216,41 @@ export function useInterviewState(sessionId: string) {
             const payload = {
                 ...pendingBroadcastRef.current,
                 userId,
-                clientId: clientIdRef.current, // Send clientId
+                clientId: clientIdRef.current,
                 timestamp
             };
             pendingBroadcastRef.current = {};
 
-            channelRef.current?.send({
-                type: "broadcast",
-                event: "state",
-                payload
-            }).catch((e: any) => console.error("Broadcast failed", e));
+            // Try Supabase broadcast
+            if (channelRef.current) {
+                channelRef.current.send({
+                    type: "broadcast",
+                    event: "state",
+                    payload
+                }).catch((e: any) => {
+                    console.warn("⚠️ Broadcast failed (Supabase):", e.message);
+                });
+            } else {
+                console.warn("⚠️ No Supabase channel, relying on polling fallback");
+            }
+
+            // Always persist to database as backup
+            persist(payload);
         }, 100);
     };
 
     const broadcastExecutionResult = (result: any) => {
-        channelRef.current?.send({
-            type: "broadcast",
-            event: "execution_result",
-            payload: result
-        });
+        if (channelRef.current) {
+            channelRef.current.send({
+                type: "broadcast",
+                event: "execution_result",
+                payload: result
+            }).catch((e: any) => {
+                console.error("❌ Execution result broadcast failed:", e);
+            });
+        } else {
+            console.warn("⚠️ No channel for execution broadcast");
+        }
     };
 
     const persist = (patch: any) => {

@@ -31,7 +31,9 @@ export function useCodeExecution({
     const onRun = async () => {
         try {
             const testsAll = mergeTests(sampleTests, privateTests);
+
             const harness = buildHarness(language, code, driver, testsAll);
+
             const res = await fetch("/api/execute", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -39,7 +41,8 @@ export function useCodeExecution({
             });
             const out = await res.json();
 
-            // Extract metrics from Judge0 response
+
+
             const executionTime = out?.time ? parseFloat(out.time) * 1000 : undefined;
             const memoryUsed = out?.memory ? parseInt(out.memory) : undefined;
             setMetrics({ time: executionTime, memory: memoryUsed });
@@ -49,7 +52,7 @@ export function useCodeExecution({
             const stdout = out?.stdout || "";
             const delimiter = "___JSON_RESULT___";
 
-            // If we have the delimiter, it means code ran successfully (even if there are warnings)
+
             if (stdout.includes(delimiter)) {
                 let jsonStr = stdout;
                 let debugOutput = "";
@@ -58,7 +61,6 @@ export function useCodeExecution({
                 debugOutput = parts[0].trim();
                 jsonStr = parts[1].trim();
 
-                // Append stderr/warnings to debug output if present
                 if (compileErr || stderr) {
                     debugOutput = (debugOutput ? debugOutput + "\n\n" : "") + "--- Stderr/Warnings ---\n" + (compileErr || "") + (stderr || "");
                 }
@@ -70,32 +72,34 @@ export function useCodeExecution({
                         setRunOutput(debugOutput);
                         return { caseResults: parsed, runOutput: debugOutput, metrics: { time: executionTime, memory: memoryUsed } };
                     }
-                } catch {
-                    // Fallthrough to error handling if parse fails
+                } catch (e) {
+                    console.error("❌ JSON parse failed:", e);
                 }
             }
 
-            // If no delimiter or parse failed, treat as error if there is stderr/compile_output
             if (compileErr || stderr) {
                 const rawErr = (compileErr || "") + "\n" + (stderr || "");
+                console.warn("⚠️ Compilation/runtime error:", rawErr);
                 setRunOutput(rawErr.trim());
                 return { caseResults: [], runOutput: rawErr.trim(), metrics: { time: executionTime, memory: memoryUsed } };
             }
 
-            // No output and no error?
             if (!stdout) {
+                console.warn("⚠️ No output from execution");
                 setRunOutput("No output");
                 setCaseResults([]);
                 return { caseResults: [], runOutput: "No output", metrics: { time: executionTime, memory: memoryUsed } };
             }
 
-            // Stdout but no delimiter (shouldn't happen with our driver, but fallback)
+
+            console.warn("⚠️ Stdout without delimiter:", stdout);
             setRunOutput(stdout);
             setCaseResults([]);
             return { caseResults: [], runOutput: stdout, metrics: { time: executionTime, memory: memoryUsed } };
         } catch (e: any) {
-            setRunOutput("Run error");
-            return { caseResults: [], runOutput: "Run error", metrics: {} };
+            console.error("❌ Run error:", e);
+            setRunOutput("Run error: " + e.message);
+            return { caseResults: [], runOutput: "Run error: " + e.message, metrics: {} };
         }
     };
 
