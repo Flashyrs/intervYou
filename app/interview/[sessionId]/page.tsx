@@ -38,6 +38,7 @@ export default function InterviewPage() {
     broadcastExecutionResult,
     remoteCursors,
     broadcastCursor,
+    lastEditor
   } = useInterviewState(sessionId);
 
   const {
@@ -158,6 +159,7 @@ export default function InterviewPage() {
             onSubmitFinal={onSubmitFinal}
             submitting={submitting}
             role={role}
+            lastEditor={lastEditor}
           />
         </div>
 

@@ -23,6 +23,7 @@ export function useInterviewState(sessionId: string) {
     const [role, setRole] = useState<Role>("interviewee");
     const [showAuthModal, setShowAuthModal] = useState(false);
     const [remoteCursors, setRemoteCursors] = useState<Record<string, any>>({});
+    const [lastEditor, setLastEditor] = useState<{ name: string, role: string, timestamp: number } | null>(null);
 
     const channelRef = useRef<any>(null);
     const saveTimeout = useRef<any>(null);
@@ -176,6 +177,15 @@ export function useInterviewState(sessionId: string) {
                 // If user typed recently (<300ms), IGNORE remote code updates to prevent jitter/overwrite
                 if (timeSinceLastEdit > 300) {
                     setCodeMap(prev => ({ ...prev, ...newCodeMap }));
+
+                    // Update Last Editor Indicator
+                    if (payload?.payload?.role) {
+                        setLastEditor({
+                            name: payload.payload.userId || "Peer",
+                            role: payload.payload.role,
+                            timestamp: Date.now()
+                        });
+                    }
                 }
             }
 
@@ -240,6 +250,7 @@ export function useInterviewState(sessionId: string) {
             const payload = {
                 ...pendingBroadcastRef.current,
                 userId,
+                role, // Broadcast role for "Last edited by..."
                 clientId: clientIdRef.current,
                 timestamp
             };
@@ -384,6 +395,7 @@ export function useInterviewState(sessionId: string) {
         executionResult,
         broadcastExecutionResult,
         remoteCursors,
-        broadcastCursor
+        broadcastCursor,
+        lastEditor
     };
 }
