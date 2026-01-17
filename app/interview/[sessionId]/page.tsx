@@ -36,6 +36,8 @@ export default function InterviewPage() {
     updateDriver,
     executionResult,
     broadcastExecutionResult,
+    remoteCursors,
+    broadcastCursor,
   } = useInterviewState(sessionId);
 
   const {
@@ -73,6 +75,36 @@ export default function InterviewPage() {
       broadcastExecutionResult(result);
     }
   };
+
+  // Render remote cursors
+  useEffect(() => {
+    const editor = (window as any)[`__editor_${sessionId}`];
+    const monaco = (window as any)[`__monaco_${sessionId}`];
+
+    if (editor && monaco && remoteCursors) {
+      const decorations: any[] = [];
+
+      Object.entries(remoteCursors).forEach(([clientId, cursor]: [string, any]) => {
+        // Skip own cursor (already handled by echo cancellation, but double check)
+        // if (clientId === myClientId) return; 
+
+        if (cursor?.lineNumber && cursor?.column) {
+          decorations.push({
+            range: new monaco.Range(cursor.lineNumber, cursor.column, cursor.lineNumber, cursor.column),
+            options: {
+              className: 'remote-cursor',
+              hoverMessage: { value: `User ${clientId.substring(0, 4)}` },
+              beforeContentClassName: 'remote-cursor-carets' // We can add CSS for this
+            }
+          });
+        }
+      });
+
+      // Maintain decorations
+      const oldDecorations = (editor as any).__oldDecorations || [];
+      (editor as any).__oldDecorations = editor.deltaDecorations(oldDecorations, decorations);
+    }
+  }, [remoteCursors, sessionId]);
 
   return (
     <div className="flex flex-col md:flex-row h-screen w-screen bg-gray-100 overflow-hidden">
@@ -138,6 +170,19 @@ export default function InterviewPage() {
             language={language}
             value={code}
             onChange={(v: string | undefined) => updateCode(v || "")}
+            onMount={(editor: any, monaco: any) => {
+              // Listen for cursor changes
+              editor.onDidChangeCursorPosition((e: any) => {
+                broadcastCursor({ lineNumber: e.position.lineNumber, column: e.position.column });
+              });
+
+              // Store editor instance map if needed, or just use effect
+              // But since we can't easily pass editor out, we'll define the cursor effect here? 
+              // Actually, better to use a ref for the editor in the component
+              // But for now, let's attach the decoration logic directly or use a mutable ref
+              (window as any)[`__editor_${sessionId}`] = editor;
+              (window as any)[`__monaco_${sessionId}`] = monaco;
+            }}
             options={{
               minimap: { enabled: false },
               scrollBeyondLastLine: false,

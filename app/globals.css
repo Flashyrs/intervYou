@@ -1,0 +1,14 @@
+/* Remote Cursor Styles */
+.remote-cursor {
+  background-color: rgba(255, 0, 0, 0.5);
+  width: 2px !important;
+}
+
+.remote-cursor-carets::before {
+  content: '';
+  position: absolute;
+  top: -10px;
+  left: -2px;
+  border-left: 2px solid red;
+  height: 20px;
+}

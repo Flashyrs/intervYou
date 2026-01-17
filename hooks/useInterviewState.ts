@@ -22,12 +22,14 @@ export function useInterviewState(sessionId: string) {
     const [privateTests, setPrivateTests] = useState("");
     const [role, setRole] = useState<Role>("interviewee");
     const [showAuthModal, setShowAuthModal] = useState(false);
+    const [remoteCursors, setRemoteCursors] = useState<Record<string, any>>({});
 
     const channelRef = useRef<any>(null);
     const saveTimeout = useRef<any>(null);
     const pendingBroadcastRef = useRef<any>({});
     const broadcastTimeout = useRef<any>(null);
     const lastUpdateRef = useRef<number>(0);
+    const lastLocalEditRef = useRef<number>(0);
 
 
     const code = codeMap[language] || "";
@@ -147,42 +149,51 @@ export function useInterviewState(sessionId: string) {
         channelRef.current = channel;
 
         channel.on("broadcast", { event: "state" }, (payload: any) => {
-            const { clientId: senderClientId, language, codeMap: newCodeMap, driverMap: newDriverMap, problemText, sampleTests, timestamp } = payload?.payload || {};
+            const { clientId: senderClientId, language: newLang, codeMap: newCodeMap, driverMap: newDriverMap, problemText: newProb, sampleTests: newTests, cursor, timestamp } = payload?.payload || {};
 
             // Echo cancellation: only skip if it's from THIS exact client
             if (senderClientId && senderClientId === clientIdRef.current) {
-                console.log("⏭️ Skipping self-echo");
                 return;
             }
 
-            console.log("📨 Received broadcast from another participant:", { language, hasCodeMap: !!newCodeMap, hasProblemText: !!problemText });
-
             // Simple timestamp check to avoid out-of-order updates
+            // (Optional: strict timestamp checking might reject valid concurrent edits in LWW, 
+            // but we keep it for basic ordering)
             if (timestamp && timestamp < lastUpdateRef.current) {
-                console.log("⏭️ Skipping old update");
                 return;
             }
 
             // Update state from broadcast
-            if (language) {
-                console.log(`🔄 Updating language to: ${language}`);
-                setLanguage(language);
+
+            // 1. Language Update
+            if (newLang) {
+                setLanguage(newLang);
             }
+
+            // 2. Code Update (Patch) - WITH DEBOUNCE
             if (newCodeMap) {
-                console.log("🔄 Updating code map");
-                setCodeMap(prev => ({ ...prev, ...newCodeMap }));
+                const timeSinceLastEdit = Date.now() - lastLocalEditRef.current;
+                // If user typed recently (<300ms), IGNORE remote code updates to prevent jitter/overwrite
+                if (timeSinceLastEdit > 300) {
+                    setCodeMap(prev => ({ ...prev, ...newCodeMap }));
+                }
             }
+
+            // 3. Driver Update
             if (newDriverMap) {
-                console.log("🔄 Updating driver map");
                 setDriverMap(prev => ({ ...prev, ...newDriverMap }));
             }
-            if (typeof problemText === "string") {
-                console.log("🔄 Updating problem text");
-                setProblemText(problemText);
+
+            if (typeof newProb === "string") {
+                setProblemText(newProb);
             }
-            if (typeof sampleTests === "string") {
-                console.log("🔄 Updating sample tests");
-                setSampleTests(sampleTests);
+            if (typeof newTests === "string") {
+                setSampleTests(newTests);
+            }
+
+            // 4. Cursor Update
+            if (cursor && senderClientId) {
+                setRemoteCursors(prev => ({ ...prev, [senderClientId]: cursor }));
             }
         });
 
@@ -203,6 +214,19 @@ export function useInterviewState(sessionId: string) {
             supabase?.removeChannel(channel);
         };
     }, [sessionId]);
+
+    const broadcastCursor = (position: { lineNumber: number, column: number }) => {
+        if (channelRef.current) {
+            channelRef.current.send({
+                type: "broadcast",
+                event: "state",
+                payload: {
+                    clientId: clientIdRef.current,
+                    cursor: { ...position, userId, timestamp: Date.now() }
+                }
+            }).catch(() => { });
+        }
+    };
 
     const broadcast = (data: any) => {
         pendingBroadcastRef.current = { ...pendingBroadcastRef.current, ...data };
@@ -270,13 +294,20 @@ export function useInterviewState(sessionId: string) {
         setLanguage(lang);
         setCodeMap(prev => {
             const current = prev[lang] || "";
-            const injected = maybeInjectSkeleton(current, lang);
-            if (injected !== current) {
-                const next = { ...prev, [lang]: injected };
-                broadcast({ language: lang, codeMap: next });
-                persist({ language: lang, codeMap: next });
+            // Skeleton injection ONLY for interviewee
+            let nextCode = current;
+            if (role === 'interviewee') {
+                nextCode = maybeInjectSkeleton(current, lang);
+            }
+
+            if (nextCode !== current) {
+                const next = { ...prev, [lang]: nextCode };
+                const patch = { language: lang, codeMap: { [lang]: nextCode } };
+                broadcast(patch);
+                persist(patch);
                 return next;
             }
+
             broadcast({ language: lang });
             persist({ language: lang });
             return prev;
@@ -284,10 +315,13 @@ export function useInterviewState(sessionId: string) {
     };
 
     const updateCode = (newCode: string) => {
+        lastLocalEditRef.current = Date.now(); // Mark local edit time
         setCodeMap(prev => {
             const next = { ...prev, [language]: newCode };
-            broadcast({ codeMap: next });
-            persist({ codeMap: next });
+            // Broadcast PATCH only
+            const patch = { codeMap: { [language]: newCode } };
+            broadcast(patch);
+            persist(patch);
             return next;
         });
     };
@@ -348,6 +382,8 @@ export function useInterviewState(sessionId: string) {
         broadcast,
         persist,
         executionResult,
-        broadcastExecutionResult
+        broadcastExecutionResult,
+        remoteCursors,
+        broadcastCursor
     };
 }
