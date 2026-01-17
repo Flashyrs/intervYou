@@ -1,101 +1,52 @@
-# IntervYou — Real‑time Technical Interview Platform
+# IntervYou - Real-time Technical Interview Platform
 
-A Next.js (App Router) platform for conducting live technical interviews with collaborative coding, video, AI‑assisted test generation, and Judge0‑powered execution. Designed for interviewer/interviewee workflows, sample vs private test cases, and clean HackerRank‑style UX.
+A Next.js (App Router) platform for conducting live technical interviews with collaborative coding, video, AI-assisted test generation, and Judge0-powered execution. Designed for pair programming workflows with robust real-time synchronization.
 
 ## Key Features
+
 - **Live Interview Room**: Real-time video + shared code state (Monaco Editor).
+- **Pro Collaboration**:
+    - **Bidirectional Editing**: Both authentication users can type simultaneously.
+    - **Real-time Cursor Sync**: See your peer's cursor position in real-time.
+    - **Smart De-bouncing**: Updates are ignored while you type (300ms) to prevent cursor jitter.
+    - **Patch Updates**: Only modified lines are broadcast to save bandwidth.
+    - **"Last Edited By"**: Visual indicator to show who made the last change.
+- **Role-Based Security**:
+    - **Skeleton Injection**: Only the **Interviewee** can trigger code skeletons on language switch, preventing accidental overwrites by the interviewer.
 - **Multi-Language Support**: JavaScript, Java, C++ with instant switching.
-- **Judge0 Integration**: One‑call multi‑test harness to conserve API quota.
-- **Test Cases**:
-    - **Sample Tests**: Visible to the candidate.
-    - **Private Tests**: Hidden (locked) from the candidate, only pass/fail results shown.
-- **AI Assistance**: Google Gemini integration for generating problem descriptions, test cases, and language-specific driver code.
+- **Judge0 Integration**: One-call multi-test harness to conserve API quota.
+- **AI Assistance**: Google Gemini integration for generating problem descriptions, test cases, and private edge cases.
 - **Authentication**: Secure Google OAuth via NextAuth.js.
-- **Session Management**:
-    - Scheduled interviews with email invites.
-    - Automatic session expiration and archiving.
-    - Email notifications for archived sessions.
-- **Submissions**: Track attempts per problem with configurable limits (default: 2).
-- **Persistence**: PostgreSQL database with Prisma ORM.
+- **Session Management**: Scheduled interviews, email invites, and auto-archiving.
 
 ## Tech Stack
+
 - **Frontend**: Next.js 14 (App Router), TypeScript, Tailwind CSS, Lucide React.
-- **Editor**: `@monaco-editor/react` for the code editor.
+- **Editor**: `@monaco-editor/react` with custom decorators for cursor sync.
 - **Auth**: `next-auth` (Google Provider).
 - **Database**: PostgreSQL (via Prisma ORM).
-- **Realtime**: Supabase Realtime Channels for broadcasting code/cursor state.
+- **Realtime**: Supabase Realtime Channels (Broadcast Mode).
 - **Code Execution**: Judge0 (Server-to-Server).
 - **AI**: Google Gemini API.
-- **Email**: Nodemailer (SMTP).
 
-## Directory Structure
+## Real-time Sync Architecture
 
-```
-intervyou/
-├── app/                        # Next.js App Router
-│   ├── api/                    # API Routes (Server-side logic)
-│   │   ├── auth/               # NextAuth endpoints
-│   │   ├── execute/            # Code execution (Judge0 proxy)
-│   │   ├── interview/          # Session state management
-│   │   ├── invite/             # Session creation & invites
-│   │   ├── submissions/        # Submission tracking
-│   │   └── tests/              # AI test generation
-│   ├── dashboard/              # User dashboard (Submissions history)
-│   ├── interview/[sessionId]/  # Main Interview Room UI
-│   └── page.tsx                # Landing page
-├── components/                 # Reusable UI Components
-│   ├── interview/              # Interview-specific components (Editor, Video, etc.)
-│   └── ui/                     # Generic UI elements (Buttons, Dialogs, etc.)
-├── hooks/                      # Custom React Hooks
-├── lib/                        # Shared Utilities & Business Logic
-│   ├── auth.ts                 # Auth configuration
-│   ├── db.ts                   # Prisma client instance
-│   ├── email.ts                # Email sending logic
-│   ├── judge0.ts               # Judge0 API client
-│   ├── realtime.ts             # Supabase Realtime setup
-│   └── sessionExpiration.ts    # Session lifecycle management
-├── prisma/                     # Database Configuration
-│   └── schema.prisma           # Database Schema
-└── public/                     # Static Assets
-```
+IntervYou uses a robust "Last Write Wins" (LWW) strategy per language buffer, enhanced for pair programming:
 
-## Database Schema (High-Level)
-
-The application uses PostgreSQL with the following core models:
-
-- **User**: Registered users (via Google).
-- **InterviewSession**: Represents a single interview room.
-    - Tracks `participants`, `status` (active/expired), `scheduledFor`.
-    - Stores `participantJoinedAt` / `participantLeftAt` for attendance.
-- **InterviewState**: Stores the *current* state of an active interview.
-    - `code`, `language`, `problemText`, `sampleTests`, `driver`.
-    - This is mutable and updates in real-time.
-- **Submission**: Records a candidate's code submission.
-    - Stores `code`, `language`, `results` (pass/fail per test), `passed` (boolean).
-    - Linked to `User`, `Session`, and `Problem`.
-- **ExecutionLog**: Audit log of code executions.
-
-## One-Call Multi-Test Harness
-
-To optimize for Judge0's rate limits and latency, we do **not** make separate API calls for each test case. Instead, we use a "Harness" approach:
-
-1.  **Assembly**: When "Run Code" is clicked, the server combines:
-    - The Candidate's Code (Function definition).
-    - A "Driver" Code (Hidden logic that parses input/output).
-    - All Test Cases (Sample + Private).
-2.  **Execution**: This single combined file is sent to Judge0.
-3.  **Parsing**: The driver runs all tests internally and prints a JSON string to `stdout`.
-4.  **Result**: The server parses this JSON and returns structured results (Pass/Fail for each test case) to the frontend.
-
-This ensures we only consume **1 execution credit** per run, regardless of how many test cases are checked.
+1.  **Broadcasts**: Code changes are broadcast via Supabase channels as "patch" updates (only `{[lang]: code}`).
+2.  **Concurrency**:
+    -   Incoming updates are applied immediately unless the local user is typing.
+    -   **Debounce**: If the local user has typed within the last 300ms, incoming remote updates are skipped to maintain typing flow.
+3.  **Cursors**: Cursor positions (`lineNumber`, `column`) are broadcast on every change and rendered as colored carets.
 
 ## Prerequisites
+
 - Node.js 18+
 - PostgreSQL Database
 - Google Cloud Project (for OAuth)
-- Judge0 API Access (RapidAPI or Self-Hosted)
-- Google Gemini API Key (Optional, for AI features)
-- SMTP Server (e.g., Gmail) for emails
+- Supabase Project (for Realtime)
+- Judge0 API Access
+- Google Gemini API Key
 
 ## Environment Variables (.env)
 
@@ -111,7 +62,11 @@ GOOGLE_CLIENT_SECRET=your-google-client-secret
 # Database
 DATABASE_URL="postgresql://user:password@host:port/dbname?schema=public"
 
-# Public URL (for invites)
+# Realtime (Supabase)
+NEXT_PUBLIC_SUPABASE_URL=your-supabase-url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-key
+
+# Public URL
 NEXT_PUBLIC_APP_URL=http://localhost:3000
 
 # Judge0 (Code Execution)
@@ -126,10 +81,6 @@ EMAIL=your-email@gmail.com
 APP_PASSWORD=your-app-password
 SMTP_HOST=smtp.gmail.com
 SMTP_PORT=465
-
-# Submission Exemptions (Optional)
-# Emails that bypass submission limits
-EXEMPT_EMAIL1=admin@example.com
 ```
 
 ## Installation & Setup
@@ -160,7 +111,6 @@ EXEMPT_EMAIL1=admin@example.com
 5.  **Install Command**: `npm install`
 6.  Deploy!
 
-> **Note**: Ensure your database is accessible from Vercel (e.g., use Supabase, Neon, or a cloud-hosted Postgres).
-
 ## License
-MIT
+
+Distributed under the MIT License. See `LICENSE` for more information.
