@@ -21,6 +21,7 @@ export default function InterviewPage() {
     language,
     code,
     problemText,
+    problemTitle,
     sampleTests,
     privateTests,
     driver,
@@ -31,6 +32,7 @@ export default function InterviewPage() {
     updateLanguage,
     updateCode,
     updateProblemText,
+    updateProblemTitle,
     updateSampleTests,
     setCodeMapFull,
     setDriverMapFull,
@@ -62,6 +64,7 @@ export default function InterviewPage() {
     sampleTests,
     privateTests,
     problemText,
+    problemTitle,
   });
 
   // Sync execution results from other participants
@@ -130,7 +133,9 @@ export default function InterviewPage() {
             privateTests={privateTests}
             setPrivateTests={setPrivateTests}
             problemText={problemText}
+            problemTitle={problemTitle}
             setProblemText={updateProblemText}
+            setProblemTitle={updateProblemTitle}
             role={role}
             language={language}
             code={code}
@@ -165,6 +170,7 @@ export default function InterviewPage() {
             lastEditor={lastEditor}
             isFrozen={isFrozen}
             onToggleFreeze={toggleFreeze}
+            sessionId={sessionId}
           />
         </div>
 

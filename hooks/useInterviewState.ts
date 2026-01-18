@@ -18,6 +18,7 @@ export function useInterviewState(sessionId: string) {
     const [driverMap, setDriverMap] = useState<Record<string, string>>({});
 
     const [problemText, setProblemText] = useState("");
+    const [problemTitle, setProblemTitle] = useState("Problem 1"); // Default title
     const [sampleTests, setSampleTests] = useState("");
     const [privateTests, setPrivateTests] = useState("");
     const [role, setRole] = useState<Role>("interviewee");
@@ -69,6 +70,7 @@ export function useInterviewState(sessionId: string) {
                     }
 
                     if (typeof stateData.problemText === "string") setProblemText(stateData.problemText);
+                    if (typeof stateData.problemTitle === "string") setProblemTitle(stateData.problemTitle);
                     if (typeof stateData.sampleTests === "string") setSampleTests(stateData.sampleTests);
                 }
             } catch { }
@@ -133,6 +135,9 @@ export function useInterviewState(sessionId: string) {
                             if (typeof stateData.problemText === "string") {
                                 setProblemText(prev => stateData.problemText !== prev ? stateData.problemText : prev);
                             }
+                            if (typeof stateData.problemTitle === "string") {
+                                setProblemTitle(prev => stateData.problemTitle !== prev ? stateData.problemTitle : prev);
+                            }
                             if (typeof stateData.sampleTests === "string") {
                                 setSampleTests(prev => stateData.sampleTests !== prev ? stateData.sampleTests : prev);
                             }
@@ -151,7 +156,7 @@ export function useInterviewState(sessionId: string) {
         channelRef.current = channel;
 
         channel.on("broadcast", { event: "state" }, (payload: any) => {
-            const { clientId: senderClientId, language: newLang, codeMap: newCodeMap, driverMap: newDriverMap, problemText: newProb, sampleTests: newTests, cursor, timestamp } = payload?.payload || {};
+            const { clientId: senderClientId, language: newLang, codeMap: newCodeMap, driverMap: newDriverMap, problemText: newProb, problemTitle: newTitle, sampleTests: newTests, cursor, timestamp } = payload?.payload || {};
 
             // Echo cancellation: only skip if it's from THIS exact client
             if (senderClientId && senderClientId === clientIdRef.current) {
@@ -197,6 +202,9 @@ export function useInterviewState(sessionId: string) {
 
             if (typeof newProb === "string") {
                 setProblemText(newProb);
+            }
+            if (typeof newTitle === "string") {
+                setProblemTitle(newTitle);
             }
             if (typeof newTests === "string") {
                 setSampleTests(newTests);
@@ -361,6 +369,12 @@ export function useInterviewState(sessionId: string) {
         persist({ problemText: text });
     };
 
+    const updateProblemTitle = (title: string) => {
+        setProblemTitle(title);
+        broadcast({ problemTitle: title });
+        persist({ problemTitle: title });
+    };
+
     const updateSampleTests = (text: string) => {
         setSampleTests(text);
         broadcast({ sampleTests: text });
@@ -387,6 +401,7 @@ export function useInterviewState(sessionId: string) {
         code,
         codeMap,
         problemText,
+        problemTitle,
         sampleTests,
         privateTests,
         driver,
@@ -400,6 +415,7 @@ export function useInterviewState(sessionId: string) {
         setCodeMapFull,
         setDriverMapFull,
         updateProblemText,
+        updateProblemTitle,
         updateSampleTests,
         updateDriver,
         broadcast,

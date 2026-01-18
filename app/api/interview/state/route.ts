@@ -28,6 +28,7 @@ export async function POST(req: Request) {
     if (typeof problemText === "string") data.problemText = problemText;
     if (typeof sampleTests === "string") data.sampleTests = sampleTests;
     if (typeof driver === "string") data.driver = driver;
+    if (typeof body.problemTitle === "string") data.problemTitle = body.problemTitle;
 
     const saved = await prisma.interviewState.upsert({
       where: { sessionId },

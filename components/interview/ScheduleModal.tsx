@@ -10,6 +10,7 @@ interface ScheduleModalProps {
 
 export function ScheduleModal({ onClose, onSuccess }: ScheduleModalProps) {
     const [email, setEmail] = useState("");
+    const [inviteeName, setInviteeName] = useState("");
     const [scheduleType, setScheduleType] = useState<"instant" | "scheduled">("instant");
     const [scheduledDateTime, setScheduledDateTime] = useState("");
     const [loading, setLoading] = useState(false);
@@ -20,7 +21,7 @@ export function ScheduleModal({ onClose, onSuccess }: ScheduleModalProps) {
         setLoading(true);
 
         try {
-            const payload: any = { email };
+            const payload: any = { email, inviteeName };
 
             if (scheduleType === "scheduled") {
                 if (!scheduledDateTime) {
@@ -58,10 +59,10 @@ export function ScheduleModal({ onClose, onSuccess }: ScheduleModalProps) {
         }
     };
 
-    
+
     const getMinDateTime = () => {
         const now = new Date();
-        now.setMinutes(now.getMinutes() + 15); 
+        now.setMinutes(now.getMinutes() + 15);
         return now.toISOString().slice(0, 16);
     };
 
@@ -71,7 +72,21 @@ export function ScheduleModal({ onClose, onSuccess }: ScheduleModalProps) {
                 <h2 className="text-2xl font-semibold mb-4">Schedule Interview</h2>
 
                 <form onSubmit={handleSubmit} className="space-y-4">
-                    {}
+                    { }
+                    <div>
+                        <label className="block text-sm font-medium mb-2">
+                            Invitee Name <span className="text-gray-400 text-xs">(Optional)</span>
+                        </label>
+                        <input
+                            type="text"
+                            value={inviteeName}
+                            onChange={(e) => setInviteeName(e.target.value)}
+                            placeholder="John Doe"
+                            className="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-black outline-none"
+                        />
+                    </div>
+
+                    { }
                     <div>
                         <label className="block text-sm font-medium mb-2">
                             Invitee Email <span className="text-red-500">*</span>
@@ -86,7 +101,7 @@ export function ScheduleModal({ onClose, onSuccess }: ScheduleModalProps) {
                         />
                     </div>
 
-                    {}
+                    { }
                     <div>
                         <label className="block text-sm font-medium mb-2">Interview Type</label>
                         <div className="flex gap-4">
@@ -115,7 +130,7 @@ export function ScheduleModal({ onClose, onSuccess }: ScheduleModalProps) {
                         </div>
                     </div>
 
-                    {}
+                    { }
                     {scheduleType === "scheduled" && (
                         <div>
                             <label className="block text-sm font-medium mb-2">
@@ -130,12 +145,12 @@ export function ScheduleModal({ onClose, onSuccess }: ScheduleModalProps) {
                                 className="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-black outline-none"
                             />
                             <p className="text-xs text-gray-500 mt-1">
-                                Minimum 15 minutes from now. Reminder will be sent 15 minutes before.
+                                Minimum 15 minutes from now.
                             </p>
                         </div>
                     )}
 
-                    {}
+                    { }
                     <div className="flex gap-3 pt-2">
                         <button
                             type="button"
@@ -150,7 +165,7 @@ export function ScheduleModal({ onClose, onSuccess }: ScheduleModalProps) {
                             disabled={loading}
                             className="flex-1 px-4 py-2 bg-black text-white rounded-lg hover:bg-gray-800 transition disabled:opacity-50"
                         >
-                            {loading ? "Sending..." : scheduleType === "instant" ? "Send Invite" : "Schedule"}
+                            {loading ? "Sending..." : scheduleType === "instant" ? "Start Instant" : "Schedule"}
                         </button>
                     </div>
                 </form>

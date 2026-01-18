@@ -1,6 +1,8 @@
 import { Role } from "@/lib/types";
 import { useState, useEffect } from "react";
-import { Play, Send, Code2, ChevronDown, RotateCcw, CheckCircle2 } from "lucide-react";
+import { Play, Send, Code2, ChevronDown, RotateCcw, CheckCircle2, Square, LogOut } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useToast } from "@/components/Toast";
 
 interface ControlBarProps {
     language: string;
@@ -12,6 +14,7 @@ interface ControlBarProps {
     lastEditor?: { name: string, role: string, timestamp: number } | null;
     isFrozen?: boolean;
     onToggleFreeze?: () => void;
+    sessionId: string;
 }
 
 const allowedLangs = [
@@ -29,9 +32,12 @@ export function ControlBar({
     role,
     lastEditor,
     isFrozen,
-    onToggleFreeze
+    onToggleFreeze,
+    sessionId
 }: ControlBarProps) {
     const [showEditorParams, setShowEditorParams] = useState(false);
+    const router = useRouter();
+    const { push } = useToast();
 
     // Auto-hide last editor message after 2 seconds
     useEffect(() => {
@@ -41,6 +47,45 @@ export function ControlBar({
             return () => clearTimeout(t);
         }
     }, [lastEditor]);
+
+    // Heartbeat check
+    useEffect(() => {
+        if (!sessionId) return;
+
+        const interval = setInterval(async () => {
+            try {
+                const res = await fetch(`/api/session/${sessionId}/heartbeat`, { method: "POST" });
+                if (res.status === 410) {
+                    // Session ended
+                    push({ message: "This session has ended.", type: "error" });
+                    router.push("/dashboard");
+                }
+            } catch (e) {
+                console.error("Heartbeat failed", e);
+            }
+        }, 60000); // Every 1 minute
+
+        // Initial call
+        fetch(`/api/session/${sessionId}/heartbeat`, { method: "POST" }).catch(() => { });
+
+        return () => clearInterval(interval);
+    }, [sessionId, router, push]);
+
+    const endInterview = async () => {
+        if (!confirm("Are you sure you want to end this interview? This cannot be undone.")) return;
+
+        try {
+            const res = await fetch(`/api/session/${sessionId}/end`, { method: "POST" });
+            if (res.ok) {
+                push({ message: "Interview ended", type: "success" });
+                router.push("/dashboard");
+            } else {
+                push({ message: "Failed to end interview", type: "error" });
+            }
+        } catch (e) {
+            push({ message: "Failed to end interview", type: "error" });
+        }
+    };
 
     return (
         <div className="flex items-center justify-between h-12 px-2">
@@ -89,6 +134,17 @@ export function ControlBar({
                     </button>
                 )}
 
+                {role === "interviewer" && (
+                    <button
+                        onClick={endInterview}
+                        className="flex items-center gap-2 px-3 py-1.5 bg-white text-red-600 border border-red-200 rounded-md text-sm font-medium hover:bg-red-50 transition"
+                        title="End interview for everyone"
+                    >
+                        <Square className="w-4 h-4 fill-current" />
+                        End
+                    </button>
+                )}
+
                 <button
                     className="flex items-center gap-2 px-4 py-1.5 bg-gray-100 text-gray-700 rounded-md text-sm font-medium hover:bg-gray-200 transition border border-gray-200"
                     onClick={onRun}
@@ -107,6 +163,14 @@ export function ControlBar({
                         {submitting ? "Submitting..." : "Submit Solution"}
                     </button>
                 )}
+
+                <button
+                    onClick={() => router.push('/dashboard')}
+                    className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-md"
+                    title="Leave Room"
+                >
+                    <LogOut className="w-4 h-4" />
+                </button>
             </div>
         </div>
     );

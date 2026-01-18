@@ -10,6 +10,8 @@ interface TestPanelProps {
     setPrivateTests: (v: string) => void;
     problemText: string;
     setProblemText: (v: string) => void;
+    problemTitle?: string;
+    setProblemTitle?: (v: string) => void;
     role: Role;
     language: string;
     code: string;
@@ -27,6 +29,8 @@ export function TestPanel({
     setPrivateTests,
     problemText,
     setProblemText,
+    problemTitle,
+    setProblemTitle,
     role,
     language,
     code,
@@ -133,14 +137,25 @@ export function TestPanel({
                 </div>
 
                 {role === "interviewer" ? (
-                    <textarea
-                        className="flex-1 w-full border rounded-lg p-3 text-sm resize-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                        value={problemText}
-                        onChange={(e) => setProblemText(e.target.value)}
-                        placeholder="Paste raw problem description here..."
-                    />
+                    <div className="flex flex-col gap-2 mb-2">
+                        <input
+                            className="w-full bg-transparent text-lg font-bold border-b border-transparent hover:border-gray-300 focus:border-indigo-500 focus:ring-0 outline-none px-1 py-0.5 transition-colors placeholder-gray-400"
+                            value={problemTitle || ""}
+                            onChange={(e) => setProblemTitle?.(e.target.value)}
+                            placeholder="Problem Title"
+                        />
+                        <textarea
+                            className="flex-1 w-full border rounded-lg p-3 text-sm resize-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                            value={problemText}
+                            onChange={(e) => setProblemText(e.target.value)}
+                            placeholder="Paste raw problem description here..."
+                        />
+                    </div>
                 ) : (
-                    <div className="flex-1 w-full border rounded-lg p-4 bg-gray-50 overflow-y-auto prose prose-sm max-w-none">
+                    <div className="flex-1 w-full border rounded-lg p-4 bg-gray-50 overflow-y-auto prose prose-sm max-w-none flex flex-col">
+                        <h1 className="text-xl font-bold text-gray-900 mb-4 pb-2 border-b">
+                            {problemTitle || "Problem"}
+                        </h1>
                         <div className="whitespace-pre-wrap font-sans text-gray-800">
                             {problemText || "Waiting for interviewer to provide problem..."}
                         </div>

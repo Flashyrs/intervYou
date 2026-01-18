@@ -17,10 +17,14 @@ A Next.js (App Router) platform for conducting live technical interviews with co
 - **Interviewer Freeze (Soft Pause)**:
     - Interviewer can temporarily pause the session (read-only mode) to explain concepts.
     - Displays a "Session Paused" overlay to the candidate.
-- **Judge0 Integration**: One-call multi-test harness to conserve API quota.
-- **AI Assistance**: Google Gemini integration for generating problem descriptions, test cases, and private edge cases.
-- **Authentication**: Secure Google OAuth via NextAuth.js.
-- **Session Management**: Scheduled interviews, email invites, and auto-archiving.
+- **Multiple Problems per Session**:
+    -   **Dynamic Context**: Interviewers can set a "Problem Title" to isolate submissions and code state for different questions in the same session.
+    -   **Submission History**: Each problem has its own submission history (up to 10 attempts per problem).
+-   **Submission Limits**: Increased limit to 10 submissions per problem/session for robust testing.
+-   **Judge0 Integration**: One-call multi-test harness to conserve API quota.
+-   **AI Assistance**: Google Gemini integration for generating problem descriptions, test cases, and private edge cases.
+-   **Authentication**: Secure Google OAuth via NextAuth.js.
+-   **Session Management**: Scheduled interviews, email invites, and auto-archiving.
 
 ## Tech Stack
 
@@ -96,7 +100,7 @@ SMTP_PORT=465
 2.  **Database Setup**:
     ```bash
     npx prisma generate
-    npx prisma migrate dev
+    node scripts/db-push.js
     ```
 
 3.  **Run Development Server**:

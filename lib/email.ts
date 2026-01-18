@@ -8,6 +8,7 @@ interface InviteEmailOptions {
   inviter?: Inviter;
   scheduledFor?: Date;
   isScheduled?: boolean;
+  inviteeName?: string | null;
 }
 
 export async function sendInviteEmail(
@@ -15,13 +16,14 @@ export async function sendInviteEmail(
   link: string,
   inviter?: Inviter,
   scheduledFor?: Date,
-  isScheduled?: boolean
+  isScheduled?: boolean,
+  inviteeName?: string | null
 ) {
-  return sendInviteEmailWithOptions({ to, link, inviter, scheduledFor, isScheduled });
+  return sendInviteEmailWithOptions({ to, link, inviter, scheduledFor, isScheduled, inviteeName });
 }
 
 export async function sendInviteEmailWithOptions(options: InviteEmailOptions) {
-  const { to, link, inviter, scheduledFor, isScheduled } = options;
+  const { to, link, inviter, scheduledFor, isScheduled, inviteeName } = options;
   const user = process.env.EMAIL;
   const pass = process.env.APP_PASSWORD;
   if (!user || !pass) {
@@ -47,22 +49,24 @@ export async function sendInviteEmailWithOptions(options: InviteEmailOptions) {
       timeStyle: 'short',
       timeZone: 'UTC'
     })} UTC<br/>
-        <em>Please convert to your local timezone</em>
+        <em>Please join 5 minutes early.</em>
       </p>
     `
     : "";
 
   const joinInstructions = isScheduled
-    ? "Please click the link below to join at the scheduled time (you can join up to 5 minutes early)."
+    ? "Please click the link below to join at the scheduled time."
     : "Please click the link below to join the interview.";
 
   const subject = isScheduled
-    ? `Scheduled Interview Invitation – IntervYou`
+    ? `Scheduled Interview: ${inviterName} invited you`
     : "Interview Invitation – IntervYou";
+
+  const greeting = inviteeName ? `Hello ${inviteeName},` : "Hello,";
 
   const html = `
   <div style="font-family: Arial, sans-serif; color: #111;">
-    <p>Hello,</p>
+    <p>${greeting}</p>
     <p>You have been invited to a technical interview on <strong>IntervYou</strong>.</p>
     <p>
       <strong>Interviewer:</strong> ${inviterName}${inviterEmail}<br/>
@@ -138,7 +142,7 @@ export async function sendScheduledReminderEmail(
     <p>Best regards,<br/>IntervYou Team</p>
   </div>`;
 
-  
+
   for (const recipient of to) {
     try {
       await transporter.sendMail({
@@ -192,7 +196,7 @@ export async function sendSessionArchivedEmail(
     <p>Best regards,<br/>IntervYou Team</p>
   </div>`;
 
-  
+
   for (const recipient of to) {
     if (!recipient) continue;
     try {

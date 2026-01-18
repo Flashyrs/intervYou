@@ -7,13 +7,46 @@ const EXEMPT_EMAILS = new Set([
   process.env.EXEMPT_EMAIL2 || "",
 ].filter(Boolean));
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
     const session = await requireAuth();
     const userId = (session.user as any)?.id as string;
+    const { searchParams } = new URL(req.url);
+    const filterSessionId = searchParams.get("sessionId");
+
+    let where: any = { userId };
+
+    // If querying by sessionId, allow viewing ALL submissions for that session IF user was a participant
+    if (filterSessionId) {
+      // Verify participation
+      const sess = await prisma.interviewSession.findUnique({
+        where: { id: filterSessionId },
+        include: { participants: true }
+      });
+      if (!sess) return NextResponse.json({ error: "Session not found" }, { status: 404 });
+
+      const isParticipant = sess.participants.some(p => p.id === userId);
+      if (!isParticipant) return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+
+      // Set filter to sessionId (removes userId constraint to see others)
+      where = { sessionId: filterSessionId };
+    }
+
     const rows = await prisma.submission.findMany({
-      where: { userId },
+      where,
       orderBy: { updatedAt: "desc" },
+      include: {
+        session: {
+          include: {
+            participants: {
+              select: { id: true, name: true, email: true }
+            }
+          }
+        },
+        user: {
+          select: { id: true, name: true, email: true }
+        }
+      }
     });
     return NextResponse.json(rows, { status: 200 });
   } catch (e: any) {
@@ -35,8 +68,8 @@ export async function POST(req: Request) {
 
 
     const existing = await prisma.submission.findUnique({ where: { sessionId_problemId_userId: { sessionId, problemId, userId } } });
-    if (existing && !EXEMPT_EMAILS.has(email) && existing.attempts >= 2) {
-      return NextResponse.json({ error: "submission limit reached (2 per problem)" }, { status: 429 });
+    if (existing && !EXEMPT_EMAILS.has(email) && existing.attempts >= 10) {
+      return NextResponse.json({ error: "submission limit reached (10 per problem)" }, { status: 429 });
     }
 
     const saved = await prisma.submission.upsert({

@@ -11,6 +11,7 @@ interface UseCodeExecutionProps {
     sampleTests: string;
     privateTests: string;
     problemText?: string;
+    problemTitle?: string;
 }
 
 export function useCodeExecution({
@@ -21,6 +22,7 @@ export function useCodeExecution({
     sampleTests,
     privateTests,
     problemText,
+    problemTitle,
 }: UseCodeExecutionProps) {
     const [runOutput, setRunOutput] = useState<string>("");
     const [caseResults, setCaseResults] = useState<any[]>([]);
@@ -119,7 +121,7 @@ export function useCodeExecution({
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     sessionId,
-                    problemId: "custom",
+                    problemId: (problemTitle || "problem-1").toLowerCase().replace(/[^a-z0-9]+/g, '-') || "custom",
                     language,
                     code,
                     results: resultsStr,

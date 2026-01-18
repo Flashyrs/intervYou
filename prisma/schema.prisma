@@ -17,6 +17,7 @@ model User {
   accounts          Account[]
   createdAt         DateTime           @default(now())
   interviewSessions InterviewSession[] @relation("InterviewParticipants")
+  submissions       Submission[]
 }
 model InterviewState {
         sessionId   String  @id
@@ -25,6 +26,7 @@ model InterviewState {
         problemText String?
         sampleTests String?
         driver      String?   
+        problemTitle String?
         createdAt   DateTime  @default(now())
         updatedAt   DateTime  @updatedAt
       }
@@ -69,12 +71,16 @@ model InterviewSession {
   scheduledFor        DateTime?
   isScheduled         Boolean   @default(false)
   inviteeEmail        String?
-  
+  inviteeName         String?
+
   // Session expiration fields
-  status              String    @default("active") // "active", "expired", "scheduled"
-  expiresAt           DateTime?
+  status              String    @default("active") // "active", "expired", "scheduled", "completed"
+  startedAt           DateTime?
+  endedAt             DateTime?
+  lastActiveAt        DateTime?
   participantJoinedAt Json?     // { userId: timestamp }
   participantLeftAt   Json?     // { userId: timestamp }
+  submissions         Submission[]
   
   @@index([status])
   @@index([scheduledFor])
@@ -94,6 +100,9 @@ model Submission {
   memory      Float?   // Memory used in kilobytes
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+  
+  session     InterviewSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([sessionId, problemId, userId])  // one row per user/problem/session
   @@index([sessionId, userId])

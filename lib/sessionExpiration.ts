@@ -2,7 +2,7 @@ import { prisma } from "./db";
 import { sendSessionArchivedEmail } from "./email";
 
 export interface ParticipantTracking {
-    [userId: string]: number; 
+    [userId: string]: number;
 }
 
 /**
@@ -21,7 +21,7 @@ export async function trackParticipantJoin(sessionId: string, userId: string) {
         const joinedAt = (session.participantJoinedAt as ParticipantTracking) || {};
         joinedAt[userId] = Date.now();
 
-        
+
         const leftAt = (session.participantLeftAt as ParticipantTracking) || {};
         delete leftAt[userId];
 
@@ -64,8 +64,8 @@ export async function trackParticipantLeave(sessionId: string, userId: string) {
             },
         });
 
-        
-        
+
+
         scheduleExpirationCheck(sessionId);
 
         return { success: true };
@@ -80,9 +80,9 @@ export async function trackParticipantLeave(sessionId: string, userId: string) {
  * If users don't rejoin within 30 seconds, session expires
  */
 function scheduleExpirationCheck(sessionId: string) {
-    
-    
-    
+
+
+
     console.log(`Scheduled expiration check for session ${sessionId}`);
 }
 
@@ -100,16 +100,16 @@ export async function endSession(sessionId: string, userId: string) {
             throw new Error("Session not found");
         }
 
-        
+
         await prisma.interviewSession.update({
             where: { id: sessionId },
             data: {
                 status: "expired",
-                expiresAt: new Date(),
+                endedAt: new Date(),
             },
         });
 
-        
+
         await cleanupExpiredSession(sessionId);
 
         return { success: true, expired: true };
@@ -141,41 +141,41 @@ export async function checkAndExpireSession(sessionId: string) {
 
         const joinedUserIds = Object.keys(joinedAt);
 
-        
+
         if (joinedUserIds.length === 0) {
             return { expired: false };
         }
 
-        
+
         const allLeft = joinedUserIds.every((userId) => leftAt[userId] !== undefined);
 
         if (!allLeft) {
             return { expired: false };
         }
 
-        
-        const GRACE_PERIOD_MS = 30 * 1000; 
+
+        const GRACE_PERIOD_MS = 30 * 1000;
         const now = Date.now();
 
-        
+
         const lastLeaveTime = Math.max(...joinedUserIds.map(id => leftAt[id] || 0));
         const timeSinceLastLeave = now - lastLeaveTime;
 
-        
+
         if (timeSinceLastLeave < GRACE_PERIOD_MS) {
             return { expired: false, gracePeriodRemaining: GRACE_PERIOD_MS - timeSinceLastLeave };
         }
 
-        
+
         await prisma.interviewSession.update({
             where: { id: sessionId },
             data: {
                 status: "expired",
-                expiresAt: new Date(),
+                endedAt: new Date(),
             },
         });
 
-        
+
         await cleanupExpiredSession(sessionId);
 
         return { expired: true };
@@ -201,10 +201,10 @@ export async function cleanupExpiredSession(sessionId: string) {
             return;
         }
 
-        
-        
 
-        
+
+
+
         const emails = session.participants
             .map(p => p.email)
             .filter((email): email is string => !!email);
@@ -241,9 +241,9 @@ export async function isSessionAccessible(sessionId: string): Promise<boolean> {
             return false;
         }
 
-        
+
         if (session.status === "expired") {
-            
+
             const leftAt = (session.participantLeftAt as ParticipantTracking) || {};
             const leaveTimestamps = Object.values(leftAt);
 
@@ -252,7 +252,7 @@ export async function isSessionAccessible(sessionId: string): Promise<boolean> {
                 const lastLeaveTime = Math.max(...leaveTimestamps);
                 const timeSinceLastLeave = Date.now() - lastLeaveTime;
 
-                
+
                 if (timeSinceLastLeave < GRACE_PERIOD_MS) {
                     return true;
                 }
@@ -261,10 +261,10 @@ export async function isSessionAccessible(sessionId: string): Promise<boolean> {
             return false;
         }
 
-        
+
         if (session.status === "scheduled" && session.scheduledFor) {
             const now = new Date();
-            
+
             const allowedTime = new Date(session.scheduledFor.getTime() - 5 * 60 * 1000);
             if (now < allowedTime) {
                 return false;
