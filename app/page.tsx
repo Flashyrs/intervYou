@@ -90,17 +90,6 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="bg-white border-t py-12">
-        <div className="max-w-7xl mx-auto px-4 text-center text-gray-500 text-sm">
-          <p>&copy; {new Date().getFullYear()} IntervYou. All rights reserved.</p>
-          <div className="mt-4 flex justify-center gap-6">
-            <Link href="#" className="hover:text-gray-900">Privacy</Link>
-            <Link href="#" className="hover:text-gray-900">Terms</Link>
-            <Link href="https://github.com/Flashyrs/intervYou" className="hover:text-gray-900">GitHub</Link>
-          </div>
-        </div>
-      </footer>
     </div>
   );
 }

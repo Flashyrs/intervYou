@@ -92,13 +92,14 @@ export default function DashboardPage() {
     pres?.on("presence", { event: "sync" }, () => {
       const state = pres?.presenceState();
       const users = Object.values(state || {})
-        .flatMap((arr: any) => arr.map((i: any) => `${i.name || i.email || i.userId}`))
-        .filter(Boolean);
+        .flatMap((arr: any) => arr.map((i: any) => i.name || i.email)) // prioritize name, then email
+        .filter((u: any) => u && u !== "undefined" && u !== "null"); // filter garbage
       setOnline(Array.from(new Set(users)) as string[]);
     });
 
     pres?.subscribe((status: any) => {
-      if (status === "SUBSCRIBED") {
+      if (status === "SUBSCRIBED" && userId) {
+        // Only track if we have a valid user
         pres.track({ userId, name: session?.user?.name, email: session?.user?.email });
       }
     });

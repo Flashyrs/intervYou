@@ -1,5 +1,6 @@
-import '../styles/globals.css';
+import './globals.css';
 import { Navbar } from '@/components/Navbar';
+import { Footer } from '@/components/Footer';
 import Providers from './providers';
 import { ToastProvider } from '@/components/Toast';
 
@@ -11,11 +12,14 @@ export const metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body className="min-h-screen bg-white text-gray-900">
+      <body className="min-h-screen bg-white text-gray-900 flex flex-col">
         <Providers>
           <ToastProvider>
             <Navbar />
-            {children}
+            <div className="flex-1">
+              {children}
+            </div>
+            <Footer />
           </ToastProvider>
         </Providers>
       </body>
