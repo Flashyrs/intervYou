@@ -53,6 +53,7 @@ export default function VideoCall({
 
     (async () => {
       try {
+        console.log("Initializing Video Call Peer Connection...");
         const { pc, localStream, remoteStream } = await setupPeerConnection();
 
         if (!mounted) {
@@ -66,15 +67,13 @@ export default function VideoCall({
 
         if (localRef.current && localStream) {
           localRef.current.srcObject = localStream;
-
           localRef.current.play().catch((e) => {
-            console.warn("Local video autoplay failed, user interaction may be required", e);
+            console.warn("Local video autoplay failed", e);
           });
         }
 
         if (remoteRef.current) {
           remoteRef.current.srcObject = remoteStream;
-
           remoteRef.current.play().catch((e) => {
             console.warn("Remote video autoplay failed", e);
           });
@@ -88,13 +87,14 @@ export default function VideoCall({
         }
 
         pc.onconnectionstatechange = () => {
+          console.log(`PC Connection State: ${pc.connectionState}`);
           if (mounted) {
             setConnectionState(pc.connectionState);
             if (pc.connectionState === "connected") {
               setActive(true);
               setError("");
             } else if (pc.connectionState === "failed") {
-              setError("Connection failed. Please check your network.");
+              setError("Connection failed. Please check your network or firewall.");
               setActive(false);
             }
           }
@@ -115,7 +115,10 @@ export default function VideoCall({
           if (!payload || !mounted) return;
 
           try {
+            console.log(`Processing signal: ${payload.type} from ${payload.from}`);
+
             if (payload.type === "call-offer" && role === "interviewer") {
+              console.log("Received Offer, creating Answer...");
               const answer = await createAnswer(pc, payload.sdp);
               broadcast(room, {
                 type: "call-answer",
@@ -124,65 +127,56 @@ export default function VideoCall({
                 sdp: answer
               });
 
+              // Apply loose ICE candidates
               while (pendingIceCandidates.length > 0) {
                 const candidate = pendingIceCandidates.shift();
                 if (candidate) {
-                  try {
-                    await pc.addIceCandidate(candidate);
-                  } catch (e) {
-                    console.warn("Failed to add queued ICE candidate", e);
-                  }
+                  await pc.addIceCandidate(candidate).catch(e => console.warn("Failed adding queued ICE", e));
                 }
               }
+
             } else if (payload.type === "call-answer" && role === "interviewee") {
+              console.log("Received Answer, applying...");
               await applyAnswer(pc, payload.sdp);
 
               while (pendingIceCandidates.length > 0) {
                 const candidate = pendingIceCandidates.shift();
                 if (candidate) {
-                  try {
-                    await pc.addIceCandidate(candidate);
-                  } catch (e) {
-                    console.warn("Failed to add queued ICE candidate", e);
-                  }
+                  await pc.addIceCandidate(candidate).catch(e => console.warn("Failed adding queued ICE", e));
                 }
               }
+
             } else if (payload.type === "ice-candidate") {
+              // Only add ICE if we have a remote description, otherwise queue
               const candidate = new RTCIceCandidate(payload.candidate);
-
-              if (pc.remoteDescription) {
-                try {
-                  await pc.addIceCandidate(candidate);
-                } catch (e) {
-                  console.warn("Failed to add ICE candidate", e);
-                }
+              if (pc.remoteDescription && pc.remoteDescription.type) {
+                await pc.addIceCandidate(candidate).catch(e => console.warn("Failed adding ICE", e));
               } else {
-
+                console.log("Queueing ICE candidate (no remote description yet)");
                 pendingIceCandidates.push(candidate);
               }
             }
           } catch (e) {
-            console.error("Signaling error", e);
-            if (mounted) setError("Signaling error occurred");
+            console.error("Signaling processing error", e);
           }
         });
 
         channelRef.current = ch;
 
-        if (ch && (!ch.state || ch.state === "closed")) {
-          await ch.subscribe();
-        }
-
+        // Auto-start logic
         if (role === "interviewee" && autoStart) {
+          // Wait a bit for channel to be ready
           setTimeout(() => {
             if (mounted) {
+              console.log("Auto-starting call as Interviewee...");
               startCall().catch((e) => {
                 console.error("Auto-start failed", e);
                 if (mounted) setError("Failed to start call");
               });
             }
-          }, 500);
+          }, 2000); // Increased delay to ensure channel subscription
         }
+
       } catch (e) {
         console.error("Setup error", e);
         if (mounted) setError("Failed to initialize video call");
@@ -192,23 +186,12 @@ export default function VideoCall({
     return () => {
       mounted = false;
       if (channelRef.current) {
-        try {
-          // Don't unsubscribe immediately to avoid race conditions on quick re-renders
-          // but do clean up listeners if possible
-          channelRef.current.unsubscribe();
-        } catch (e) {
-          console.warn("Channel cleanup error", e);
-        }
+        // We generally rely on global cleanup, but good to be safe
+        // channelRef.current.unsubscribe(); 
       }
       if (pcRef.current) {
-        try {
-          pcRef.current.getSenders().forEach((sender) => {
-            sender.track?.stop();
-          });
-          pcRef.current.close();
-        } catch (e) {
-          console.warn("PC cleanup error", e);
-        }
+        pcRef.current.close();
+        pcRef.current = null;
       }
     };
   }, [room, role, autoStart, startCall]);

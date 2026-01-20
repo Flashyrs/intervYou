@@ -41,6 +41,7 @@ export function onSignal(room: string, handler: (payload: SignalPayload) => void
 
   const handleSignal = (msg: any) => {
     try {
+      console.log(`[Signal Received] ${msg?.payload?.type} from ${msg?.payload?.from}`);
       handler(msg?.payload);
     } catch (error) {
       console.error("Signal handler error:", error);
@@ -49,13 +50,16 @@ export function onSignal(room: string, handler: (payload: SignalPayload) => void
 
   ch.on("broadcast", { event: "signal" }, handleSignal);
 
-  // Ensure subscription is active
+  // Subscribe if not already joined/joining
   if (ch.state !== 'joined' && ch.state !== 'joining') {
     ch.subscribe((status) => {
+      console.log(`Region Channel '${room}' status:`, status);
       if (status === 'SUBSCRIBED') {
-        console.log(`Subscribed to signal channel: ${room}`);
+        // console.log(`Subscribed to signal channel: ${room}`);
       } else if (status === 'CHANNEL_ERROR') {
         console.error(`Failed to subscribe to signal channel: ${room}`);
+      } else if (status === 'TIMED_OUT') {
+        console.error(`Subscription timed out for channel: ${room}`);
       }
     });
   }
