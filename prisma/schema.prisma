@@ -88,6 +88,9 @@ model InterviewSession {
   
   @@index([status])
   @@index([scheduledFor])
+  @@index([createdBy])
+  @@index([inviteeEmail])
+  @@index([createdAt])
 }
 model Submission {
   id          String   @id @default(cuid())
