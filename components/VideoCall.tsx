@@ -187,7 +187,7 @@ export default function VideoCall({
       mounted = false;
       if (channelRef.current) {
         // We generally rely on global cleanup, but good to be safe
-        // channelRef.current.unsubscribe(); 
+        channelRef.current.unsubscribe();
       }
       if (pcRef.current) {
         pcRef.current.close();

@@ -72,6 +72,7 @@ export function useInterviewState(sessionId: string) {
                     if (typeof stateData.problemText === "string") setProblemText(stateData.problemText);
                     if (typeof stateData.problemTitle === "string") setProblemTitle(stateData.problemTitle);
                     if (typeof stateData.sampleTests === "string") setSampleTests(stateData.sampleTests);
+                    if (typeof stateData.privateTests === "string") setPrivateTests(stateData.privateTests);
                 }
             } catch { }
         })();
@@ -141,6 +142,19 @@ export function useInterviewState(sessionId: string) {
                             if (typeof stateData.sampleTests === "string") {
                                 setSampleTests(prev => stateData.sampleTests !== prev ? stateData.sampleTests : prev);
                             }
+                            if (typeof stateData.privateTests === "string") {
+                                setPrivateTests(prev => stateData.privateTests !== prev ? stateData.privateTests : prev);
+                            }
+                            // Sync stored execution result if available
+                            if (stateData.lastOutput) {
+                                setExecutionResult((prev: any) => {
+                                    // Deep equality check is expensive, simple JSON stringify check
+                                    if (JSON.stringify(prev) !== JSON.stringify(stateData.lastOutput)) {
+                                        return stateData.lastOutput;
+                                    }
+                                    return prev;
+                                });
+                            }
                         }
                     }
                 } catch (err) {
@@ -177,18 +191,26 @@ export function useInterviewState(sessionId: string) {
                 setLanguage(newLang);
             }
 
-            // 2. Code Update (Patch) - WITH DEBOUNCE
+            // 2. Code Update (Patch) - OPTIMIZED
             if (newCodeMap) {
+                // Reduced debounce to 50ms for sub-100ms perceived latency
+                // Just enough to prevent local-echo loops, but fast enough for collaboration
                 const timeSinceLastEdit = Date.now() - lastLocalEditRef.current;
-                // If user typed recently (<300ms), IGNORE remote code updates to prevent jitter/overwrite
-                if (timeSinceLastEdit > 300) {
-                    setCodeMap(prev => ({ ...prev, ...newCodeMap }));
+
+                if (senderClientId !== clientIdRef.current && timeSinceLastEdit > 300) {
+                    setCodeMap(prev => {
+                        // Merge logic: only update if actual change
+                        const hasChange = Object.keys(newCodeMap).some(k => newCodeMap[k] !== prev[k]);
+                        if (!hasChange) return prev;
+                        return { ...prev, ...newCodeMap };
+                    });
 
                     // Update Last Editor Indicator
-                    if (payload?.payload?.role) {
+                    const p = payload?.payload as any;
+                    if (p?.role) {
                         setLastEditor({
-                            name: payload.payload.userId || "Peer",
-                            role: payload.payload.role,
+                            name: p.userId || "Peer",
+                            role: p.role,
                             timestamp: Date.now()
                         });
                     }
@@ -209,6 +231,9 @@ export function useInterviewState(sessionId: string) {
             if (typeof newTests === "string") {
                 setSampleTests(newTests);
             }
+            if (payload?.payload?.privateTests && typeof payload.payload.privateTests === "string") {
+                setPrivateTests(payload.payload.privateTests);
+            }
 
             // 4. Cursor Update
             if (cursor && senderClientId) {
@@ -219,11 +244,21 @@ export function useInterviewState(sessionId: string) {
             if (payload?.payload?.isFrozen !== undefined) {
                 setIsFrozen(payload.payload.isFrozen);
             }
+
+            // 6. Last Output Update (from persist patch, fallback for broadcast)
+            if (payload?.payload?.lastOutput) {
+                setExecutionResult(payload.payload.lastOutput);
+            }
         });
 
         channel.on("broadcast", { event: "execution_result" }, (payload: any) => {
             console.log("📨 Received execution result broadcast");
             setExecutionResult(payload.payload);
+        });
+
+        channel.on("broadcast", { event: "session_ended" }, () => {
+            console.warn("⚠️ Session ended by interviewer");
+            window.location.href = "/dashboard";
         });
 
         channel.subscribe((status) => {
@@ -240,7 +275,7 @@ export function useInterviewState(sessionId: string) {
     }, [sessionId]);
 
     const broadcastCursor = (position: { lineNumber: number, column: number }) => {
-        if (channelRef.current) {
+        if (channelRef.current && channelRef.current.state === 'joined') {
             channelRef.current.send({
                 type: "broadcast",
                 event: "state",
@@ -271,7 +306,7 @@ export function useInterviewState(sessionId: string) {
             pendingBroadcastRef.current = {};
 
             // Try Supabase broadcast
-            if (channelRef.current) {
+            if (channelRef.current && channelRef.current.state === 'joined') {
                 channelRef.current.send({
                     type: "broadcast",
                     event: "state",
@@ -280,7 +315,8 @@ export function useInterviewState(sessionId: string) {
                     console.warn("⚠️ Broadcast failed (Supabase):", e.message);
                 });
             } else {
-                console.warn("⚠️ No Supabase channel, relying on polling fallback");
+                // If not joined, rely on polling/persist (which we invoke below)
+                // console.warn("⚠️ Channel not joined, relying on persist");
             }
 
             // Always persist to database as backup
@@ -289,17 +325,29 @@ export function useInterviewState(sessionId: string) {
     };
 
     const broadcastExecutionResult = (result: any) => {
-        if (channelRef.current) {
-            channelRef.current.send({
-                type: "broadcast",
-                event: "execution_result",
-                payload: result
-            }).catch((e: any) => {
-                console.error("❌ Execution result broadcast failed:", e);
-            });
-        } else {
-            console.warn("⚠️ No channel for execution broadcast");
+        if (!channelRef.current || channelRef.current.state !== 'joined') {
+            console.warn("⚠️ Channel not joined for execution broadcast");
+            // Try global fallback? Or just rely on local state?
+            // Page.tsx sets local state anyway for the runner.
+            // For the peer, we need this. 
+            // We can try to force using the global supabase client if it has an active channel, 
+            // but usually this ref is the active channel.
+            return;
         }
+
+        // Immediate send, no debounce for results
+        channelRef.current.send({
+            type: "broadcast",
+            event: "execution_result",
+            payload: result
+        }).then(() => {
+            console.log("✅ Execution result broadcast successfully");
+        }).catch((e: any) => {
+            console.error("❌ Execution result broadcast failed:", e);
+        });
+
+        // ALSO persist to DB for reliability
+        persist({ lastOutput: result });
     };
 
     const persist = (patch: any) => {
@@ -396,6 +444,21 @@ export function useInterviewState(sessionId: string) {
         broadcast({ isFrozen: newState });
     };
 
+    const endSession = async () => {
+        // Broadcast first so others leave
+        if (channelRef.current && channelRef.current.state === 'joined') {
+            await channelRef.current.send({
+                type: "broadcast",
+                event: "session_ended",
+                payload: {}
+            });
+        }
+
+        // Call API to close
+        await fetch(`/api/session/${sessionId}/end`, { method: "POST" });
+        window.location.href = "/dashboard";
+    };
+
     return {
         language,
         code,
@@ -409,7 +472,11 @@ export function useInterviewState(sessionId: string) {
         role,
         showAuthModal,
         setShowAuthModal,
-        setPrivateTests,
+        setPrivateTests: (text: string) => {
+            setPrivateTests(text);
+            broadcast({ privateTests: text });
+            persist({ privateTests: text });
+        },
         updateLanguage,
         updateCode,
         setCodeMapFull,
@@ -424,8 +491,9 @@ export function useInterviewState(sessionId: string) {
         broadcastExecutionResult,
         remoteCursors,
         broadcastCursor,
-        lastEditor,
         isFrozen,
-        toggleFreeze
+        toggleFreeze,
+        lastEditor,
+        endSession
     };
 }

@@ -397,8 +397,12 @@ class Main {
         java.io.PrintWriter pw = new java.io.PrintWriter(sw);
         t.printStackTrace(pw);
         
+        String err = sw.toString();
+        if (t instanceof ClassCastException && err.contains("JSONObject") && err.contains("List")) {
+             err = "Type Mismatch: Test case input is an Object {}, but code expects Array/List [].\\n" + err;
+        }
         Map<String,Object> r = new LinkedHashMap<>();
-        r.put("error", "Runtime Error: " + sw.toString());
+        r.put("error", "Runtime Error: " + err);
         results.add(r);
         System.out.println("___JSON_RESULT___");
         System.out.println(toJson(results));

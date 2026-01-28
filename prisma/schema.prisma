@@ -27,6 +27,10 @@ model InterviewState {
         sampleTests String?
         driver      String?   
         problemTitle String?
+        privateTests String?
+        codeMap     Json?
+        driverMap   Json?
+        lastOutput  Json?
         createdAt   DateTime  @default(now())
         updatedAt   DateTime  @updatedAt
       }

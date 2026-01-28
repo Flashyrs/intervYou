@@ -43,7 +43,8 @@ export default function InterviewPage() {
     broadcastCursor,
     lastEditor,
     isFrozen,
-    toggleFreeze
+    toggleFreeze,
+    endSession
   } = useInterviewState(sessionId);
 
   const {
@@ -126,7 +127,7 @@ export default function InterviewPage() {
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-2 md:p-4 space-y-2 md:space-y-4">
+        <div className="flex-1 overflow-hidden flex flex-col p-2 md:p-4">
           <TestPanel
             sampleTests={sampleTests}
             setSampleTests={updateSampleTests}
@@ -171,6 +172,7 @@ export default function InterviewPage() {
             isFrozen={isFrozen}
             onToggleFreeze={toggleFreeze}
             sessionId={sessionId}
+            endSession={endSession}
           />
         </div>
 

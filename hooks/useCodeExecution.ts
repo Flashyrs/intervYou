@@ -64,7 +64,18 @@ export function useCodeExecution({
                 jsonStr = parts[1].trim();
 
                 if (compileErr || stderr) {
-                    debugOutput = (debugOutput ? debugOutput + "\n\n" : "") + "--- Stderr/Warnings ---\n" + (compileErr || "") + (stderr || "");
+                    let cleanedErrors = (compileErr || "") + (stderr || "");
+                    // Filter noisy Java warnings
+                    if (language === 'java') {
+                        cleanedErrors = cleanedErrors
+                            .split('\n')
+                            .filter((l: string) => !l.includes("Note: Main.java uses unchecked") && !l.includes("Note: Recompile with -Xlint"))
+                            .join('\n')
+                            .trim();
+                    }
+                    if (cleanedErrors) {
+                        debugOutput = (debugOutput ? debugOutput + "\n\n" : "") + "--- Stderr/Errors ---\n" + cleanedErrors;
+                    }
                 }
 
                 try {
@@ -108,6 +119,9 @@ export function useCodeExecution({
     const onSubmitFinal = async () => {
         setSubmitting(true);
         try {
+            // Auto-run tests first
+            const executionData = await onRun();
+            const finalCaseResults = executionData?.caseResults || [];
 
             await fetch("/api/interview/state", {
                 method: "POST",
@@ -115,7 +129,11 @@ export function useCodeExecution({
                 body: JSON.stringify({ sessionId, code }),
             });
 
-            const resultsStr = JSON.stringify(caseResults || []);
+            // Broadcast results explicitly just in case onRun didn't propagate fast enough
+            // (onRun already broadcasts via page.tsx but we want to be sure submission record has generic data)
+
+            const resultsStr = JSON.stringify(finalCaseResults);
+
             const r = await fetch("/api/submissions", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },

@@ -73,7 +73,7 @@ function CaseCard({ result, idx, isPrivate, role, input, testType, forceExpanded
     const getTypeInfo = () => {
         if (testType === 'sample') return { label: 'Sample', color: 'bg-blue-100 text-blue-700' };
         if (testType === 'edge') return { label: 'Edge', color: 'bg-orange-100 text-orange-700' };
-        return { label: 'Hidden', color: 'bg-gray-100 text-gray-700' };
+        return { label: 'Test Case', color: 'bg-gray-100 text-gray-700' };
     };
 
     const typeInfo = getTypeInfo();
@@ -119,11 +119,9 @@ function CaseCard({ result, idx, isPrivate, role, input, testType, forceExpanded
                     </div>
 
                     <div className="flex items-center gap-2 shrink-0">
-                        {!locked && (
-                            <span className={`text-xs font-semibold px-2 py-1 rounded ${pass ? 'bg-green-50 text-green-700' : isError ? 'bg-red-50 text-red-700' : 'bg-red-50 text-red-700'}`}>
-                                {pass ? 'Passed' : isError ? 'Error' : 'Failed'}
-                            </span>
-                        )}
+                        <span className={`text-xs font-semibold px-2 py-1 rounded ${pass ? 'bg-green-50 text-green-700' : isError ? 'bg-red-50 text-red-700' : 'bg-red-50 text-red-700'}`}>
+                            {pass ? 'Passed' : isError ? 'Error' : 'Failed'}
+                        </span>
                         {!locked && (
                             <div className={`w-4 h-4 transition-transform ${expanded ? 'rotate-180' : ''}`}>
                                 <ChevronDown className="w-4 h-4 text-gray-400" />

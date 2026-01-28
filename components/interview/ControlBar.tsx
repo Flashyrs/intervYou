@@ -15,6 +15,7 @@ interface ControlBarProps {
     isFrozen?: boolean;
     onToggleFreeze?: () => void;
     sessionId: string;
+    endSession?: () => Promise<void>;
 }
 
 const allowedLangs = [
@@ -33,7 +34,8 @@ export function ControlBar({
     lastEditor,
     isFrozen,
     onToggleFreeze,
-    sessionId
+    sessionId,
+    endSession
 }: ControlBarProps) {
     const [showEditorParams, setShowEditorParams] = useState(false);
     const router = useRouter();
@@ -75,12 +77,14 @@ export function ControlBar({
         if (!confirm("Are you sure you want to end this interview? This cannot be undone.")) return;
 
         try {
-            const res = await fetch(`/api/session/${sessionId}/end`, { method: "POST" });
-            if (res.ok) {
-                push({ message: "Interview ended", type: "success" });
-                router.push("/dashboard");
+            if (endSession) {
+                await endSession();
             } else {
-                push({ message: "Failed to end interview", type: "error" });
+                // Fallback (shouldn't happen with new logic)
+                const res = await fetch(`/api/session/${sessionId}/end`, { method: "POST" });
+                if (res.ok) {
+                    router.push("/dashboard");
+                }
             }
         } catch (e) {
             push({ message: "Failed to end interview", type: "error" });
@@ -123,7 +127,7 @@ export function ControlBar({
                 {role === "interviewer" && onToggleFreeze && (
                     <button
                         onClick={onToggleFreeze}
-                        className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition border ${isFrozen
+                        className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition border whitespace-nowrap shrink-0 ${isFrozen
                             ? "bg-blue-100 text-blue-700 border-blue-200 hover:bg-blue-200"
                             : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50"
                             }`}
@@ -146,7 +150,7 @@ export function ControlBar({
                 )}
 
                 <button
-                    className="flex items-center gap-2 px-4 py-1.5 bg-gray-100 text-gray-700 rounded-md text-sm font-medium hover:bg-gray-200 transition border border-gray-200"
+                    className="flex items-center gap-2 px-4 py-1.5 bg-gray-100 text-gray-700 rounded-md text-sm font-medium hover:bg-gray-200 transition border border-gray-200 whitespace-nowrap shrink-0"
                     onClick={onRun}
                 >
                     <Play className="w-4 h-4 fill-current" />
@@ -155,7 +159,7 @@ export function ControlBar({
 
                 {role === "interviewee" && (
                     <button
-                        className="flex items-center gap-2 px-4 py-1.5 bg-green-600 text-white rounded-md text-sm font-medium hover:bg-green-700 transition shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="flex items-center gap-2 px-4 py-1.5 bg-green-600 text-white rounded-md text-sm font-medium hover:bg-green-700 transition shadow-sm disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap shrink-0"
                         onClick={onSubmitFinal}
                         disabled={submitting}
                     >
