@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useRef, useState, useCallback } from "react";
 import { applyAnswer, createAnswer, createOffer, setupPeerConnection } from "@/lib/webrtc";
-import { broadcast, onSignal } from "@/lib/realtime";
+import { broadcast, onSignal, leaveChannel } from "@/lib/realtime";
 import { Mic, MicOff, Video, VideoOff, Settings, Monitor, PhoneOff } from "lucide-react";
 
 /**
@@ -201,10 +201,11 @@ export default function VideoCall({
 
     return () => {
       mounted = false;
-      if (channelRef.current) {
-        // We generally rely on global cleanup, but good to be safe
-        channelRef.current.unsubscribe();
-      }
+      // Remove this room from the channel registry and unsubscribe.
+      // This must go through leaveChannel() — not channelRef.unsubscribe() —
+      // so the module-level cache is cleared for the next mount.
+      leaveChannel(room);
+      channelRef.current = null;
       if (pcRef.current) {
         pcRef.current.close();
         pcRef.current = null;
