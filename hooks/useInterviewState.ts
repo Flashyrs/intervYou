@@ -202,7 +202,7 @@ export function useInterviewState(sessionId: string) {
                 // Just enough to prevent local-echo loops, but fast enough for collaboration
                 const timeSinceLastEdit = Date.now() - lastLocalEditRef.current;
 
-                if (senderClientId !== clientIdRef.current && timeSinceLastEdit > 300) {
+                if (senderClientId !== clientIdRef.current && timeSinceLastEdit > 50) {
                     setCodeMap(prev => {
                         // Merge logic: only update if actual change
                         const hasChange = Object.keys(newCodeMap).some(k => newCodeMap[k] !== prev[k]);

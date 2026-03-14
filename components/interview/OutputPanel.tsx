@@ -86,7 +86,7 @@ function CaseCard({ result, idx, isPrivate, role, input, testType, forceExpanded
     };
 
     return (
-        <div className={`group border rounded-lg overflow-hidden transition-all duration-200 shadow-sm hover:shadow-md ${pass ? 'border-gray-200 hover:border-green-300' : 'border-red-300 bg-red-50/20'
+        <div className={`group border rounded-sm overflow-hidden transition-all duration-200 shadow-sm hover:shadow-md ${pass ? 'border-gray-200 hover:border-green-300' : 'border-red-300 bg-red-50/20'
             }`}>
             <button
                 onClick={() => !locked && setExpanded(!expanded)}
@@ -144,7 +144,7 @@ function CaseCard({ result, idx, isPrivate, role, input, testType, forceExpanded
                             {input !== undefined && (
                                 <div className="space-y-1">
                                     <div className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Input</div>
-                                    <div className="font-mono bg-white p-2.5 rounded-lg border text-gray-800 text-xs break-all">
+                                    <div className="font-mono bg-white p-2.5 rounded-sm border text-gray-800 text-xs break-all">
                                         {stringifyCompact(input)}
                                     </div>
                                 </div>
@@ -153,7 +153,7 @@ function CaseCard({ result, idx, isPrivate, role, input, testType, forceExpanded
                             {'exp' in result && (
                                 <div className="space-y-1">
                                     <div className="text-[10px] text-green-600 font-bold uppercase tracking-wider">Expected</div>
-                                    <div className="font-mono bg-green-50 p-2.5 rounded-lg border border-green-200 text-green-900 text-xs break-all">
+                                    <div className="font-mono bg-green-50 p-2.5 rounded-sm border border-green-200 text-green-900 text-xs break-all">
                                         {stringifyCompact(result.exp)}
                                     </div>
                                 </div>
@@ -162,7 +162,7 @@ function CaseCard({ result, idx, isPrivate, role, input, testType, forceExpanded
                             {'got' in result && (
                                 <div className="space-y-1">
                                     <div className={`text-[10px] font-bold uppercase tracking-wider ${pass ? 'text-green-600' : 'text-red-600'}`}>Your Output</div>
-                                    <div className={`font-mono p-2.5 rounded-lg border text-xs break-all ${pass ? 'bg-green-50 border-green-200 text-green-900' : 'bg-red-50 border-red-200 text-red-900'}`}>
+                                    <div className={`font-mono p-2.5 rounded-sm border text-xs break-all ${pass ? 'bg-green-50 border-green-200 text-green-900' : 'bg-red-50 border-red-200 text-red-900'}`}>
                                         {stringifyCompact(result.got)}
                                     </div>
                                 </div>
@@ -175,7 +175,7 @@ function CaseCard({ result, idx, isPrivate, role, input, testType, forceExpanded
             {locked && (
                 <div className="px-3 pb-3 pt-0 text-xs text-gray-400 italic flex items-center gap-1.5 pl-12">
                     <Lock className="w-3 h-3" />
-                    Hidden from interviewee
+                    Hidden
                 </div>
             )}
         </div>
@@ -285,7 +285,7 @@ export function OutputPanel({ runOutput, caseResults, sampleTests, privateTests,
                 ) : (
                     <div className="space-y-4">
                         <RunSummary results={caseResults} metrics={metrics} />
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-3">
+                        <div className="flex flex-col gap-3">
                             {caseResults.map((r, idx) => {
                                 // Get input for this test case from merged test array
                                 const testInput = allTests[idx]?.input;
