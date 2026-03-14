@@ -1,6 +1,6 @@
 import { Role } from "@/lib/types";
 import { useState, useEffect } from "react";
-import { Play, Send, Code2, ChevronDown, RotateCcw, CheckCircle2, Square, LogOut } from "lucide-react";
+import { Play, Send, Code2, ChevronDown, RotateCcw, CheckCircle2, Square, LogOut, Clock, Pause, PlayCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/Toast";
 
@@ -14,6 +14,8 @@ interface ControlBarProps {
     lastEditor?: { name: string, role: string, timestamp: number } | null;
     isFrozen?: boolean;
     onToggleFreeze?: () => void;
+    timerState?: { active: boolean, startTimestamp: number | null, accumulated: number };
+    updateTimerState?: (newState: { active: boolean, startTimestamp: number | null, accumulated: number }) => void;
     sessionId: string;
     endSession?: () => Promise<void>;
 }
@@ -34,12 +36,72 @@ export function ControlBar({
     lastEditor,
     isFrozen,
     onToggleFreeze,
+    timerState,
+    updateTimerState,
     sessionId,
     endSession
 }: ControlBarProps) {
     const [showEditorParams, setShowEditorParams] = useState(false);
+    const [elapsed, setElapsed] = useState(0);
     const router = useRouter();
     const { push } = useToast();
+
+    // Synced Timer logic
+    useEffect(() => {
+        let interval: any;
+        
+        const updateElapsed = () => {
+            if (!timerState) return;
+            if (timerState.active && timerState.startTimestamp) {
+                const now = Date.now();
+                const diff = Math.floor((now - timerState.startTimestamp) / 1000);
+                setElapsed(timerState.accumulated + diff);
+            } else {
+                setElapsed(timerState.accumulated || 0);
+            }
+        };
+
+        // Initial update
+        updateElapsed();
+
+        if (timerState?.active) {
+            interval = setInterval(updateElapsed, 1000);
+        }
+
+        return () => {
+            if (interval) clearInterval(interval);
+        };
+    }, [timerState]);
+
+    const handleTimerToggle = () => {
+        if (!timerState || !updateTimerState) return;
+        
+        if (timerState.active) {
+            // Pause
+            const now = Date.now();
+            const diff = timerState.startTimestamp ? Math.floor((now - timerState.startTimestamp) / 1000) : 0;
+            updateTimerState({
+                active: false,
+                startTimestamp: null,
+                accumulated: timerState.accumulated + diff
+            });
+        } else {
+            // Start
+            updateTimerState({
+                active: true,
+                startTimestamp: Date.now(),
+                accumulated: timerState.accumulated
+            });
+        }
+    };
+
+    const formatTime = (seconds: number) => {
+        const h = Math.floor(seconds / 3600).toString().padStart(2, '0');
+        const m = Math.floor((seconds % 3600) / 60).toString().padStart(2, '0');
+        const s = Math.floor(seconds % 60).toString().padStart(2, '0');
+        if (h === '00') return `${m}:${s}`;
+        return `${h}:${m}:${s}`;
+    };
 
     // Auto-hide last editor message after 2 seconds
     useEffect(() => {
@@ -170,11 +232,32 @@ export function ControlBar({
 
                 <button
                     onClick={() => router.push('/dashboard')}
-                    className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-md"
+                    className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-md transition"
                     title="Leave Room"
                 >
                     <LogOut className="w-4 h-4" />
                 </button>
+                
+                {/* Synced Timer Display */}
+                <div className="flex items-center bg-gray-50 border border-gray-200 rounded-md shadow-sm ml-2 overflow-hidden h-8">
+                    <div className="flex items-center gap-1.5 px-3 py-1.5 text-gray-600 text-sm font-medium min-w-[70px] justify-center">
+                        <Clock className={`w-3.5 h-3.5 ${timerState?.active ? 'text-indigo-500 animate-pulse' : 'text-gray-400'}`} />
+                        <span className="tabular-nums tracking-tight">{formatTime(elapsed)}</span>
+                    </div>
+                    {role === 'interviewer' && (
+                        <button
+                            onClick={handleTimerToggle}
+                            className={`flex items-center justify-center px-2.5 h-full border-l border-gray-200 transition ${
+                                timerState?.active 
+                                    ? 'bg-amber-50 text-amber-600 hover:bg-amber-100' 
+                                    : 'bg-indigo-50 text-indigo-600 hover:bg-indigo-100'
+                            }`}
+                            title={timerState?.active ? "Pause Timer" : "Start Timer"}
+                        >
+                            {timerState?.active ? <Pause className="w-3.5 h-3.5" /> : <PlayCircle className="w-3.5 h-3.5" />}
+                        </button>
+                    )}
+                </div>
             </div>
         </div>
     );

@@ -33,6 +33,7 @@ export async function POST(req: Request) {
     if (body.codeMap) data.codeMap = body.codeMap;
     if (body.driverMap) data.driverMap = body.driverMap;
     if (body.lastOutput) data.lastOutput = body.lastOutput;
+    if (body.timerState) data.timerState = body.timerState;
 
     const saved = await prisma.interviewState.upsert({
       where: { sessionId },

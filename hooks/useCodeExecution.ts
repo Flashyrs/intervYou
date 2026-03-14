@@ -106,11 +106,25 @@ export function useCodeExecution({
 
 
             console.warn("⚠️ Stdout without delimiter:", stdout);
+            
+            // Try fallback json parse in case judge0 returns pure json due to error or custom output
+            try {
+                const parsed = JSON.parse(stdout);
+                if (Array.isArray(parsed)) {
+                    setCaseResults(parsed);
+                    setRunOutput(compileErr ? "Compilation Warning:\n" + compileErr : "Executed successfully, but no debug output.");
+                    return { caseResults: parsed, runOutput: compileErr || "Executed successfully", metrics: { time: executionTime, memory: memoryUsed } };
+                }
+            } catch (e) {
+                // Ignore fallback parse error
+            }
+
             setRunOutput(stdout);
             setCaseResults([]);
             return { caseResults: [], runOutput: stdout, metrics: { time: executionTime, memory: memoryUsed } };
         } catch (e: any) {
             console.error("❌ Run error:", e);
+            push({ message: `Execution failed: ${e.message}`, type: "error" });
             setRunOutput("Run error: " + e.message);
             return { caseResults: [], runOutput: "Run error: " + e.message, metrics: {} };
         }

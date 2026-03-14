@@ -26,6 +26,7 @@ export function useInterviewState(sessionId: string) {
     const [remoteCursors, setRemoteCursors] = useState<Record<string, any>>({});
     const [lastEditor, setLastEditor] = useState<{ name: string, role: string, timestamp: number } | null>(null);
     const [isFrozen, setIsFrozen] = useState(false);
+    const [timerState, setTimerState] = useState<{ active: boolean, startTimestamp: number | null, accumulated: number }>({ active: false, startTimestamp: null, accumulated: 0 });
 
     const channelRef = useRef<any>(null);
     const saveTimeout = useRef<any>(null);
@@ -73,6 +74,7 @@ export function useInterviewState(sessionId: string) {
                     if (typeof stateData.problemTitle === "string") setProblemTitle(stateData.problemTitle);
                     if (typeof stateData.sampleTests === "string") setSampleTests(stateData.sampleTests);
                     if (typeof stateData.privateTests === "string") setPrivateTests(stateData.privateTests);
+                    if (stateData.timerState) setTimerState(stateData.timerState);
                 }
             } catch { }
         })();
@@ -144,6 +146,9 @@ export function useInterviewState(sessionId: string) {
                             }
                             if (typeof stateData.privateTests === "string") {
                                 setPrivateTests(prev => stateData.privateTests !== prev ? stateData.privateTests : prev);
+                            }
+                            if (stateData.timerState) {
+                                setTimerState(prev => JSON.stringify(stateData.timerState) !== JSON.stringify(prev) ? stateData.timerState : prev);
                             }
                             // Sync stored execution result if available
                             if (stateData.lastOutput) {
@@ -245,7 +250,12 @@ export function useInterviewState(sessionId: string) {
                 setIsFrozen(payload.payload.isFrozen);
             }
 
-            // 6. Last Output Update (from persist patch, fallback for broadcast)
+            // 6. Timer Update
+            if (payload?.payload?.timerState !== undefined) {
+                setTimerState(payload.payload.timerState);
+            }
+
+            // 7. Last Output Update (from persist patch, fallback for broadcast)
             if (payload?.payload?.lastOutput) {
                 setExecutionResult(payload.payload.lastOutput);
             }
@@ -444,6 +454,12 @@ export function useInterviewState(sessionId: string) {
         broadcast({ isFrozen: newState });
     };
 
+    const updateTimerState = (newState: { active: boolean, startTimestamp: number | null, accumulated: number }) => {
+        setTimerState(newState);
+        broadcast({ timerState: newState });
+        persist({ timerState: newState });
+    };
+
     const endSession = async () => {
         // Broadcast first so others leave
         if (channelRef.current && channelRef.current.state === 'joined') {
@@ -493,6 +509,8 @@ export function useInterviewState(sessionId: string) {
         broadcastCursor,
         isFrozen,
         toggleFreeze,
+        timerState,
+        updateTimerState,
         lastEditor,
         endSession
     };

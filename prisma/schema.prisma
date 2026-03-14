@@ -31,6 +31,7 @@ model InterviewState {
         codeMap     Json?
         driverMap   Json?
         lastOutput  Json?
+        timerState  Json?
         createdAt   DateTime  @default(now())
         updatedAt   DateTime  @updatedAt
       }
@@ -113,6 +114,7 @@ model Submission {
 
   @@unique([sessionId, problemId, userId])  // one row per user/problem/session
   @@index([sessionId, userId])
+  @@index([sessionId, updatedAt])
 }
 
 model VerificationToken {
