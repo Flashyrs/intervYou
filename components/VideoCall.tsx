@@ -4,6 +4,26 @@ import { applyAnswer, createAnswer, createOffer, setupPeerConnection } from "@/l
 import { broadcast, onSignal } from "@/lib/realtime";
 import { Mic, MicOff, Video, VideoOff, Settings, Monitor, PhoneOff } from "lucide-react";
 
+/**
+ * Safely call play() only when the element is actually paused and has a src.
+ * This prevents the DOMException: "play() request was interrupted" that occurs
+ * when play() is called while another play/load is already in-flight.
+ */
+function safePlay(el: HTMLVideoElement, label: string) {
+  // readyState 0 = HAVE_NOTHING (no src yet) — nothing to play
+  if (!el.srcObject && !el.src) return;
+  if (!el.paused) return; // already playing, no-op
+  const promise = el.play();
+  if (promise !== undefined) {
+    promise.catch((err: unknown) => {
+      // AbortError is expected when the component unmounts mid-play — suppress it.
+      // Any other error is worth logging.
+      if (err instanceof DOMException && err.name === "AbortError") return;
+      console.warn(`[VideoCall] ${label} play() failed:`, err);
+    });
+  }
+}
+
 export default function VideoCall({
   room,
   role,
@@ -67,16 +87,12 @@ export default function VideoCall({
 
         if (localRef.current && localStream) {
           localRef.current.srcObject = localStream;
-          localRef.current.play().catch((e) => {
-            console.warn("Local video autoplay failed", e);
-          });
+          safePlay(localRef.current, "local");
         }
 
         if (remoteRef.current) {
           remoteRef.current.srcObject = remoteStream;
-          remoteRef.current.play().catch((e) => {
-            console.warn("Remote video autoplay failed", e);
-          });
+          safePlay(remoteRef.current, "remote");
         }
 
         try {
@@ -235,9 +251,7 @@ export default function VideoCall({
 
       if (localRef.current) {
         localRef.current.srcObject = newStream;
-        localRef.current.play().catch((e) => {
-          console.warn("Video play failed after device switch", e);
-        });
+        safePlay(localRef.current, "local (device switch)");
       }
 
       setError("");
@@ -282,7 +296,6 @@ export default function VideoCall({
         <div className="relative w-1/2 aspect-square bg-gray-900 rounded-lg overflow-hidden group">
           <video
             ref={localRef}
-            autoPlay
             playsInline
             muted
             className={`w-full h-full object-cover transition-opacity duration-300 ${camOn ? 'opacity-100' : 'opacity-0'}`}
@@ -304,7 +317,6 @@ export default function VideoCall({
         <div className="relative w-1/2 aspect-square bg-gray-900 rounded-lg overflow-hidden">
           <video
             ref={remoteRef}
-            autoPlay
             playsInline
             className="w-full h-full object-cover"
           />
