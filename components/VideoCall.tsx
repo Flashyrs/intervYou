@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useRef, useState, useCallback } from "react";
 import { applyAnswer, createAnswer, createOffer, setupPeerConnection } from "@/lib/webrtc";
-import { broadcast, onSignal, leaveChannel } from "@/lib/realtime";
+import { broadcast, onSignal } from "@/lib/realtime";
 import { Mic, MicOff, Video, VideoOff, Settings, Monitor, PhoneOff } from "lucide-react";
 
 /**
@@ -54,8 +54,12 @@ export default function VideoCall({
     }
 
     try {
+      if (!channelRef.current) {
+        setError("Signal channel not ready");
+        return;
+      }
       const offer = await createOffer(pcRef.current);
-      broadcast(room, {
+      broadcast(channelRef.current, {
         type: "call-offer",
         from: role,
         sessionId: room,
@@ -117,8 +121,8 @@ export default function VideoCall({
         };
 
         pc.onicecandidate = (e) => {
-          if (e.candidate) {
-            broadcast(room, {
+          if (e.candidate && channelRef.current) {
+            broadcast(channelRef.current, {
               type: "ice-candidate",
               from: role,
               sessionId: room,
@@ -136,12 +140,14 @@ export default function VideoCall({
             if (payload.type === "call-offer" && role === "interviewer") {
               console.log("Received Offer, creating Answer...");
               const answer = await createAnswer(pc, payload.sdp);
-              broadcast(room, {
-                type: "call-answer",
-                from: role,
-                sessionId: room,
-                sdp: answer
-              });
+              if (channelRef.current) {
+                broadcast(channelRef.current, {
+                  type: "call-answer",
+                  from: role,
+                  sessionId: room,
+                  sdp: answer
+                });
+              }
 
               // Apply loose ICE candidates
               while (pendingIceCandidates.length > 0) {
@@ -201,10 +207,7 @@ export default function VideoCall({
 
     return () => {
       mounted = false;
-      // Remove this room from the channel registry and unsubscribe.
-      // This must go through leaveChannel() — not channelRef.unsubscribe() —
-      // so the module-level cache is cleared for the next mount.
-      leaveChannel(room);
+      channelRef.current?.unsubscribe();
       channelRef.current = null;
       if (pcRef.current) {
         pcRef.current.close();
