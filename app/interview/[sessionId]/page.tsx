@@ -17,9 +17,10 @@ const MonacoEditor: any = dynamic(() => import("@monaco-editor/react"), { ssr: f
 export default function InterviewPage() {
   const { sessionId } = useParams() as { sessionId: string };
 
-  const {
+    const {
     language,
     code,
+    problemId,
     problemText,
     problemTitle,
     sampleTests,
@@ -44,7 +45,8 @@ export default function InterviewPage() {
     lastEditor,
     isFrozen,
     toggleFreeze,
-    endSession
+    endSession,
+    resetSessionForNextQuestion
   } = useInterviewState(sessionId);
 
   const {
@@ -64,6 +66,7 @@ export default function InterviewPage() {
     driver,
     sampleTests,
     privateTests,
+    problemId,
     problemText,
     problemTitle,
   });
@@ -140,6 +143,7 @@ export default function InterviewPage() {
             onToggleFreeze={toggleFreeze}
             sessionId={sessionId}
             endSession={endSession}
+            onNextQuestion={resetSessionForNextQuestion}
           />
         </div>
       </header>

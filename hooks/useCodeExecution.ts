@@ -10,6 +10,7 @@ interface UseCodeExecutionProps {
     driver: string;
     sampleTests: string;
     privateTests: string;
+    problemId: string;
     problemText?: string;
     problemTitle?: string;
 }
@@ -21,6 +22,7 @@ export function useCodeExecution({
     driver,
     sampleTests,
     privateTests,
+    problemId,
     problemText,
     problemTitle,
 }: UseCodeExecutionProps) {
@@ -153,7 +155,7 @@ export function useCodeExecution({
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     sessionId,
-                    problemId: (problemTitle || "problem-1").toLowerCase().replace(/[^a-z0-9]+/g, '-') || "custom",
+                    problemId,
                     language,
                     code,
                     results: resultsStr,

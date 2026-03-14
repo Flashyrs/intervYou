@@ -18,6 +18,7 @@ interface ControlBarProps {
     updateTimerState?: (newState: { active: boolean, startTimestamp: number | null, accumulated: number }) => void;
     sessionId: string;
     endSession?: () => Promise<void>;
+    onNextQuestion?: () => void;
 }
 
 const allowedLangs = [
@@ -39,7 +40,8 @@ export function ControlBar({
     timerState,
     updateTimerState,
     sessionId,
-    endSession
+    endSession,
+    onNextQuestion
 }: ControlBarProps) {
     const [showEditorParams, setShowEditorParams] = useState(false);
     const [elapsed, setElapsed] = useState(0);
@@ -77,16 +79,15 @@ export function ControlBar({
         if (!timerState || !updateTimerState) return;
         
         if (timerState.active) {
-            // Pause
-            const now = Date.now();
-            const diff = timerState.startTimestamp ? Math.floor((now - timerState.startTimestamp) / 1000) : 0;
+            // Pause: Add the currently ticking elapsed seconds to the accumulated total
+            const diff = timerState.startTimestamp ? Math.floor((Date.now() - timerState.startTimestamp) / 1000) : 0;
             updateTimerState({
                 active: false,
                 startTimestamp: null,
                 accumulated: timerState.accumulated + diff
             });
         } else {
-            // Start
+            // Start: Initialize startTimestamp to exactly Date.now()
             updateTimerState({
                 active: true,
                 startTimestamp: Date.now(),
@@ -153,6 +154,11 @@ export function ControlBar({
         }
     };
 
+    const handleNextQuestion = () => {
+        if (!confirm("Are you sure you want to move to the next question? This will clear the current code and problem statement for everyone.")) return;
+        if (onNextQuestion) onNextQuestion();
+    };
+
     return (
         <div className="flex items-center justify-between h-12 px-2">
             <div className="flex items-center gap-4">
@@ -197,6 +203,17 @@ export function ControlBar({
                     >
                         {isFrozen ? <RotateCcw className="w-4 h-4" /> : <CheckCircle2 className="w-4 h-4" />}
                         {isFrozen ? "Resume Session" : "Pause Session"}
+                    </button>
+                )}
+
+                {role === "interviewer" && onNextQuestion && (
+                    <button
+                        onClick={handleNextQuestion}
+                        className="flex items-center gap-2 px-3 py-1.5 bg-white text-indigo-600 border border-indigo-200 rounded-md text-sm font-medium hover:bg-indigo-50 transition"
+                        title="Clear session variables for a new problem"
+                    >
+                        <RotateCcw className="w-4 h-4 fill-current" />
+                        Next Question
                     </button>
                 )}
 

@@ -17,6 +17,7 @@ export function useInterviewState(sessionId: string) {
     });
     const [driverMap, setDriverMap] = useState<Record<string, string>>({});
 
+    const [problemId, setProblemId] = useState<string>(() => Math.random().toString(36).substring(2, 15));
     const [problemText, setProblemText] = useState("");
     const [problemTitle, setProblemTitle] = useState("Problem 1"); // Default title
     const [sampleTests, setSampleTests] = useState("");
@@ -57,6 +58,13 @@ export function useInterviewState(sessionId: string) {
                     setRole(roleData.role);
 
                 const stateData = await stateRes.json();
+                
+                // If the session is already completed, violently eject the user to the dashboard
+                if (stateRes.status === 410 || stateData?.status === "completed") {
+                    window.location.href = "/dashboard";
+                    return;
+                }
+
                 if (stateRes.ok && stateData) {
                     if (typeof stateData.language === "string") setLanguage(stateData.language);
                     if (stateData.codeMap) setCodeMap(stateData.codeMap);
@@ -72,11 +80,14 @@ export function useInterviewState(sessionId: string) {
 
                     if (typeof stateData.problemText === "string") setProblemText(stateData.problemText);
                     if (typeof stateData.problemTitle === "string") setProblemTitle(stateData.problemTitle);
+                    if (typeof stateData.problemId === "string") setProblemId(stateData.problemId);
                     if (typeof stateData.sampleTests === "string") setSampleTests(stateData.sampleTests);
                     if (typeof stateData.privateTests === "string") setPrivateTests(stateData.privateTests);
                     if (stateData.timerState) setTimerState(stateData.timerState);
                 }
-            } catch { }
+            } catch {
+                // Ignore network errors on init
+            }
         })();
 
 
@@ -112,8 +123,19 @@ export function useInterviewState(sessionId: string) {
             const pollInterval = setInterval(async () => {
                 try {
                     const res = await fetch(`/api/interview/state?sessionId=${sessionId}`);
+                    
+                    if (res.status === 410) {
+                        window.location.href = "/dashboard";
+                        return;
+                    }
+
                     if (res.ok) {
                         const stateData = await res.json();
+                        if (stateData?.status === "completed") {
+                            window.location.href = "/dashboard";
+                            return;
+                        }
+                        
                         if (stateData) {
                             // Only update if data is newer (basic check)
                             if (typeof stateData.language === "string" && stateData.language !== language) {
@@ -140,6 +162,9 @@ export function useInterviewState(sessionId: string) {
                             }
                             if (typeof stateData.problemTitle === "string") {
                                 setProblemTitle(prev => stateData.problemTitle !== prev ? stateData.problemTitle : prev);
+                            }
+                            if (typeof stateData.problemId === "string") {
+                                setProblemId(prev => stateData.problemId !== prev ? stateData.problemId : prev);
                             }
                             if (typeof stateData.sampleTests === "string") {
                                 setSampleTests(prev => stateData.sampleTests !== prev ? stateData.sampleTests : prev);
@@ -175,7 +200,7 @@ export function useInterviewState(sessionId: string) {
         channelRef.current = channel;
 
         channel.on("broadcast", { event: "state" }, (payload: any) => {
-            const { clientId: senderClientId, language: newLang, codeMap: newCodeMap, driverMap: newDriverMap, problemText: newProb, problemTitle: newTitle, sampleTests: newTests, cursor, timestamp } = payload?.payload || {};
+            const { clientId: senderClientId, language: newLang, codeMap: newCodeMap, driverMap: newDriverMap, problemText: newProb, problemTitle: newTitle, problemId: newProblemId, sampleTests: newTests, cursor, timestamp } = payload?.payload || {};
 
             // Echo cancellation: only skip if it's from THIS exact client
             if (senderClientId && senderClientId === clientIdRef.current) {
@@ -232,6 +257,9 @@ export function useInterviewState(sessionId: string) {
             }
             if (typeof newTitle === "string") {
                 setProblemTitle(newTitle);
+            }
+            if (typeof newProblemId === "string") {
+                setProblemId(newProblemId);
             }
             if (typeof newTests === "string") {
                 setSampleTests(newTests);
@@ -460,6 +488,39 @@ export function useInterviewState(sessionId: string) {
         persist({ timerState: newState });
     };
 
+    const resetSessionForNextQuestion = () => {
+        const newProblemId = Math.random().toString(36).substring(2, 15);
+        
+        const resetPatch = {
+            problemId: newProblemId,
+            problemTitle: "Next Problem",
+            problemText: "",
+            sampleTests: "",
+            privateTests: "",
+            codeMap: {
+                javascript: "// Start coding new problem...\n",
+                java: "// Start coding new problem...\n",
+                cpp: "// Start coding new problem...\n"
+            },
+            driverMap: {},
+            lastOutput: null,
+            timerState: { active: false, startTimestamp: null, accumulated: 0 }
+        };
+
+        setProblemId(newProblemId);
+        setProblemTitle(resetPatch.problemTitle);
+        setProblemText(resetPatch.problemText);
+        setSampleTests(resetPatch.sampleTests);
+        setPrivateTests(resetPatch.privateTests);
+        setCodeMap(resetPatch.codeMap);
+        setDriverMap(resetPatch.driverMap);
+        setExecutionResult(null);
+        setTimerState(resetPatch.timerState);
+
+        broadcast(resetPatch);
+        persist(resetPatch);
+    };
+
     const endSession = async () => {
         // Broadcast first so others leave
         if (channelRef.current && channelRef.current.state === 'joined') {
@@ -479,6 +540,7 @@ export function useInterviewState(sessionId: string) {
         language,
         code,
         codeMap,
+        problemId,
         problemText,
         problemTitle,
         sampleTests,
@@ -512,6 +574,7 @@ export function useInterviewState(sessionId: string) {
         timerState,
         updateTimerState,
         lastEditor,
+        resetSessionForNextQuestion,
         endSession
     };
 }
