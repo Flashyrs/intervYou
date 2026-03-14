@@ -213,6 +213,19 @@ export default function DashboardPage() {
     const invitee = s.inviteeName || s.inviteeEmail || "Guest";
     const date = s.scheduledFor ? new Date(s.scheduledFor) : new Date(s.createdAt);
 
+    const timeFormatter = new Intl.DateTimeFormat("en-IN", {
+      timeZone: "Asia/Kolkata",
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+    });
+    
+    const formattedDate = timeFormatter.format(date) + " (IST)";
+    const isPassed = s.scheduledFor && new Date().getTime() > date.getTime();
+
     const canJoin = isUpcoming ? (
       // Can join if instant (scheduledFor null) OR now >= scheduled - 5 min
       !s.scheduledFor || new Date().getTime() >= new Date(s.scheduledFor).getTime() - 5 * 60 * 1000
@@ -226,9 +239,12 @@ export default function DashboardPage() {
           <div>
             <h3 className="font-medium text-lg">{s.isScheduled ? "Scheduled Interview" : "Instant Interview"}</h3>
             <p className="text-sm text-gray-500">With: <span className="text-black font-medium">{invitee}</span></p>
-            <p className="text-xs text-gray-400 mt-1">
-              {date.toLocaleString()}
-            </p>
+            <div className="flex items-center gap-2 mt-1">
+              <p className={`text-xs ${isPassed && type === 'upcoming' ? 'text-red-500 font-medium' : 'text-gray-400'}`}>
+                {formattedDate} 
+                {isPassed && type === 'upcoming' && " (Time Passed)"}
+              </p>
+            </div>
             {s.status === 'completed' && <span className="inline-block mt-2 px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded">Completed</span>}
           </div>
 
