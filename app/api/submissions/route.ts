@@ -35,6 +35,7 @@ export async function GET(req: Request) {
     const rows = await prisma.submission.findMany({
       where,
       orderBy: { updatedAt: "desc" },
+      take: 50,
       include: {
         session: {
           include: {
