@@ -89,7 +89,7 @@ model InterviewSession {
   
   @@index([status])
   @@index([scheduledFor])
-  @@index([createdBy])
+  @@index([createdBy, createdAt])
   @@index([inviteeEmail])
   @@index([createdAt])
 }
@@ -115,6 +115,7 @@ model Submission {
   @@unique([sessionId, problemId, userId])  // one row per user/problem/session
   @@index([sessionId, userId])
   @@index([sessionId, updatedAt])
+  @@index([userId, createdAt])
 }
 
 model VerificationToken {

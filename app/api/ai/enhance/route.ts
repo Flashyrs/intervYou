@@ -153,17 +153,20 @@ Generate 9 test cases: 4 sample + 5 edge cases.`;
 }`,
             java: `import java.util.*;
 import java.lang.reflect.Method;
+import java.lang.reflect.Array;
 
 class Driver {
+
     public static List<String> runTests(List<Map<String, Object>> tests) {
         List<String> outcomes = new ArrayList<>();
         Solution sol = new Solution();
         
         Method solveMethod = null;
+        // Find the method by name, considering potential overloads
         for (Method m : Solution.class.getDeclaredMethods()) {
             if (m.getName().equals("${funcInfo.java?.name || "solve"}")) {
                 solveMethod = m;
-                break;
+                break; // Assuming no overloads for simplicity, or pick the first one
             }
         }
 
@@ -176,48 +179,42 @@ class Driver {
             Map<String, Object> result = new LinkedHashMap<>();
             try {
                 Object rawInput = test.get("input");
-                List<Object> args;
+                // Normalise rawInput into a list of per-parameter arguments.
+                // The AI wraps args as: input:[arg1, arg2, ...].
+                // But if the method takes 1 param and input is a flat list of scalars,
+                // the whole list IS that one argument (e.g. int[] nums).
+                List<Object> argsList = new ArrayList<>();
+                java.lang.reflect.Type[] paramTypes = solveMethod.getGenericParameterTypes();
+                Class<?>[] rawParamTypes = solveMethod.getParameterTypes();
                 if (rawInput instanceof List) {
-                    args = (List<Object>) rawInput;
+                    List<?> asList = (List<?>) rawInput;
+                    boolean firstIsScalar = !asList.isEmpty() && !(asList.get(0) instanceof List);
+                    boolean wantsOneArg = paramTypes.length == 1;
+                    if (wantsOneArg && firstIsScalar) {
+                        // The whole list is the single array/List argument
+                        argsList.add(rawInput);
+                    } else {
+                        argsList.addAll((List<Object>) rawInput);
+                    }
                 } else {
-                    args = new ArrayList<>();
-                    args.add(rawInput);
+                    argsList.add(rawInput);
                 }
-                
-                Object[] convertedArgs = new Object[args.size()];
-                Class<?>[] paramTypes = solveMethod.getParameterTypes();
 
-                for (int i = 0; i < args.size(); i++) {
-                     if (i < paramTypes.length) {
-                        convertedArgs[i] = convert(args.get(i), paramTypes[i]);
-                     } else {
-                        // Varargs or extra args? usage mismatch
-                        convertedArgs[i] = args.get(i); 
-                     }
+                Object[] convertedArgs = new Object[Math.min(argsList.size(), paramTypes.length)];
+                for (int i = 0; i < convertedArgs.length; i++) {
+                    convertedArgs[i] = convert(argsList.get(i), paramTypes[i]);
                 }
 
                 Object res = solveMethod.invoke(sol, convertedArgs);
                 result.put("got", res);
                 result.put("exp", test.get("output"));
                 
-                // Simple equality check
-                boolean pass = Objects.equals(String.valueOf(res), String.valueOf(test.get("output")));
-                // Try better check
-                try { 
-                    Object expected = convert(test.get("output"), res.getClass());
-                    if (res.getClass().isArray() && expected.getClass().isArray()) {
-                         // Arrays.deepEquals doesn't work on Object objects easily without casting
-                         pass = Objects.deepEquals(res, expected);
-                    } else {
-                         pass = res.equals(expected); 
-                    }
-                } catch(Exception e){}
+                boolean pass = deepEquals(res, test.get("output"));
                 
                 result.put("pass", pass);
 
             } catch (Exception e) {
                 result.put("pass", false);
-                // Simplify error message for user
                 Throwable cause = e.getCause() != null ? e.getCause() : e;
                 result.put("error", cause.getClass().getSimpleName() + ": " + cause.getMessage());
             }
@@ -226,20 +223,88 @@ class Driver {
         return outcomes;
     }
 
-    private static Object convert(Object o, Class<?> target) {
-        if (target == int.class || target == Integer.class) return ((Number)o).intValue();
-        if (target == long.class || target == Long.class) return ((Number)o).longValue();
-        if (target == double.class || target == Double.class) return ((Number)o).doubleValue();
-        if (target == float.class || target == Float.class) return ((Number)o).floatValue();
-        if (target == String.class) return String.valueOf(o);
-        if (target == int[].class) {
-             List l = (List) o;
-             int[] arr = new int[l.size()];
-             for(int i=0; i<l.size(); i++) arr[i] = ((Number)l.get(i)).intValue();
-             return arr;
+    private static Object convert(Object o, java.lang.reflect.Type targetType) {
+        if (o == null) return null;
+
+        Class<?> targetClass;
+        if (targetType instanceof Class<?>) {
+            targetClass = (Class<?>) targetType;
+        } else if (targetType instanceof java.lang.reflect.ParameterizedType) {
+            targetClass = (Class<?>) ((java.lang.reflect.ParameterizedType) targetType).getRawType();
+        } else {
+            return o;
         }
-        // Add more conversions as needed
+
+        if (targetClass == int.class || targetClass == Integer.class) return ((Number)o).intValue();
+        if (targetClass == long.class || targetClass == Long.class) return ((Number)o).longValue();
+        if (targetClass == double.class || targetClass == Double.class) return ((Number)o).doubleValue();
+        if (targetClass == float.class || targetClass == Float.class) return ((Number)o).floatValue();
+        if (targetClass == boolean.class || targetClass == Boolean.class) return (Boolean)o;
+        if (targetClass == char.class || targetClass == Character.class) return String.valueOf(o).charAt(0);
+        if (targetClass == String.class) return String.valueOf(o);
+
+        if (targetClass.isArray()) {
+            if (o instanceof List) {
+                List<?> list = (List<?>) o;
+                Class<?> componentType = targetClass.getComponentType();
+                Object array = Array.newInstance(componentType, list.size());
+                for (int i = 0; i < list.size(); i++) {
+                    Array.set(array, i, convert(list.get(i), componentType));
+                }
+                return array;
+            }
+        }
+        
+        if (List.class.isAssignableFrom(targetClass)) {
+            if (o instanceof List) {
+                List<?> list = (List<?>) o;
+                java.lang.reflect.Type elementType = Object.class;
+                if (targetType instanceof java.lang.reflect.ParameterizedType) {
+                    elementType = ((java.lang.reflect.ParameterizedType) targetType).getActualTypeArguments()[0];
+                }
+                List<Object> newList = new ArrayList<>();
+                for (Object item : list) {
+                    newList.add(convert(item, elementType));
+                }
+                return newList;
+            }
+        }
+
         return o;
+    }
+
+    // Order-independent equality: sorts inner lists so [[1,-1,0]] == [[-1,0,1]]
+    @SuppressWarnings("unchecked")
+    private static boolean deepEquals(Object a, Object b) {
+        if (a == b) return true;
+        if (a == null || b == null) return false;
+        return normalise(a).equals(normalise(b));
+    }
+
+    @SuppressWarnings("unchecked")
+    private static String normalise(Object v) {
+        if (v == null) return "null";
+        if (v instanceof List) {
+            List<?> list = (List<?>) v;
+            if (!list.isEmpty() && list.get(0) instanceof List) {
+                List<String> parts = new ArrayList<>();
+                for (Object inner : list) {
+                    List<?> il = (List<?>) inner;
+                    List<Long> nums = new ArrayList<>();
+                    for (Object x : il) nums.add(((Number) x).longValue());
+                    Collections.sort(nums);
+                    parts.add(nums.toString());
+                }
+                Collections.sort(parts);
+                return parts.toString();
+            }
+            List<String> items = new ArrayList<>();
+            for (Object x : list) items.add(String.valueOf(x instanceof Number ? ((Number)x).longValue() : x));
+            Collections.sort(items);
+            return items.toString();
+        }
+        if (v instanceof Number) return String.valueOf(((Number) v).longValue());
+        return Main.valToJson(v);
     }
 }
 `,
