@@ -320,7 +320,7 @@ export function useInterviewState(sessionId: string) {
         if (cursorBroadcastTimeout.current) clearTimeout(cursorBroadcastTimeout.current);
         
         cursorBroadcastTimeout.current = setTimeout(() => {
-            if (channelRef.current && channelRef.current.state === 'joined') {
+            if (channelRef.current) {
                 const pos = pendingCursorRef.current;
                 channelRef.current.send({
                     type: "broadcast",
@@ -353,7 +353,7 @@ export function useInterviewState(sessionId: string) {
             pendingBroadcastRef.current = {};
 
             // Try Supabase broadcast
-            if (channelRef.current && channelRef.current.state === 'joined') {
+            if (channelRef.current) {
                 channelRef.current.send({
                     type: "broadcast",
                     event: "state",
@@ -361,9 +361,6 @@ export function useInterviewState(sessionId: string) {
                 }).catch((e: any) => {
                     console.warn("⚠️ Broadcast failed (Supabase):", e.message);
                 });
-            } else {
-                // If not joined, rely on polling/persist (which we invoke below)
-                // console.warn("⚠️ Channel not joined, relying on persist");
             }
 
             // Always persist to database as backup
@@ -372,13 +369,8 @@ export function useInterviewState(sessionId: string) {
     };
 
     const broadcastExecutionResult = (result: any) => {
-        if (!channelRef.current || channelRef.current.state !== 'joined') {
-            console.warn("⚠️ Channel not joined for execution broadcast");
-            // Try global fallback? Or just rely on local state?
-            // Page.tsx sets local state anyway for the runner.
-            // For the peer, we need this. 
-            // We can try to force using the global supabase client if it has an active channel, 
-            // but usually this ref is the active channel.
+        if (!channelRef.current) {
+            console.warn("⚠️ Channel not ready for execution broadcast");
             return;
         }
 
