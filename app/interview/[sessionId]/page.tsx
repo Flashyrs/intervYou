@@ -45,6 +45,8 @@ export default function InterviewPage() {
     lastEditor,
     isFrozen,
     toggleFreeze,
+    timerState,
+    updateTimerState,
     endSession,
     resetSessionForNextQuestion
   } = useInterviewState(sessionId);
@@ -141,6 +143,8 @@ export default function InterviewPage() {
             lastEditor={lastEditor}
             isFrozen={isFrozen}
             onToggleFreeze={toggleFreeze}
+            timerState={timerState}
+            updateTimerState={updateTimerState}
             sessionId={sessionId}
             endSession={endSession}
             onNextQuestion={resetSessionForNextQuestion}
