@@ -331,7 +331,7 @@ export function useInterviewState(sessionId: string) {
                     }
                 }).catch(() => { });
             }
-        }, 100);
+        }, 400);
     };
 
     const broadcast = (data: any) => {
@@ -365,7 +365,7 @@ export function useInterviewState(sessionId: string) {
 
             // Always persist to database as backup
             persist(payload);
-        }, 100);
+        }, 400);
     };
 
     const broadcastExecutionResult = (result: any) => {

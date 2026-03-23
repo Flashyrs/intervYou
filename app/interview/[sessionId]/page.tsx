@@ -256,7 +256,8 @@ export default function InterviewPage() {
                </h2>
             </div>
             <div className="w-full h-full flex items-center justify-center">
-               <VideoCall room={`interview-${sessionId}`} role={role} />
+               {/* Use a dedicated webrtc channel to prevent collisions with the code editor channel */}
+               <VideoCall room={`webrtc-${sessionId}`} role={role} />
             </div>
           </div>
 
