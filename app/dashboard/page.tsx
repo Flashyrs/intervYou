@@ -65,6 +65,9 @@ export default function DashboardPage() {
     }
   }, [activeTab, viewingSessionId]);
 
+  const userName = session?.user?.name;
+  const userEmail = session?.user?.email;
+
   useEffect(() => {
     if (!supabase) return;
 
@@ -100,7 +103,7 @@ export default function DashboardPage() {
     pres?.subscribe((status: any) => {
       if (status === "SUBSCRIBED" && userId) {
         // Only track if we have a valid user
-        pres.track({ userId, name: session?.user?.name, email: session?.user?.email });
+        pres.track({ userId, name: userName, email: userEmail });
       }
     });
 
@@ -108,7 +111,7 @@ export default function DashboardPage() {
       if (channelRef.current && supabase) supabase.removeChannel(channelRef.current);
       if (presenceRef.current && supabase) supabase.removeChannel(presenceRef.current);
     };
-  }, [tempId, router, userId, push, session]);
+  }, [tempId, router, userId, push, userName, userEmail]);
 
   const startRandom = async () => {
     if (!session) { signIn(); return; }
