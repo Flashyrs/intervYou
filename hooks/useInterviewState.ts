@@ -33,6 +33,9 @@ export function useInterviewState(sessionId: string) {
     const saveTimeout = useRef<any>(null);
     const pendingBroadcastRef = useRef<any>({});
     const broadcastTimeout = useRef<any>(null);
+    const cursorBroadcastTimeout = useRef<any>(null);
+    const pendingCursorRef = useRef<any>(null);
+    const pendingPersistRef = useRef<any>({});
     const lastUpdateRef = useRef<number>(0);
     const lastLocalEditRef = useRef<number>(0);
 
@@ -207,12 +210,8 @@ export function useInterviewState(sessionId: string) {
                 return;
             }
 
-            // Simple timestamp check to avoid out-of-order updates
-            // (Optional: strict timestamp checking might reject valid concurrent edits in LWW, 
-            // but we keep it for basic ordering)
-            if (timestamp && timestamp < lastUpdateRef.current) {
-                return;
-            }
+            // Removed timestamp clock-sync check because it relies on local system time 
+            // which can differ between clients, causing valid messages to be dropped.
 
             // Update state from broadcast
 
@@ -230,7 +229,10 @@ export function useInterviewState(sessionId: string) {
                 if (senderClientId !== clientIdRef.current && timeSinceLastEdit > 50) {
                     setCodeMap(prev => {
                         // Merge logic: only update if actual change
-                        const hasChange = Object.keys(newCodeMap).some(k => newCodeMap[k] !== prev[k]);
+                        let hasChange = false;
+                        for (const k of Object.keys(newCodeMap)) {
+                            if (newCodeMap[k] !== prev[k]) { hasChange = true; break; }
+                        }
                         if (!hasChange) return prev;
                         return { ...prev, ...newCodeMap };
                     });
@@ -313,16 +315,23 @@ export function useInterviewState(sessionId: string) {
     }, [sessionId]);
 
     const broadcastCursor = (position: { lineNumber: number, column: number }) => {
-        if (channelRef.current && channelRef.current.state === 'joined') {
-            channelRef.current.send({
-                type: "broadcast",
-                event: "state",
-                payload: {
-                    clientId: clientIdRef.current,
-                    cursor: { ...position, userId, timestamp: Date.now() }
-                }
-            }).catch(() => { });
-        }
+        pendingCursorRef.current = position;
+        
+        if (cursorBroadcastTimeout.current) clearTimeout(cursorBroadcastTimeout.current);
+        
+        cursorBroadcastTimeout.current = setTimeout(() => {
+            if (channelRef.current && channelRef.current.state === 'joined') {
+                const pos = pendingCursorRef.current;
+                channelRef.current.send({
+                    type: "broadcast",
+                    event: "state",
+                    payload: {
+                        clientId: clientIdRef.current,
+                        cursor: { ...pos, userId, timestamp: Date.now() }
+                    }
+                }).catch(() => { });
+            }
+        }, 100);
     };
 
     const broadcast = (data: any) => {
@@ -389,13 +398,16 @@ export function useInterviewState(sessionId: string) {
     };
 
     const persist = (patch: any) => {
+        pendingPersistRef.current = { ...pendingPersistRef.current, ...patch };
         if (saveTimeout.current) clearTimeout(saveTimeout.current);
         saveTimeout.current = setTimeout(async () => {
             try {
+                const payloadToPersist = { ...pendingPersistRef.current };
+                pendingPersistRef.current = {};
                 await fetch("/api/interview/state", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ sessionId, ...patch }),
+                    body: JSON.stringify({ sessionId, ...payloadToPersist }),
                 });
             } catch { }
         }, 1000);
