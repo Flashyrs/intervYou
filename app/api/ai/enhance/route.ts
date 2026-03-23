@@ -17,29 +17,28 @@ export async function POST(req: Request) {
 
 Problem: ${problemText}
 
-Return ONLY this JSON (no markdown):
-{
-  "enhancedTitle": "Short descriptive title of the problem",
-  "enhancedProblem": "formatted markdown problem description",
-  "testCases": [
-    {"input": [arg1], "output": result, "category": "sample"},
-    {"input": [arg2], "output": result2, "category": "sample"},
-    {"input": [arg3], "output": result3, "category": "sample"},
-    {"input": [arg4], "output": result4, "category": "sample"},
-    {"input": [edge1], "output": result5, "category": "edge"},
-    {"input": [edge2], "output": result6, "category": "edge"},
-    {"input": [edge3], "output": result7, "category": "edge"},
-    {"input": [edge4], "output": result8, "category": "edge"},
-    {"input": [edge5], "output": result9, "category": "edge"}
-  ],
-  "functionInfo": {
-    "javascript": {"name": "functionName", "params": ["param1", "param2"]},
-    "java": {"name": "functionName", "returnType": "int", "params": ["int[] nums"]},
-    "cpp": {"name": "functionName", "returnType": "int", "params": ["vector<int>& nums"]}
-  }
-}
-
-Generate 9 test cases: 4 sample + 5 edge cases.`;
+ Return ONLY this JSON (no markdown):
+ {
+   "enhancedTitle": "Short descriptive title of the problem",
+   "enhancedProblem": "formatted markdown problem description",
+   "testCases": [
+     {"input": [arg1], "output": result, "category": "sample"},
+     {"input": [arg2], "output": result2, "category": "sample"},
+     {"input": [arg3], "output": result3, "category": "sample"},
+     {"input": [edge1], "output": result4, "category": "edge"},
+     {"input": [edge2], "output": result5, "category": "edge"}
+   ],
+   "functionInfo": {
+     "javascript": {"name": "actualFunctionName", "params": ["actualParam1", "actualParam2"]},
+     "java": {"name": "actualFunctionName", "returnType": "int", "params": ["int[] actualParam1"]},
+     "cpp": {"name": "actualFunctionName", "returnType": "int", "params": ["vector<int>& actualParam1"]}
+   }
+ }
+ 
+ IMPORTANT RULES:
+ 1. Generate 9 test cases: 4 sample + 5 edge cases.
+ 2. In "functionInfo", you MUST invent a proper, descriptive function name (e.g., "twoSum", "maxProfit") based on the problem. Do NOT literally output "functionName"!
+ 3. You MUST invent proper parameter names and types based on the problem. Do NOT literally output "param1" or "arg1"!`;
 
         // Updated model list: prioritize stable models, then experimental
         const models = [
