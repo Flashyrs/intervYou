@@ -6,6 +6,7 @@ export async function GET(req: Request) {
   try {
     const session = await requireAuth();
     const userId = (session.user as any)?.id as string | undefined;
+    const userEmail = session.user?.email?.toLowerCase() || null;
 
     const { searchParams } = new URL(req.url);
     const sessionId = searchParams.get("sessionId");
@@ -23,17 +24,25 @@ export async function GET(req: Request) {
 
     if (item.createdBy === userId)
       return NextResponse.json({ role: "interviewer" }, { status: 200 });
-    type Participant = {
-      id: string;
-    };
-    if (item.participants.some((p: { id: string }) => p.id === userId))
+
+    const isExistingParticipant = item.participants.some((p: { id: string }) => p.id === userId);
+    if (isExistingParticipant)
       return NextResponse.json({ role: "interviewee" }, { status: 200 });
 
-    
-    if (item.participants.length === 0) {
+    const nonCreatorParticipants = item.participants.filter((p: { id: string }) => p.id !== item.createdBy);
+    const hasIntervieweeJoined = nonCreatorParticipants.length > 0;
+    const matchesInviteeEmail = !!item.inviteeEmail && !!userEmail && item.inviteeEmail.toLowerCase() === userEmail;
+    const canJoinAsFirstInterviewee =
+      !hasIntervieweeJoined && (!item.isScheduled || !item.inviteeEmail || matchesInviteeEmail);
+
+    if (canJoinAsFirstInterviewee) {
       await prisma.interviewSession.update({
         where: { id: sessionId },
-        data: { participants: { connect: { id: userId } } },
+        data: {
+          participants: { connect: { id: userId } },
+          status: item.status === "scheduled" ? "active" : item.status,
+          startedAt: item.startedAt ?? (item.status === "scheduled" ? new Date() : undefined),
+        },
       });
       return NextResponse.json({ role: "interviewee" }, { status: 200 });
     }
