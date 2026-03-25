@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
-import { CheckCircle2 } from "lucide-react";
+import { CheckCircle2, Code2, PenSquare } from "lucide-react";
 import { useSession, signIn } from "next-auth/react";
 import VideoCall from "@/components/VideoCall";
 import { useInterviewState } from "@/hooks/useInterviewState";
@@ -12,7 +12,8 @@ import { ControlBar } from "@/components/interview/ControlBar";
 import { OutputPanel } from "@/components/interview/OutputPanel";
 import { TestPanel } from "@/components/interview/TestPanel";
 import { AuthModal } from "@/components/interview/AuthModal";
-import { getWebRtcChannel } from "@/lib/sessionChannels";
+import { getScreenShareChannel, getWebRtcChannel } from "@/lib/sessionChannels";
+import { WhiteboardPanel } from "@/components/interview/WhiteboardPanel";
 
 const MonacoEditor: any = dynamic(() => import("@monaco-editor/react"), { ssr: false });
 
@@ -138,6 +139,7 @@ export default function InterviewPage() {
 }
 
 function InterviewRoom({ sessionId }: { sessionId: string }) {
+  const [workspaceTab, setWorkspaceTab] = useState<"editor" | "whiteboard">("editor");
   const {
     language,
     code,
@@ -316,60 +318,94 @@ function InterviewRoom({ sessionId }: { sessionId: string }) {
         {/* Center Pane: Solution Editor (50%) */}
         <section className="w-full md:w-[50%] flex flex-col bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden relative group">
           <div className="px-4 py-3 border-b border-gray-100 bg-gray-50/80 flex justify-between items-center">
-            <h2 className="text-[11px] font-bold text-gray-500 uppercase tracking-wider flex items-center gap-2">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-              Code Editor
-            </h2>
-            <div className="flex gap-1.5">
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition ${
+                  workspaceTab === "editor"
+                    ? "bg-white text-gray-900 shadow-sm border border-gray-200"
+                    : "text-gray-500 hover:text-gray-700"
+                }`}
+                onClick={() => setWorkspaceTab("editor")}
+              >
+                <Code2 className="w-3.5 h-3.5" />
+                Editor
+              </button>
+              <button
+                type="button"
+                className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition ${
+                  workspaceTab === "whiteboard"
+                    ? "bg-white text-gray-900 shadow-sm border border-gray-200"
+                    : "text-gray-500 hover:text-gray-700"
+                }`}
+                onClick={() => setWorkspaceTab("whiteboard")}
+              >
+                <PenSquare className="w-3.5 h-3.5" />
+                Whiteboard
+              </button>
+            </div>
+            <div className="flex items-center gap-2">
+              <h2 className="text-[11px] font-bold text-gray-500 uppercase tracking-wider flex items-center gap-2">
+                <span className={`w-1.5 h-1.5 rounded-full ${workspaceTab === "editor" ? "bg-emerald-500" : "bg-orange-500"}`}></span>
+                {workspaceTab === "editor" ? "Code Editor" : "Shared Whiteboard"}
+              </h2>
+              <div className="flex gap-1.5">
                <span className="w-2.5 h-2.5 rounded-full bg-red-400"></span>
                <span className="w-2.5 h-2.5 rounded-full bg-amber-400"></span>
                <span className="w-2.5 h-2.5 rounded-full bg-green-400"></span>
+              </div>
             </div>
           </div>
           <div className="flex-1 relative">
-            {/* Frozen State Overlay */}
-            {isFrozen && role === 'interviewee' && (
-              <div className="absolute inset-0 z-50 bg-white/60 backdrop-blur-md flex items-center justify-center">
-                <div className="bg-white p-8 rounded-2xl shadow-xl border border-indigo-100 text-center max-w-sm transform transition-all duration-300">
-                  <div className="mb-5 flex justify-center">
-                    <div className="p-4 bg-indigo-50 rounded-full animate-bounce">
-                      <CheckCircle2 className="w-10 h-10 text-indigo-600" />
+            {workspaceTab === "editor" ? (
+              <>
+                {/* Frozen State Overlay */}
+                {isFrozen && role === 'interviewee' && (
+                  <div className="absolute inset-0 z-50 bg-white/60 backdrop-blur-md flex items-center justify-center">
+                    <div className="bg-white p-8 rounded-2xl shadow-xl border border-indigo-100 text-center max-w-sm transform transition-all duration-300">
+                      <div className="mb-5 flex justify-center">
+                        <div className="p-4 bg-indigo-50 rounded-full animate-bounce">
+                          <CheckCircle2 className="w-10 h-10 text-indigo-600" />
+                        </div>
+                      </div>
+                      <h3 className="text-xl font-bold text-gray-900 mb-2">Session Paused</h3>
+                      <p className="text-sm text-gray-500 leading-relaxed">
+                        The interviewer is explaining a concept. Please wait for them to resume the session before typing.
+                      </p>
                     </div>
                   </div>
-                  <h3 className="text-xl font-bold text-gray-900 mb-2">Session Paused</h3>
-                  <p className="text-sm text-gray-500 leading-relaxed">
-                    The interviewer is explaining a concept. Please wait for them to resume the session before typing.
-                  </p>
-                </div>
-              </div>
-            )}
+                )}
 
-            <MonacoEditor
-              key={`${language}-${sessionId}`}
-              height="100%"
-              defaultLanguage="javascript"
-              language={language}
-              value={code}
-              onChange={(v: string | undefined) => updateCode(v || "")}
-              onMount={(editor: any, monaco: any) => {
-                editor.onDidChangeCursorPosition((e: any) => {
-                  broadcastCursor({ lineNumber: e.position.lineNumber, column: e.position.column });
-                });
-                (window as any)[`__editor_${sessionId}`] = editor;
-                (window as any)[`__monaco_${sessionId}`] = monaco;
-              }}
-              options={{
-                minimap: { enabled: false },
-                scrollBeyondLastLine: false,
-                readOnly: isFrozen && role === 'interviewee',
-                fontSize: 14,
-                fontFamily: "'JetBrains Mono', 'Fira Code', Consolas, monospace",
-                lineHeight: 1.6,
-                padding: { top: 16, bottom: 16 },
-                roundedSelection: true,
-                cursorBlinking: "smooth",
-              }}
-            />
+                <MonacoEditor
+                  key={`${language}-${sessionId}`}
+                  height="100%"
+                  defaultLanguage="javascript"
+                  language={language}
+                  value={code}
+                  onChange={(v: string | undefined) => updateCode(v || "")}
+                  onMount={(editor: any, monaco: any) => {
+                    editor.onDidChangeCursorPosition((e: any) => {
+                      broadcastCursor({ lineNumber: e.position.lineNumber, column: e.position.column });
+                    });
+                    (window as any)[`__editor_${sessionId}`] = editor;
+                    (window as any)[`__monaco_${sessionId}`] = monaco;
+                  }}
+                  options={{
+                    minimap: { enabled: false },
+                    scrollBeyondLastLine: false,
+                    readOnly: isFrozen && role === 'interviewee',
+                    fontSize: 14,
+                    fontFamily: "'JetBrains Mono', 'Fira Code', Consolas, monospace",
+                    lineHeight: 1.6,
+                    padding: { top: 16, bottom: 16 },
+                    roundedSelection: true,
+                    cursorBlinking: "smooth",
+                  }}
+                />
+              </>
+            ) : (
+              <WhiteboardPanel sessionId={sessionId} role={role} />
+            )}
           </div>
         </section>
 
@@ -385,7 +421,11 @@ function InterviewRoom({ sessionId }: { sessionId: string }) {
             </div>
             <div className="w-full h-full flex items-center justify-center">
                {/* Use a dedicated webrtc channel to prevent collisions with the code editor channel */}
-               <VideoCall room={getWebRtcChannel(sessionId)} role={role} />
+               <VideoCall
+                room={getWebRtcChannel(sessionId)}
+                screenShareRoom={getScreenShareChannel(sessionId)}
+                role={role}
+              />
             </div>
           </div>
 
@@ -398,7 +438,7 @@ function InterviewRoom({ sessionId }: { sessionId: string }) {
               </h2>
             </div>
             <div className="flex-1 relative z-10 overflow-hidden">
-               <OutputPanel
+              <OutputPanel
                 runOutput={runOutput}
                 caseResults={caseResults}
                 sampleTests={sampleTests}
