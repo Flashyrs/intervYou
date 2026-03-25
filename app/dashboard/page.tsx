@@ -13,7 +13,9 @@ export default function DashboardPage() {
   const [incoming, setIncoming] = useState<{ from: string; tempId: string; initiatorId?: string; name?: string } | null>(null);
   const [status, setStatus] = useState<string>("");
   const [tempId, setTempId] = useState<string | null>(null);
+  const [lobbyReady, setLobbyReady] = useState(false);
   const channelRef = useRef<any | null>(null);
+  const tempIdRef = useRef<string | null>(null);
   const presenceRef = useRef<any | null>(null);
   const [online, setOnline] = useState<string[]>([]);
   const [showScheduleModal, setShowScheduleModal] = useState(false);
@@ -34,6 +36,10 @@ export default function DashboardPage() {
   const { push } = useToast();
 
   const userId = (session?.user as any)?.id as string | undefined;
+
+  useEffect(() => {
+    tempIdRef.current = tempId;
+  }, [tempId]);
 
   useEffect(() => {
     if (session?.user) {
@@ -80,14 +86,16 @@ export default function DashboardPage() {
         if (msg.initiatorId && userId && msg.initiatorId === userId) return;
         setIncoming({ from: msg.from, tempId: msg.tempId, initiatorId: msg.initiatorId, name: msg.name });
       } else if (msg?.type === "random-accept") {
-        if (tempId && msg.tempId === tempId && msg.sessionId) {
+        if (tempIdRef.current && msg.tempId === tempIdRef.current && msg.sessionId) {
           push({ message: "Matched! Redirecting…", type: "success" });
           router.push(`/interview/${msg.sessionId}`);
         }
       }
     });
 
-    ch.subscribe();
+    ch.subscribe((channelStatus) => {
+      setLobbyReady(channelStatus === "SUBSCRIBED");
+    });
 
     const pres = presenceChannel("presence-lobby");
     presenceRef.current = pres;
@@ -111,7 +119,7 @@ export default function DashboardPage() {
       if (channelRef.current && supabase) supabase.removeChannel(channelRef.current);
       if (presenceRef.current && supabase) supabase.removeChannel(presenceRef.current);
     };
-  }, [tempId, router, userId, push, userName, userEmail]);
+  }, [router, userId, push, userName, userEmail]);
 
   const startRandom = async () => {
     if (!session) { signIn(); return; }
@@ -119,6 +127,10 @@ export default function DashboardPage() {
 
     if (!userId) {
       push({ message: "User ID missing. Please sign out and sign in again.", type: "error" });
+      return;
+    }
+    if (!lobbyReady) {
+      push({ message: "Matchmaking is still connecting. Please try again in a moment.", type: "error" });
       return;
     }
 
@@ -138,6 +150,8 @@ export default function DashboardPage() {
       type: "broadcast",
       event: "lobby",
       payload,
+    }).catch(() => {
+      push({ message: "Failed to broadcast matchmaking request", type: "error" });
     });
   };
 
@@ -157,10 +171,17 @@ export default function DashboardPage() {
     }
 
     const sessionId = data.sessionId;
+    if (!lobbyReady) {
+      push({ message: "Matchmaking channel is reconnecting. Please try accepting again.", type: "error" });
+      return;
+    }
     channelRef.current?.send({
       type: "broadcast",
       event: "lobby",
       payload: { type: "random-accept", from: "interviewer", tempId: incoming.tempId, sessionId },
+    }).catch(() => {
+      push({ message: "Failed to confirm match", type: "error" });
+      return;
     });
     setIncoming(null);
     router.push(`/interview/${sessionId}`);
@@ -470,11 +491,12 @@ export default function DashboardPage() {
             <div className="space-y-6">
               <div className="flex gap-4 p-4 bg-gray-50 rounded-lg items-center">
                 <button
-                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-black text-white text-sm font-medium rounded-md shadow-sm hover:bg-gray-800 transition"
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-black text-white text-sm font-medium rounded-md shadow-sm hover:bg-gray-800 transition disabled:opacity-50 disabled:cursor-not-allowed"
                   onClick={startRandom}
+                  disabled={!lobbyReady}
                 >
                   <Play className="w-4 h-4" />
-                  Random Match
+                  {lobbyReady ? "Random Match" : "Connecting Matchmaking..."}
                 </button>
 
                 <button
