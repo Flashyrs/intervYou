@@ -17,6 +17,9 @@ export async function GET(req: Request) {
     });
 
     if (!item) return NextResponse.json({ error: "not found" }, { status: 404 });
+    if (item.status === "completed" || item.status === "expired" || item.endedAt) {
+      return NextResponse.json({ error: "session ended" }, { status: 410 });
+    }
 
     if (item.createdBy === userId)
       return NextResponse.json({ role: "interviewer" }, { status: 200 });

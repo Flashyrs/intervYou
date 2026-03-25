@@ -55,13 +55,12 @@ Important:
 `;
 
     const models = [
-      "gemini-2.5-pro",
-      "gemini-2.5-flash",
-      "gemini-2.0-flash"
+      "gemini-2.5-flash"
     ];
 
     let response;
-    let lastError;
+    let lastError = "";
+    let lastStatus = 500;
 
     for (const model of models) {
       try {
@@ -88,6 +87,7 @@ Important:
         } else {
           const errText = await response.text();
           console.warn(`Failed with model ${model}: ${response.status} - ${errText}`);
+          lastStatus = response.status;
           lastError = `Error ${response.status}: ${errText}`;
         }
       } catch (e: any) {
@@ -97,6 +97,12 @@ Important:
     }
 
     if (!response || !response.ok) {
+      if (lastStatus === 429 || lastError.includes("429")) {
+        return NextResponse.json(
+          { error: "AI rate limit reached for this project. Please wait a bit and try again." },
+          { status: 429 }
+        );
+      }
       return NextResponse.json(
         { error: `All Gemini models failed. Last error: ${lastError}` },
         { status: 502 }

@@ -42,13 +42,12 @@ Problem: ${problemText}
 
         // Updated model list: prioritize stable models, then experimental
         const models = [
-            "gemini-2.5-pro",
-            "gemini-2.5-flash",
-            "gemini-2.0-flash"
+            "gemini-2.5-flash"
         ];
 
         let response;
-        let lastError;
+        let lastError = "";
+        let lastStatus = 500;
         let successfulModel = "";
 
         for (const model of models) {
@@ -83,6 +82,7 @@ Problem: ${problemText}
 
                 const errorText = await response.text();
                 console.warn(`Model ${model} failed:`, errorText);
+                lastStatus = response.status;
                 lastError = `Model ${model} error: ${response.status} ${response.statusText}`;
             } catch (e: any) {
                 const message = e?.name === "AbortError" ? "AI request timed out" : e.message;
@@ -93,6 +93,12 @@ Problem: ${problemText}
 
         if (!response || !response.ok) {
             console.error("All AI models failed. Last error:", lastError);
+            if (lastStatus === 429 || lastError.includes("429")) {
+                return NextResponse.json(
+                    { error: "AI rate limit reached for this project. Please wait a bit and try again." },
+                    { status: 429 }
+                );
+            }
             return NextResponse.json({ error: "AI service failed to respond. Please try again later. Details: " + lastError }, { status: 500 });
         }
 
