@@ -1,5 +1,6 @@
 import { prisma } from "./db";
 import { sendSessionArchivedEmail } from "./email";
+import { persistFinalInterviewState } from "./interviewStateStore";
 
 export interface ParticipantTracking {
     [userId: string]: number;
@@ -24,6 +25,8 @@ export async function trackParticipantJoin(sessionId: string, userId: string) {
 
         const leftAt = (session.participantLeftAt as ParticipantTracking) || {};
         delete leftAt[userId];
+
+        await persistFinalInterviewState(sessionId);
 
         await prisma.interviewSession.update({
             where: { id: sessionId },
@@ -56,6 +59,8 @@ export async function trackParticipantLeave(sessionId: string, userId: string) {
 
         const leftAt = (session.participantLeftAt as ParticipantTracking) || {};
         leftAt[userId] = Date.now();
+
+        await persistFinalInterviewState(sessionId);
 
         await prisma.interviewSession.update({
             where: { id: sessionId },

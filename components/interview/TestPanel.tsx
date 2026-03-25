@@ -20,6 +20,8 @@ interface TestPanelProps {
     setDriver: (v: string) => void;
     setCodeMapFull: (map: Record<string, string>) => void;
     setDriverMapFull: (map: Record<string, string>) => void;
+    interviewerNotes: string;
+    setInterviewerNotes: (v: string) => void;
 }
 
 export function TestPanel({
@@ -38,10 +40,12 @@ export function TestPanel({
     sessionId,
     setDriver,
     setCodeMapFull,
-    setDriverMapFull
+    setDriverMapFull,
+    interviewerNotes,
+    setInterviewerNotes
 }: TestPanelProps) {
     const [enhancing, setEnhancing] = useState(false);
-    const [activeTab, setActiveTab] = useState<'problem' | 'tests'>('problem');
+    const [activeTab, setActiveTab] = useState<'problem' | 'tests' | 'notes'>('problem');
 
     const enhanceWithAI = async () => {
         if (!problemText.trim()) {
@@ -109,6 +113,14 @@ export function TestPanel({
                     >
                         Test Cases
                     </button>
+                    {role === "interviewer" && (
+                        <button
+                            onClick={() => setActiveTab('notes')}
+                            className={`text-sm font-medium transition-colors ${activeTab === 'notes' ? 'text-gray-900' : 'text-gray-400 hover:text-gray-600'}`}
+                        >
+                            Notes
+                        </button>
+                    )}
                 </div>
 
                 {role === "interviewer" && activeTab === 'problem' && (
@@ -159,7 +171,7 @@ export function TestPanel({
                             </div>
                         )}
                     </div>
-                ) : (
+                ) : activeTab === 'tests' ? (
                     <div className="h-full overflow-y-auto p-4 space-y-6 scrollbar-thin animate-in fade-in duration-300">
                         {/* Sample Tests Section */}
                         <section>
@@ -195,6 +207,23 @@ export function TestPanel({
                                 </div>
                             </section>
                         )}
+                    </div>
+                ) : (
+                    <div className="h-full overflow-y-auto p-6 animate-in fade-in duration-300">
+                        <div className="space-y-3 h-full flex flex-col">
+                            <div>
+                                <h3 className="text-sm font-semibold text-gray-900">Private Interviewer Notes</h3>
+                                <p className="text-xs text-gray-500 mt-1">
+                                    Saved privately for grading, feedback, and decision history. These notes are never shown to the interviewee.
+                                </p>
+                            </div>
+                            <textarea
+                                className="flex-1 min-h-[320px] w-full resize-none rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-700 outline-none transition focus:border-indigo-300 focus:bg-white focus:ring-2 focus:ring-indigo-100"
+                                placeholder="Capture observations, communication signals, approach, tradeoffs, and follow-up grading notes..."
+                                value={interviewerNotes}
+                                onChange={(e) => setInterviewerNotes(e.target.value)}
+                            />
+                        </div>
                     </div>
                 )}
             </div>

@@ -54,20 +54,27 @@ Problem: ${problemText}
         for (const model of models) {
             try {
                 console.log(`Attempting AI Enhance with model: ${model}`);
-                response = await fetch(
-                    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
-                    {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({
-                            contents: [{ parts: [{ text: prompt }] }],
-                            generationConfig: {
-                                temperature: 0.3,
-                                responseMimeType: "application/json" // Hint for JSON output
-                            }
-                        })
-                    }
-                );
+                const controller = new AbortController();
+                const timeout = setTimeout(() => controller.abort(), 25000);
+                try {
+                    response = await fetch(
+                        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+                        {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            signal: controller.signal,
+                            body: JSON.stringify({
+                                contents: [{ parts: [{ text: prompt }] }],
+                                generationConfig: {
+                                    temperature: 0.3,
+                                    responseMimeType: "application/json" // Hint for JSON output
+                                }
+                            })
+                        }
+                    );
+                } finally {
+                    clearTimeout(timeout);
+                }
 
                 if (response.ok) {
                     successfulModel = model;
@@ -78,8 +85,9 @@ Problem: ${problemText}
                 console.warn(`Model ${model} failed:`, errorText);
                 lastError = `Model ${model} error: ${response.status} ${response.statusText}`;
             } catch (e: any) {
-                console.warn(`Model ${model} network error:`, e.message);
-                lastError = e.message;
+                const message = e?.name === "AbortError" ? "AI request timed out" : e.message;
+                console.warn(`Model ${model} network error:`, message);
+                lastError = message;
             }
         }
 

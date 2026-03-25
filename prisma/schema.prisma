@@ -56,6 +56,12 @@ model InterviewSession {
   createdAt           DateTime  @default(now())
   problemId           String?
   participants        User[]    @relation("InterviewParticipants")
+  liveStateVersion    Int       @default(0)
+  stateSnapshot       Json?
+  finalState          Json?
+  problemPack         Json?
+  interviewerNotes    String?   @db.Text
+  stateSnapshotUpdatedAt DateTime?
   
   // Scheduling fields
   scheduledFor        DateTime?

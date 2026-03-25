@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useSession } from "next-auth/react";
 import { supabase } from "@/lib/supabase";
 import { maybeInjectSkeleton } from "@/lib/interviewUtils";
+import { getInterviewStateChannel } from "@/lib/sessionChannels";
 
 export type Role = "interviewer" | "interviewee";
 
@@ -28,9 +29,12 @@ export function useInterviewState(sessionId: string) {
     const [lastEditor, setLastEditor] = useState<{ name: string, role: string, timestamp: number } | null>(null);
     const [isFrozen, setIsFrozen] = useState(false);
     const [timerState, setTimerState] = useState<{ active: boolean, startTimestamp: number | null, accumulated: number }>({ active: false, startTimestamp: null, accumulated: 0 });
+    const [stateVersion, setStateVersion] = useState(0);
+    const [interviewerNotes, setInterviewerNotes] = useState("");
 
     const channelRef = useRef<any>(null);
     const saveTimeout = useRef<any>(null);
+    const notesSaveTimeout = useRef<any>(null);
     const pendingBroadcastRef = useRef<any>({});
     const broadcastTimeout = useRef<any>(null);
     const cursorBroadcastTimeout = useRef<any>(null);
@@ -38,10 +42,51 @@ export function useInterviewState(sessionId: string) {
     const pendingPersistRef = useRef<any>({});
     const lastUpdateRef = useRef<number>(0);
     const lastLocalEditRef = useRef<number>(0);
+    const stateVersionRef = useRef<number>(0);
 
 
     const code = codeMap[language] || "";
     const driver = driverMap[language] || "";
+
+    const applyServerState = (stateData: any) => {
+        if (!stateData) return;
+
+        if (typeof stateData.language === "string") setLanguage(stateData.language);
+        if (stateData.codeMap) setCodeMap(stateData.codeMap);
+        else if (typeof stateData.code === "string") {
+            setCodeMap(prev => ({ ...prev, [stateData.language || 'javascript']: stateData.code }));
+        }
+
+        if (stateData.driverMap) setDriverMap(stateData.driverMap);
+        else if (typeof stateData.driver === "string") {
+            setDriverMap(prev => ({ ...prev, [stateData.language || 'javascript']: stateData.driver }));
+        }
+
+        if (typeof stateData.problemText === "string") setProblemText(stateData.problemText);
+        if (typeof stateData.problemTitle === "string") setProblemTitle(stateData.problemTitle);
+        if (typeof stateData.problemId === "string") setProblemId(stateData.problemId);
+        if (typeof stateData.sampleTests === "string") setSampleTests(stateData.sampleTests);
+        if (typeof stateData.privateTests === "string") setPrivateTests(stateData.privateTests);
+        if (typeof stateData.interviewerNotes === "string") setInterviewerNotes(stateData.interviewerNotes);
+        if (typeof stateData.version === "number") {
+            setStateVersion(stateData.version);
+            stateVersionRef.current = stateData.version;
+        }
+        if (stateData.timerState) setTimerState(stateData.timerState);
+        if (stateData.lastOutput !== undefined) setExecutionResult(stateData.lastOutput);
+        if (stateData.isFrozen !== undefined) setIsFrozen(stateData.isFrozen);
+    };
+
+    const reloadAuthoritativeState = async () => {
+        try {
+            const res = await fetch(`/api/interview/state?sessionId=${sessionId}`, { cache: "no-store" });
+            if (!res.ok) return;
+            const stateData = await res.json();
+            applyServerState(stateData);
+        } catch {
+            // Ignore reload failures; realtime/polling can recover later.
+        }
+    };
 
 
     useEffect(() => {
@@ -69,24 +114,7 @@ export function useInterviewState(sessionId: string) {
                 }
 
                 if (stateRes.ok && stateData) {
-                    if (typeof stateData.language === "string") setLanguage(stateData.language);
-                    if (stateData.codeMap) setCodeMap(stateData.codeMap);
-                    else if (typeof stateData.code === "string") {
-
-                        setCodeMap(prev => ({ ...prev, [stateData.language || 'javascript']: stateData.code }));
-                    }
-
-                    if (stateData.driverMap) setDriverMap(stateData.driverMap);
-                    else if (typeof stateData.driver === "string") {
-                        setDriverMap(prev => ({ ...prev, [stateData.language || 'javascript']: stateData.driver }));
-                    }
-
-                    if (typeof stateData.problemText === "string") setProblemText(stateData.problemText);
-                    if (typeof stateData.problemTitle === "string") setProblemTitle(stateData.problemTitle);
-                    if (typeof stateData.problemId === "string") setProblemId(stateData.problemId);
-                    if (typeof stateData.sampleTests === "string") setSampleTests(stateData.sampleTests);
-                    if (typeof stateData.privateTests === "string") setPrivateTests(stateData.privateTests);
-                    if (stateData.timerState) setTimerState(stateData.timerState);
+                    applyServerState(stateData);
                 }
             } catch {
                 // Ignore network errors on init
@@ -140,7 +168,6 @@ export function useInterviewState(sessionId: string) {
                         }
                         
                         if (stateData) {
-                            // Only update if data is newer (basic check)
                             if (typeof stateData.language === "string" && stateData.language !== language) {
                                 setLanguage(stateData.language);
                             }
@@ -175,6 +202,13 @@ export function useInterviewState(sessionId: string) {
                             if (typeof stateData.privateTests === "string") {
                                 setPrivateTests(prev => stateData.privateTests !== prev ? stateData.privateTests : prev);
                             }
+                            if (typeof stateData.interviewerNotes === "string") {
+                                setInterviewerNotes(prev => stateData.interviewerNotes !== prev ? stateData.interviewerNotes : prev);
+                            }
+                            if (typeof stateData.version === "number" && stateData.version !== stateVersionRef.current) {
+                                setStateVersion(stateData.version);
+                                stateVersionRef.current = stateData.version;
+                            }
                             if (stateData.timerState) {
                                 setTimerState(prev => JSON.stringify(stateData.timerState) !== JSON.stringify(prev) ? stateData.timerState : prev);
                             }
@@ -199,11 +233,11 @@ export function useInterviewState(sessionId: string) {
         }
 
         // Original Supabase real-time logic
-        const channel = supabase.channel(`interview-${sessionId}`);
+        const channel = supabase.channel(getInterviewStateChannel(sessionId));
         channelRef.current = channel;
 
         channel.on("broadcast", { event: "state" }, (payload: any) => {
-            const { clientId: senderClientId, language: newLang, codeMap: newCodeMap, driverMap: newDriverMap, problemText: newProb, problemTitle: newTitle, problemId: newProblemId, sampleTests: newTests, cursor, timestamp } = payload?.payload || {};
+            const { clientId: senderClientId, language: newLang, codeMap: newCodeMap, driverMap: newDriverMap, problemText: newProb, problemTitle: newTitle, problemId: newProblemId, sampleTests: newTests, cursor, version } = payload?.payload || {};
 
             // Echo cancellation: only skip if it's from THIS exact client
             if (senderClientId && senderClientId === clientIdRef.current) {
@@ -285,6 +319,11 @@ export function useInterviewState(sessionId: string) {
                 setTimerState(payload.payload.timerState);
             }
 
+            if (typeof version === "number" && version > stateVersionRef.current) {
+                setStateVersion(version);
+                stateVersionRef.current = version;
+            }
+
             // 7. Last Output Update (from persist patch, fallback for broadcast)
             if (payload?.payload?.lastOutput) {
                 setExecutionResult(payload.payload.lastOutput);
@@ -348,7 +387,8 @@ export function useInterviewState(sessionId: string) {
                 userId,
                 role, // Broadcast role for "Last edited by..."
                 clientId: clientIdRef.current,
-                timestamp
+                timestamp,
+                version: stateVersionRef.current + 1
             };
             pendingBroadcastRef.current = {};
 
@@ -363,8 +403,6 @@ export function useInterviewState(sessionId: string) {
                 });
             }
 
-            // Always persist to database as backup
-            persist(payload);
         }, 400);
     };
 
@@ -396,13 +434,55 @@ export function useInterviewState(sessionId: string) {
             try {
                 const payloadToPersist = { ...pendingPersistRef.current };
                 pendingPersistRef.current = {};
-                await fetch("/api/interview/state", {
+                const res = await fetch("/api/interview/state", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ sessionId, ...payloadToPersist }),
+                    body: JSON.stringify({ sessionId, baseVersion: stateVersionRef.current, ...payloadToPersist }),
                 });
+                if (res.ok) {
+                    const data = await res.json();
+                    if (typeof data.version === "number") {
+                        setStateVersion(data.version);
+                        stateVersionRef.current = data.version;
+                    }
+                    if (typeof data.interviewerNotes === "string") {
+                        setInterviewerNotes(data.interviewerNotes);
+                    }
+                } else if (res.status === 409) {
+                    await reloadAuthoritativeState();
+                }
             } catch { }
         }, 1000);
+    };
+
+    const persistInterviewerNotes = (notes: string) => {
+        setInterviewerNotes(notes);
+        if (notesSaveTimeout.current) clearTimeout(notesSaveTimeout.current);
+        notesSaveTimeout.current = setTimeout(async () => {
+            try {
+                const res = await fetch("/api/interview/state", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        sessionId,
+                        interviewerNotes: notes,
+                        baseVersion: stateVersionRef.current,
+                    }),
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    if (typeof data.interviewerNotes === "string") {
+                        setInterviewerNotes(data.interviewerNotes);
+                    }
+                    if (typeof data.version === "number") {
+                        setStateVersion(data.version);
+                        stateVersionRef.current = data.version;
+                    }
+                }
+            } catch {
+                // Ignore note persistence failures and allow retry on next edit.
+            }
+        }, 500);
     };
 
     const updateLanguage = (lang: string) => {
@@ -484,6 +564,7 @@ export function useInterviewState(sessionId: string) {
         const newState = !isFrozen;
         setIsFrozen(newState);
         broadcast({ isFrozen: newState });
+        persist({ isFrozen: newState });
     };
 
     const updateTimerState = (newState: { active: boolean, startTimestamp: number | null, accumulated: number }) => {
@@ -552,6 +633,7 @@ export function useInterviewState(sessionId: string) {
         driver,
         driverMap,
         role,
+        interviewerNotes,
         showAuthModal,
         setShowAuthModal,
         setPrivateTests: (text: string) => {
@@ -578,6 +660,8 @@ export function useInterviewState(sessionId: string) {
         timerState,
         updateTimerState,
         lastEditor,
+        stateVersion,
+        persistInterviewerNotes,
         resetSessionForNextQuestion,
         endSession
     };
