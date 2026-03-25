@@ -40,6 +40,7 @@ export default function VideoCall({
   const localRef = useRef<HTMLVideoElement>(null);
   const remoteRef = useRef<HTMLVideoElement>(null);
   const remoteScreenRef = useRef<HTMLVideoElement>(null);
+  const remoteScreenStreamRef = useRef<MediaStream | null>(null);
   const pcRef = useRef<RTCPeerConnection | null>(null);
   const channelRef = useRef<any>(null);
   const screenSharePcRef = useRef<RTCPeerConnection | null>(null);
@@ -321,6 +322,7 @@ export default function VideoCall({
     setScreenShareChannelReady(false);
     const remoteScreenStream = new MediaStream();
     const pendingIceCandidates: RTCIceCandidate[] = [];
+    remoteScreenStreamRef.current = remoteScreenStream;
     const remoteScreenEl = remoteScreenRef.current;
 
     const ch = onSignal(screenShareRoom, async (payload) => {
@@ -338,9 +340,9 @@ export default function VideoCall({
             event.streams[0].getTracks().forEach((track) => {
               remoteScreenStream.addTrack(track);
             });
-            if (remoteScreenEl) {
-              remoteScreenEl.srcObject = remoteScreenStream;
-              safePlay(remoteScreenEl, "remote-screen");
+            if (remoteScreenRef.current) {
+              remoteScreenRef.current.srcObject = remoteScreenStream;
+              safePlay(remoteScreenRef.current, "remote-screen");
             }
             setRemoteScreenActive(true);
           };
@@ -390,9 +392,10 @@ export default function VideoCall({
           }
         } else if (payload.type === "screen-share-stopped") {
           setRemoteScreenActive(false);
-          if (remoteScreenEl) {
-            remoteScreenEl.srcObject = null;
+          if (remoteScreenRef.current) {
+            remoteScreenRef.current.srcObject = null;
           }
+          remoteScreenStreamRef.current = null;
           screenSharePcRef.current?.close();
           screenSharePcRef.current = null;
         }
@@ -411,9 +414,16 @@ export default function VideoCall({
       if (remoteScreenEl) {
         remoteScreenEl.srcObject = null;
       }
+      remoteScreenStreamRef.current = null;
       setRemoteScreenActive(false);
     };
   }, [screenShareRoom]);
+
+  useEffect(() => {
+    if (!remoteScreenActive || !remoteScreenRef.current || !remoteScreenStreamRef.current) return;
+    remoteScreenRef.current.srcObject = remoteScreenStreamRef.current;
+    safePlay(remoteScreenRef.current, "remote-screen-mounted");
+  }, [remoteScreenActive]);
 
   const handleReconnect = async () => {
     setError("");
