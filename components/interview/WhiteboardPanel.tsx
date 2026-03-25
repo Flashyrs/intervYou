@@ -137,7 +137,7 @@ export function WhiteboardPanel({
             <RefreshCw className="w-3.5 h-3.5" />
             Sync
           </button>
-          {role === "interviewer" && (
+          {role === "interviewee" && (
             <button
               type="button"
               className="inline-flex items-center gap-1 rounded-md border border-gray-200 px-2.5 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-100 transition"
@@ -167,6 +167,7 @@ export function WhiteboardPanel({
             },
           }}
           onChange={(elements, appState) => {
+            if (role !== "interviewee") return;
             if (suppressBroadcastRef.current) return;
             const scene = {
               elements: elements.map((element: any) => ({ ...element })),
@@ -179,7 +180,7 @@ export function WhiteboardPanel({
             };
             queueBroadcast(scene);
           }}
-          viewModeEnabled={false}
+          viewModeEnabled={role === "interviewer"}
           UIOptions={{
             canvasActions: {
               loadScene: false,

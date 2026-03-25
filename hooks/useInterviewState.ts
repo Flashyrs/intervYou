@@ -23,6 +23,7 @@ export function useInterviewState(sessionId: string, initialRole: Role) {
     const [problemTitle, setProblemTitle] = useState("Problem 1"); // Default title
     const [sampleTests, setSampleTests] = useState("");
     const [privateTests, setPrivateTests] = useState("");
+    const [workspaceMode, setWorkspaceMode] = useState<"editor" | "whiteboard">("editor");
     const [role, setRole] = useState<Role>(initialRole);
     const [showAuthModal, setShowAuthModal] = useState(false);
     const [remoteCursors, setRemoteCursors] = useState<Record<string, any>>({});
@@ -68,6 +69,9 @@ export function useInterviewState(sessionId: string, initialRole: Role) {
         if (typeof stateData.problemId === "string") setProblemId(stateData.problemId);
         if (typeof stateData.sampleTests === "string") setSampleTests(stateData.sampleTests);
         if (typeof stateData.privateTests === "string") setPrivateTests(stateData.privateTests);
+        if (stateData.workspaceMode === "editor" || stateData.workspaceMode === "whiteboard") {
+            setWorkspaceMode(stateData.workspaceMode);
+        }
         if (typeof stateData.version === "number") {
             setStateVersion(stateData.version);
             stateVersionRef.current = stateData.version;
@@ -229,6 +233,9 @@ export function useInterviewState(sessionId: string, initialRole: Role) {
                             if (typeof stateData.privateTests === "string") {
                                 setPrivateTests(prev => stateData.privateTests !== prev ? stateData.privateTests : prev);
                             }
+                            if ((stateData.workspaceMode === "editor" || stateData.workspaceMode === "whiteboard") && stateData.workspaceMode !== workspaceMode) {
+                                setWorkspaceMode(stateData.workspaceMode);
+                            }
                             if (typeof stateData.version === "number" && stateData.version !== stateVersionRef.current) {
                                 setStateVersion(stateData.version);
                                 stateVersionRef.current = stateData.version;
@@ -261,7 +268,7 @@ export function useInterviewState(sessionId: string, initialRole: Role) {
         channelRef.current = channel;
 
         channel.on("broadcast", { event: "state" }, (payload: any) => {
-            const { clientId: senderClientId, language: newLang, codeMap: newCodeMap, driverMap: newDriverMap, problemText: newProb, problemTitle: newTitle, problemId: newProblemId, sampleTests: newTests, cursor, version } = payload?.payload || {};
+            const { clientId: senderClientId, language: newLang, codeMap: newCodeMap, driverMap: newDriverMap, problemText: newProb, problemTitle: newTitle, problemId: newProblemId, sampleTests: newTests, workspaceMode: newWorkspaceMode, cursor, version } = payload?.payload || {};
 
             // Echo cancellation: only skip if it's from THIS exact client
             if (senderClientId && senderClientId === clientIdRef.current) {
@@ -323,6 +330,9 @@ export function useInterviewState(sessionId: string, initialRole: Role) {
             }
             if (typeof newTests === "string") {
                 setSampleTests(newTests);
+            }
+            if (newWorkspaceMode === "editor" || newWorkspaceMode === "whiteboard") {
+                setWorkspaceMode(newWorkspaceMode);
             }
             if (payload?.payload?.privateTests && typeof payload.payload.privateTests === "string") {
                 setPrivateTests(payload.payload.privateTests);
@@ -568,6 +578,12 @@ export function useInterviewState(sessionId: string, initialRole: Role) {
         persist({ sampleTests: text });
     };
 
+    const updateWorkspaceMode = (mode: "editor" | "whiteboard") => {
+        setWorkspaceMode(mode);
+        broadcast({ workspaceMode: mode });
+        persist({ workspaceMode: mode });
+    };
+
     const updateDriver = (text: string) => {
         setDriverMap(prev => {
             const next = { ...prev, [language]: text };
@@ -606,7 +622,8 @@ export function useInterviewState(sessionId: string, initialRole: Role) {
             },
             driverMap: {},
             lastOutput: null,
-            timerState: { active: false, startTimestamp: null, accumulated: 0 }
+            timerState: { active: false, startTimestamp: null, accumulated: 0 },
+            workspaceMode: "editor"
         };
 
         setProblemId(newProblemId);
@@ -618,6 +635,7 @@ export function useInterviewState(sessionId: string, initialRole: Role) {
         setDriverMap(resetPatch.driverMap);
         setExecutionResult(null);
         setTimerState(resetPatch.timerState);
+        setWorkspaceMode("editor");
 
         broadcast(resetPatch);
         persist(resetPatch);
@@ -647,6 +665,7 @@ export function useInterviewState(sessionId: string, initialRole: Role) {
         problemTitle,
         sampleTests,
         privateTests,
+        workspaceMode,
         driver,
         driverMap,
         role,
@@ -666,6 +685,7 @@ export function useInterviewState(sessionId: string, initialRole: Role) {
         updateProblemText,
         updateProblemTitle,
         updateSampleTests,
+        updateWorkspaceMode,
         updateDriver,
         broadcast,
         persist,

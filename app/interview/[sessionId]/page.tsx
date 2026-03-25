@@ -155,7 +155,6 @@ export default function InterviewPage() {
 }
 
 function InterviewRoom({ sessionId, initialRole }: { sessionId: string; initialRole: "interviewer" | "interviewee" }) {
-  const [workspaceTab, setWorkspaceTab] = useState<"editor" | "whiteboard">("editor");
   const {
     language,
     code,
@@ -164,6 +163,7 @@ function InterviewRoom({ sessionId, initialRole }: { sessionId: string; initialR
     problemTitle,
     sampleTests,
     privateTests,
+    workspaceMode,
     driver,
     role,
     showAuthModal,
@@ -174,6 +174,7 @@ function InterviewRoom({ sessionId, initialRole }: { sessionId: string; initialR
     updateProblemText,
     updateProblemTitle,
     updateSampleTests,
+    updateWorkspaceMode,
     setCodeMapFull,
     setDriverMapFull,
     updateDriver,
@@ -338,11 +339,11 @@ function InterviewRoom({ sessionId, initialRole }: { sessionId: string; initialR
               <button
                 type="button"
                 className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition ${
-                  workspaceTab === "editor"
+                  workspaceMode === "editor"
                     ? "bg-white text-gray-900 shadow-sm border border-gray-200"
                     : "text-gray-500 hover:text-gray-700"
                 }`}
-                onClick={() => setWorkspaceTab("editor")}
+                onClick={() => updateWorkspaceMode("editor")}
               >
                 <Code2 className="w-3.5 h-3.5" />
                 Editor
@@ -350,11 +351,11 @@ function InterviewRoom({ sessionId, initialRole }: { sessionId: string; initialR
               <button
                 type="button"
                 className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition ${
-                  workspaceTab === "whiteboard"
+                  workspaceMode === "whiteboard"
                     ? "bg-white text-gray-900 shadow-sm border border-gray-200"
                     : "text-gray-500 hover:text-gray-700"
                 }`}
-                onClick={() => setWorkspaceTab("whiteboard")}
+                onClick={() => updateWorkspaceMode("whiteboard")}
               >
                 <PenSquare className="w-3.5 h-3.5" />
                 Whiteboard
@@ -362,8 +363,8 @@ function InterviewRoom({ sessionId, initialRole }: { sessionId: string; initialR
             </div>
             <div className="flex items-center gap-2">
               <h2 className="text-[11px] font-bold text-gray-500 uppercase tracking-wider flex items-center gap-2">
-                <span className={`w-1.5 h-1.5 rounded-full ${workspaceTab === "editor" ? "bg-emerald-500" : "bg-orange-500"}`}></span>
-                {workspaceTab === "editor" ? "Code Editor" : "Shared Whiteboard"}
+                <span className={`w-1.5 h-1.5 rounded-full ${workspaceMode === "editor" ? "bg-emerald-500" : "bg-orange-500"}`}></span>
+                {workspaceMode === "editor" ? "Code Editor" : "Shared Whiteboard"}
               </h2>
               <div className="flex gap-1.5">
                <span className="w-2.5 h-2.5 rounded-full bg-red-400"></span>
@@ -373,7 +374,7 @@ function InterviewRoom({ sessionId, initialRole }: { sessionId: string; initialR
             </div>
           </div>
           <div className="flex-1 relative">
-            {workspaceTab === "editor" ? (
+            {workspaceMode === "editor" ? (
               <>
                 {/* Frozen State Overlay */}
                 {isFrozen && role === 'interviewee' && (

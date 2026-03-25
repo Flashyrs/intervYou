@@ -592,16 +592,14 @@ export default function VideoCall({
 
       { }
       <div className="h-12 md:h-16 bg-gray-900/90 backdrop-blur border-t border-white/10 flex items-center justify-between px-2 md:px-6 shrink-0">
-        <div className="flex items-center gap-2">
-          {role === "interviewee" && !active && (
-            <button
-              className="px-2 md:px-4 py-1 md:py-2 bg-green-600 text-white rounded-full hover:bg-green-700 transition font-medium text-xs md:text-sm shadow-lg shadow-green-900/20 disabled:opacity-50 disabled:cursor-not-allowed"
-              onClick={startCall}
-              disabled={!callChannelReady}
-            >
-              {callChannelReady ? "Start Call" : "Connecting..."}
-            </button>
-          )}
+        <div className="flex items-center gap-2 text-[11px] text-white/70 uppercase tracking-wider font-medium">
+          {active
+            ? "Call Connected"
+            : callChannelReady
+              ? role === "interviewee"
+                ? "Starting Call..."
+                : "Waiting For Candidate..."
+              : "Connecting Signaling..."}
         </div>
 
         <div className="flex items-center gap-3">
