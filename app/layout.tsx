@@ -1,4 +1,5 @@
 import './globals.css';
+import '@excalidraw/excalidraw/index.css';
 import { Navbar } from '@/components/Navbar';
 import { Footer } from '@/components/Footer';
 import Providers from './providers';
