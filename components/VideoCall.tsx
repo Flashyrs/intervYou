@@ -327,7 +327,7 @@ export default function VideoCall({
       if (!payload || !mounted) return;
 
       try {
-        if (payload.type === "screen-share-offer" && roleRef.current === "interviewer") {
+        if (payload.type === "screen-share-offer" && payload.from !== roleRef.current) {
           const pc = new RTCPeerConnection({
             iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
             iceCandidatePoolSize: 10,
@@ -372,7 +372,7 @@ export default function VideoCall({
               await pc.addIceCandidate(candidate).catch((e) => console.warn("Failed adding queued screen-share ICE", e));
             }
           }
-        } else if (payload.type === "screen-share-answer" && roleRef.current === "interviewee" && screenSharePcRef.current) {
+        } else if (payload.type === "screen-share-answer" && payload.from !== roleRef.current && screenSharePcRef.current) {
           await applyAnswer(screenSharePcRef.current, payload.sdp);
           while (pendingIceCandidates.length > 0) {
             const candidate = pendingIceCandidates.shift();
