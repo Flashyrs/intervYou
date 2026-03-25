@@ -6,7 +6,7 @@ import { getInterviewStateChannel } from "@/lib/sessionChannels";
 
 export type Role = "interviewer" | "interviewee";
 
-export function useInterviewState(sessionId: string) {
+export function useInterviewState(sessionId: string, initialRole: Role) {
     const { data: session } = useSession();
     const userId = (session?.user as any)?.id as string | undefined;
 
@@ -23,7 +23,7 @@ export function useInterviewState(sessionId: string) {
     const [problemTitle, setProblemTitle] = useState("Problem 1"); // Default title
     const [sampleTests, setSampleTests] = useState("");
     const [privateTests, setPrivateTests] = useState("");
-    const [role, setRole] = useState<Role>("interviewee");
+    const [role, setRole] = useState<Role>(initialRole);
     const [showAuthModal, setShowAuthModal] = useState(false);
     const [remoteCursors, setRemoteCursors] = useState<Record<string, any>>({});
     const [lastEditor, setLastEditor] = useState<{ name: string, role: string, timestamp: number } | null>(null);
@@ -141,6 +141,10 @@ export function useInterviewState(sessionId: string) {
             }
         };
     }, [sessionId, userId]);
+
+    useEffect(() => {
+        setRole(initialRole);
+    }, [initialRole]);
 
     useEffect(() => {
         if (role !== "interviewer") return;

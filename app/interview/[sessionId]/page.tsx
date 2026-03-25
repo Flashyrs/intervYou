@@ -22,6 +22,7 @@ export default function InterviewPage() {
   const router = useRouter();
   const { status: authStatus } = useSession();
   const [accessState, setAccessState] = useState<"checking" | "ready" | "ended" | "forbidden">("checking");
+  const [accessRole, setAccessRole] = useState<"interviewer" | "interviewee" | null>(null);
 
   useEffect(() => {
     if (authStatus === "loading") return;
@@ -40,6 +41,10 @@ export default function InterviewPage() {
         if (cancelled) return;
 
         if (roleRes.ok) {
+          const roleData = await roleRes.json();
+          if (roleData.role === "interviewer" || roleData.role === "interviewee") {
+            setAccessRole(roleData.role);
+          }
           setAccessState("ready");
           return;
         }
@@ -135,10 +140,21 @@ export default function InterviewPage() {
     );
   }
 
-  return <InterviewRoom sessionId={sessionId} />;
+  if (!accessRole) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 px-6">
+        <div className="rounded-xl border border-gray-200 bg-white px-6 py-8 shadow-sm text-center max-w-md w-full">
+          <h1 className="text-xl font-semibold text-gray-900">Preparing Interview Room</h1>
+          <p className="mt-2 text-sm text-gray-500">Loading your interview role before the room starts.</p>
+        </div>
+      </div>
+    );
+  }
+
+  return <InterviewRoom sessionId={sessionId} initialRole={accessRole} />;
 }
 
-function InterviewRoom({ sessionId }: { sessionId: string }) {
+function InterviewRoom({ sessionId, initialRole }: { sessionId: string; initialRole: "interviewer" | "interviewee" }) {
   const [workspaceTab, setWorkspaceTab] = useState<"editor" | "whiteboard">("editor");
   const {
     language,
@@ -174,7 +190,7 @@ function InterviewRoom({ sessionId }: { sessionId: string }) {
     persistInterviewerNotes,
     endSession,
     resetSessionForNextQuestion
-  } = useInterviewState(sessionId);
+  } = useInterviewState(sessionId, initialRole);
 
   const {
     runOutput,
