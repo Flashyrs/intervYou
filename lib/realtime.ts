@@ -5,6 +5,10 @@ export type SignalPayload =
   | { type: "call-offer"; from: string; sessionId: string; sdp: any }
   | { type: "call-answer"; from: string; sessionId: string; sdp: any }
   | { type: "ice-candidate"; from: string; sessionId: string; candidate: any }
+  | { type: "screen-share-offer"; from: string; sessionId: string; sdp: any }
+  | { type: "screen-share-answer"; from: string; sessionId: string; sdp: any }
+  | { type: "screen-share-ice-candidate"; from: string; sessionId: string; candidate: any }
+  | { type: "screen-share-stopped"; from: string; sessionId: string }
   | { type: "call-cancel"; from: string; sessionId: string }
   | { type: "random-invite"; from: string; tempId: string; initiatorId?: string }
   | { type: "random-accept"; from: string; tempId: string; sessionId: string };
