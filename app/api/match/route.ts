@@ -7,8 +7,8 @@ export async function POST(req: Request) {
     const session = await requireAuth();
     const userId = (session.user as any)?.id as string | undefined;
     if (!userId) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
-    enqueue(userId);
-    const match = tryMatch();
+    await enqueue(userId);
+    const match = await tryMatch();
     if (match) {
       return NextResponse.json({ matched: true, users: match }, { status: 200 });
     }

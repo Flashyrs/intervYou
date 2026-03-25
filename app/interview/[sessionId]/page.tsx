@@ -11,6 +11,7 @@ import { ControlBar } from "@/components/interview/ControlBar";
 import { OutputPanel } from "@/components/interview/OutputPanel";
 import { TestPanel } from "@/components/interview/TestPanel";
 import { AuthModal } from "@/components/interview/AuthModal";
+import { getWebRtcChannel } from "@/lib/sessionChannels";
 
 const MonacoEditor: any = dynamic(() => import("@monaco-editor/react"), { ssr: false });
 
@@ -47,6 +48,8 @@ export default function InterviewPage() {
     toggleFreeze,
     timerState,
     updateTimerState,
+    interviewerNotes,
+    persistInterviewerNotes,
     endSession,
     resetSessionForNextQuestion
   } = useInterviewState(sessionId);
@@ -181,6 +184,8 @@ export default function InterviewPage() {
               setDriver={updateDriver}
               setCodeMapFull={setCodeMapFull}
               setDriverMapFull={setDriverMapFull}
+              interviewerNotes={interviewerNotes}
+              setInterviewerNotes={persistInterviewerNotes}
             />
           </div>
         </aside>
@@ -257,7 +262,7 @@ export default function InterviewPage() {
             </div>
             <div className="w-full h-full flex items-center justify-center">
                {/* Use a dedicated webrtc channel to prevent collisions with the code editor channel */}
-               <VideoCall room={`webrtc-${sessionId}`} role={role} />
+               <VideoCall room={getWebRtcChannel(sessionId)} role={role} />
             </div>
           </div>
 

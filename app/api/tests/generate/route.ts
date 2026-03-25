@@ -66,14 +66,21 @@ Important:
     for (const model of models) {
       try {
         console.log(`Trying Gemini model: ${model}`);
-        response = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${process.env.GEMINI_API_KEY}`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
-          }
-        );
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 25000);
+        try {
+          response = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${process.env.GEMINI_API_KEY}`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              signal: controller.signal,
+              body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
+            }
+          );
+        } finally {
+          clearTimeout(timeout);
+        }
 
         if (response.ok) {
           console.log(`Success with model: ${model}`);
@@ -85,7 +92,7 @@ Important:
         }
       } catch (e: any) {
         console.warn(`Exception with model ${model}:`, e);
-        lastError = e.message;
+        lastError = e?.name === "AbortError" ? "AI request timed out" : e.message;
       }
     }
 

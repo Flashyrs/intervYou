@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { persistFinalInterviewState } from "@/lib/interviewStateStore";
 
 export async function POST(req: Request, { params }: { params: { id: string } }) {
     try {
@@ -32,6 +33,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
 
             if (diff > tenMinutes) {
                 // Expire it
+                await persistFinalInterviewState(id);
                 await prisma.interviewSession.update({
                     where: { id },
                     data: { status: 'expired', endedAt: now }

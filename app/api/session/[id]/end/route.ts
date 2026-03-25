@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireAuth } from "@/lib/utils";
 import { prisma } from "@/lib/db";
+import { persistFinalInterviewState } from "@/lib/interviewStateStore";
 
 export async function POST(req: Request, { params }: { params: { id: string } }) {
     try {
@@ -27,6 +28,8 @@ export async function POST(req: Request, { params }: { params: { id: string } })
         if (interviewSession.createdBy !== userId) {
             return NextResponse.json({ error: "Only the interviewer can end the session" }, { status: 403 });
         }
+
+        await persistFinalInterviewState(id);
 
         await prisma.interviewSession.update({
             where: { id },
