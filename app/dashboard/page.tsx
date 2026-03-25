@@ -97,29 +97,46 @@ export default function DashboardPage() {
       setLobbyReady(channelStatus === "SUBSCRIBED");
     });
 
-    const pres = presenceChannel("presence-lobby");
+    return () => {
+      if (channelRef.current && supabase) supabase.removeChannel(channelRef.current);
+    };
+  }, [router, userId, push]);
+
+  useEffect(() => {
+    if (!supabase || !userId) return;
+
+    const presenceKey = userEmail || userId;
+    const pres = presenceChannel("presence-lobby", presenceKey);
     presenceRef.current = pres;
 
-    pres?.on("presence", { event: "sync" }, () => {
+    const syncOnlineUsers = () => {
       const state = pres?.presenceState();
       const users = Object.values(state || {})
-        .flatMap((arr: any) => arr.map((i: any) => i.name || i.email)) // prioritize name, then email
-        .filter((u: any) => u && u !== "undefined" && u !== "null"); // filter garbage
+        .flatMap((arr: any) => arr.map((i: any) => i.name || i.email || i.userId))
+        .filter((u: any) => u && u !== "undefined" && u !== "null");
       setOnline(Array.from(new Set(users)) as string[]);
-    });
+    };
 
-    pres?.subscribe((status: any) => {
-      if (status === "SUBSCRIBED" && userId) {
-        // Only track if we have a valid user
-        pres.track({ userId, name: userName, email: userEmail });
+    pres?.on("presence", { event: "sync" }, syncOnlineUsers);
+    pres?.on("presence", { event: "join" }, syncOnlineUsers);
+    pres?.on("presence", { event: "leave" }, syncOnlineUsers);
+
+    pres?.subscribe(async (presenceStatus: any) => {
+      if (presenceStatus === "SUBSCRIBED") {
+        try {
+          await pres.track({ userId, name: userName, email: userEmail });
+          syncOnlineUsers();
+        } catch (error) {
+          console.error("Presence track failed", error);
+        }
       }
     });
 
     return () => {
-      if (channelRef.current && supabase) supabase.removeChannel(channelRef.current);
+      setOnline([]);
       if (presenceRef.current && supabase) supabase.removeChannel(presenceRef.current);
     };
-  }, [router, userId, push, userName, userEmail]);
+  }, [userId, userName, userEmail]);
 
   const startRandom = async () => {
     if (!session) { signIn(); return; }
