@@ -35,6 +35,8 @@ export default function VideoCall({
   role: "interviewer" | "interviewee";
   autoStart?: boolean;
 }) {
+  const roleRef = useRef(role);
+  const hasAutoStartedRef = useRef(false);
   const localRef = useRef<HTMLVideoElement>(null);
   const remoteRef = useRef<HTMLVideoElement>(null);
   const remoteScreenRef = useRef<HTMLVideoElement>(null);
@@ -54,8 +56,14 @@ export default function VideoCall({
   const [connectionState, setConnectionState] = useState<string>("new");
   const [error, setError] = useState<string>("");
   const [showSettings, setShowSettings] = useState(false);
+  const [callChannelReady, setCallChannelReady] = useState(false);
+  const [screenShareChannelReady, setScreenShareChannelReady] = useState(false);
   const [focusView, setFocusView] = useState<"local" | "remote" | "screen" | null>(null);
   const focusVideoRef = useRef<HTMLVideoElement>(null);
+
+  useEffect(() => {
+    roleRef.current = role;
+  }, [role]);
 
   const startCall = useCallback(async () => {
     if (!pcRef.current) {
@@ -71,7 +79,7 @@ export default function VideoCall({
       const offer = await createOffer(pcRef.current);
       broadcast(channelRef.current, {
         type: "call-offer",
-        from: role,
+        from: roleRef.current,
         sessionId: room,
         sdp: offer
       });
@@ -80,7 +88,7 @@ export default function VideoCall({
       console.error("Failed to start call", e);
       setError("Failed to start call");
     }
-  }, [room, role]);
+  }, [room]);
 
   const stopScreenShare = useCallback(async () => {
     localScreenStreamRef.current?.getTracks().forEach((track) => track.stop());
@@ -92,15 +100,19 @@ export default function VideoCall({
     if (screenShareChannelRef.current) {
       broadcast(screenShareChannelRef.current, {
         type: "screen-share-stopped",
-        from: role,
+        from: roleRef.current,
         sessionId: screenShareRoom || room,
       });
     }
-  }, [role, room, screenShareRoom]);
+  }, [room, screenShareRoom]);
 
   const startScreenShare = useCallback(async () => {
     if (!screenShareRoom) {
       setError("Screen share channel not configured");
+      return;
+    }
+    if (!screenShareChannelReady) {
+      setError("Screen share channel is still connecting");
       return;
     }
 
@@ -123,7 +135,7 @@ export default function VideoCall({
         if (e.candidate && screenShareChannelRef.current) {
           broadcast(screenShareChannelRef.current, {
             type: "screen-share-ice-candidate",
-            from: role,
+            from: roleRef.current,
             sessionId: screenShareRoom,
             candidate: e.candidate,
           });
@@ -138,7 +150,7 @@ export default function VideoCall({
       if (screenShareChannelRef.current) {
         broadcast(screenShareChannelRef.current, {
           type: "screen-share-offer",
-          from: role,
+          from: roleRef.current,
           sessionId: screenShareRoom,
           sdp: offer,
         });
@@ -150,10 +162,12 @@ export default function VideoCall({
       console.error("Failed to start screen share", e);
       setError("Failed to start screen share");
     }
-  }, [role, screenShareRoom, stopScreenShare]);
+  }, [screenShareChannelReady, screenShareRoom, stopScreenShare]);
 
   useEffect(() => {
     let mounted = true;
+    hasAutoStartedRef.current = false;
+    setCallChannelReady(false);
 
     (async () => {
       try {
@@ -204,7 +218,7 @@ export default function VideoCall({
           if (e.candidate && channelRef.current) {
             broadcast(channelRef.current, {
               type: "ice-candidate",
-              from: role,
+              from: roleRef.current,
               sessionId: room,
               candidate: e.candidate
             });
@@ -217,13 +231,13 @@ export default function VideoCall({
           try {
             console.log(`Processing signal: ${payload.type} from ${payload.from}`);
 
-            if (payload.type === "call-offer" && role === "interviewer") {
+            if (payload.type === "call-offer" && roleRef.current === "interviewer") {
               console.log("Received Offer, creating Answer...");
               const answer = await createAnswer(pc, payload.sdp);
               if (channelRef.current) {
                 broadcast(channelRef.current, {
                   type: "call-answer",
-                  from: role,
+                  from: roleRef.current,
                   sessionId: room,
                   sdp: answer
                 });
@@ -237,7 +251,7 @@ export default function VideoCall({
                 }
               }
 
-            } else if (payload.type === "call-answer" && role === "interviewee") {
+            } else if (payload.type === "call-answer" && roleRef.current === "interviewee") {
               console.log("Received Answer, applying...");
               await applyAnswer(pc, payload.sdp);
 
@@ -261,23 +275,19 @@ export default function VideoCall({
           } catch (e) {
             console.error("Signaling processing error", e);
           }
+        }, (status) => {
+          if (!mounted) return;
+          setCallChannelReady(status === "SUBSCRIBED");
+          if (status === "SUBSCRIBED" && roleRef.current === "interviewee" && autoStart && !hasAutoStartedRef.current) {
+            hasAutoStartedRef.current = true;
+            startCall().catch((e) => {
+              console.error("Auto-start failed", e);
+              if (mounted) setError("Failed to start call");
+            });
+          }
         });
 
         channelRef.current = ch;
-
-        // Auto-start logic
-        if (role === "interviewee" && autoStart) {
-          // Wait a bit for channel to be ready
-          setTimeout(() => {
-            if (mounted) {
-              console.log("Auto-starting call as Interviewee...");
-              startCall().catch((e) => {
-                console.error("Auto-start failed", e);
-                if (mounted) setError("Failed to start call");
-              });
-            }
-          }, 2000); // Increased delay to ensure channel subscription
-        }
 
       } catch (e) {
         console.error("Setup error", e);
@@ -302,12 +312,13 @@ export default function VideoCall({
         pcRef.current = null;
       }
     };
-  }, [room, role, autoStart, startCall]);
+  }, [room, autoStart, startCall]);
 
   useEffect(() => {
     if (!screenShareRoom) return;
 
     let mounted = true;
+    setScreenShareChannelReady(false);
     const remoteScreenStream = new MediaStream();
     const pendingIceCandidates: RTCIceCandidate[] = [];
     const remoteScreenEl = remoteScreenRef.current;
@@ -316,7 +327,7 @@ export default function VideoCall({
       if (!payload || !mounted) return;
 
       try {
-        if (payload.type === "screen-share-offer" && role === "interviewer") {
+        if (payload.type === "screen-share-offer" && roleRef.current === "interviewer") {
           const pc = new RTCPeerConnection({
             iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
             iceCandidatePoolSize: 10,
@@ -338,7 +349,7 @@ export default function VideoCall({
             if (e.candidate && screenShareChannelRef.current) {
               broadcast(screenShareChannelRef.current, {
                 type: "screen-share-ice-candidate",
-                from: role,
+                from: roleRef.current,
                 sessionId: screenShareRoom,
                 candidate: e.candidate,
               });
@@ -349,7 +360,7 @@ export default function VideoCall({
           if (screenShareChannelRef.current) {
             broadcast(screenShareChannelRef.current, {
               type: "screen-share-answer",
-              from: role,
+              from: roleRef.current,
               sessionId: screenShareRoom,
               sdp: answer,
             });
@@ -361,7 +372,7 @@ export default function VideoCall({
               await pc.addIceCandidate(candidate).catch((e) => console.warn("Failed adding queued screen-share ICE", e));
             }
           }
-        } else if (payload.type === "screen-share-answer" && role === "interviewee" && screenSharePcRef.current) {
+        } else if (payload.type === "screen-share-answer" && roleRef.current === "interviewee" && screenSharePcRef.current) {
           await applyAnswer(screenSharePcRef.current, payload.sdp);
           while (pendingIceCandidates.length > 0) {
             const candidate = pendingIceCandidates.shift();
@@ -388,6 +399,9 @@ export default function VideoCall({
       } catch (e) {
         console.error("Screen share signaling error", e);
       }
+    }, (status) => {
+      if (!mounted) return;
+      setScreenShareChannelReady(status === "SUBSCRIBED");
     });
 
     screenShareChannelRef.current = ch;
@@ -399,7 +413,7 @@ export default function VideoCall({
       }
       setRemoteScreenActive(false);
     };
-  }, [role, screenShareRoom]);
+  }, [screenShareRoom]);
 
   const handleReconnect = async () => {
     setError("");
@@ -581,10 +595,11 @@ export default function VideoCall({
         <div className="flex items-center gap-2">
           {role === "interviewee" && !active && (
             <button
-              className="px-2 md:px-4 py-1 md:py-2 bg-green-600 text-white rounded-full hover:bg-green-700 transition font-medium text-xs md:text-sm shadow-lg shadow-green-900/20"
+              className="px-2 md:px-4 py-1 md:py-2 bg-green-600 text-white rounded-full hover:bg-green-700 transition font-medium text-xs md:text-sm shadow-lg shadow-green-900/20 disabled:opacity-50 disabled:cursor-not-allowed"
               onClick={startCall}
+              disabled={!callChannelReady}
             >
-              Start Call
+              {callChannelReady ? "Start Call" : "Connecting..."}
             </button>
           )}
         </div>

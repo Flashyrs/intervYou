@@ -38,7 +38,8 @@ export function broadcast(ch: RealtimeChannel, payload: SignalPayload) {
  */
 export function onSignal(
   room: string,
-  handler: (payload: SignalPayload) => void
+  handler: (payload: SignalPayload) => void,
+  onStatus?: (status: string) => void
 ): RealtimeChannel | null {
   if (!supabase) {
     console.warn("[Realtime] Supabase client not initialized");
@@ -58,6 +59,7 @@ export function onSignal(
 
   ch.subscribe((status: string) => {
     console.log(`[Realtime] Channel '${room}' status: ${status}`);
+    onStatus?.(status);
     if (status === "CHANNEL_ERROR") {
       console.error(`[Realtime] Failed to subscribe: ${room}`);
     } else if (status === "TIMED_OUT") {
