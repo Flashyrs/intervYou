@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect } from "react";
-import { useParams } from "next/navigation";
+import { useEffect, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import { CheckCircle2 } from "lucide-react";
+import { useSession, signIn } from "next-auth/react";
 import VideoCall from "@/components/VideoCall";
 import { useInterviewState } from "@/hooks/useInterviewState";
 import { useCodeExecution } from "@/hooks/useCodeExecution";
@@ -17,8 +18,127 @@ const MonacoEditor: any = dynamic(() => import("@monaco-editor/react"), { ssr: f
 
 export default function InterviewPage() {
   const { sessionId } = useParams() as { sessionId: string };
+  const router = useRouter();
+  const { status: authStatus } = useSession();
+  const [accessState, setAccessState] = useState<"checking" | "ready" | "ended" | "forbidden">("checking");
 
-    const {
+  useEffect(() => {
+    if (authStatus === "loading") return;
+
+    if (authStatus === "unauthenticated") {
+      setAccessState("checking");
+      return;
+    }
+
+    let cancelled = false;
+    setAccessState("checking");
+
+    (async () => {
+      try {
+        const roleRes = await fetch(`/api/interview/role?sessionId=${sessionId}`, { cache: "no-store" });
+        if (cancelled) return;
+
+        if (roleRes.ok) {
+          setAccessState("ready");
+          return;
+        }
+
+        if (roleRes.status === 410) {
+          setAccessState("ended");
+          return;
+        }
+
+        if (roleRes.status === 401) {
+          setAccessState("checking");
+          return;
+        }
+
+        setAccessState("forbidden");
+      } catch {
+        if (!cancelled) {
+          setAccessState("forbidden");
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [authStatus, sessionId]);
+
+  if (authStatus === "loading" || (authStatus === "authenticated" && accessState === "checking")) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 px-6">
+        <div className="rounded-xl border border-gray-200 bg-white px-6 py-8 shadow-sm text-center max-w-md w-full">
+          <h1 className="text-xl font-semibold text-gray-900">Checking Interview Room</h1>
+          <p className="mt-2 text-sm text-gray-500">Verifying your sign-in status and room access.</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (authStatus === "unauthenticated") {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 px-6">
+        <div className="rounded-xl border border-gray-200 bg-white px-6 py-8 shadow-sm text-center max-w-md w-full">
+          <h1 className="text-xl font-semibold text-gray-900">Sign In Required</h1>
+          <p className="mt-2 text-sm text-gray-500">
+            You need to sign in before entering this interview room. After sign-in, we will return you to this link.
+          </p>
+          <button
+            className="mt-6 w-full rounded-lg bg-black px-4 py-2.5 text-sm font-medium text-white hover:bg-gray-800 transition"
+            onClick={() => signIn("google", { callbackUrl: `/interview/${sessionId}` })}
+          >
+            Sign in with Google
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (accessState === "ended") {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 px-6">
+        <div className="rounded-xl border border-gray-200 bg-white px-6 py-8 shadow-sm text-center max-w-md w-full">
+          <h1 className="text-xl font-semibold text-gray-900">Interview Ended</h1>
+          <p className="mt-2 text-sm text-gray-500">
+            This interview session has already been ended or expired. Its final state has been saved and the room is no longer joinable.
+          </p>
+          <button
+            className="mt-6 w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition"
+            onClick={() => router.replace("/dashboard")}
+          >
+            Go to Dashboard
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (accessState === "forbidden") {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 px-6">
+        <div className="rounded-xl border border-gray-200 bg-white px-6 py-8 shadow-sm text-center max-w-md w-full">
+          <h1 className="text-xl font-semibold text-gray-900">Room Unavailable</h1>
+          <p className="mt-2 text-sm text-gray-500">
+            You do not have access to this interview room. Please use the correct invite link or ask the interviewer to invite you again.
+          </p>
+          <button
+            className="mt-6 w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition"
+            onClick={() => router.replace("/dashboard")}
+          >
+            Go to Dashboard
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return <InterviewRoom sessionId={sessionId} />;
+}
+
+function InterviewRoom({ sessionId }: { sessionId: string }) {
+  const {
     language,
     code,
     problemId,
@@ -77,7 +197,6 @@ export default function InterviewPage() {
     problemTitle,
   });
 
-  // Sync execution results from other participants
   useEffect(() => {
     if (executionResult) {
       if (executionResult.runOutput !== undefined) setRunOutput(executionResult.runOutput);
@@ -98,7 +217,6 @@ export default function InterviewPage() {
     resetSessionForNextQuestion();
   };
 
-  // Render remote cursors
   useEffect(() => {
     const editor = (window as any)[`__editor_${sessionId}`];
     const monaco = (window as any)[`__monaco_${sessionId}`];
@@ -119,7 +237,6 @@ export default function InterviewPage() {
         }
       });
 
-      // Maintain decorations
       const oldDecorations = (editor as any).__oldDecorations || [];
       (editor as any).__oldDecorations = editor.deltaDecorations(oldDecorations, decorations);
     }

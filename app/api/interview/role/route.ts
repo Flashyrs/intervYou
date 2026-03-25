@@ -40,6 +40,9 @@ export async function GET(req: Request) {
 
     return NextResponse.json({ error: "forbidden" }, { status: 403 });
   } catch (e: any) {
+    if (e?.message === "Unauthorized") {
+      return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+    }
     return NextResponse.json({ error: e?.message || "failed" }, { status: 500 });
   }
 }
