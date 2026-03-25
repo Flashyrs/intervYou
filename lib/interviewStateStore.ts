@@ -324,3 +324,37 @@ export async function persistFinalInterviewState(sessionId: string) {
 
   return state;
 }
+
+export async function getInterviewerNotesForSessions(
+  userId: string,
+  sessionIds: string[]
+): Promise<Record<string, string>> {
+  if (!sessionIds.length || durableStateColumnsAvailable === false) return {};
+
+  try {
+    const placeholders = sessionIds.map((_, idx) => `$${idx + 2}`).join(", ");
+    const rows = await prisma.$queryRawUnsafe<any[]>(
+      `SELECT "id", "interviewerNotes"
+       FROM "InterviewSession"
+       WHERE "createdBy" = $1
+         AND "id" IN (${placeholders})`,
+      userId,
+      ...sessionIds
+    );
+    durableStateColumnsAvailable = true;
+
+    const map: Record<string, string> = {};
+    for (const row of rows || []) {
+      if (row?.id && row?.interviewerNotes) {
+        map[String(row.id)] = String(row.interviewerNotes);
+      }
+    }
+    return map;
+  } catch (error) {
+    if (isMissingDurableStateColumns(error)) {
+      durableStateColumnsAvailable = false;
+      return {};
+    }
+    throw error;
+  }
+}

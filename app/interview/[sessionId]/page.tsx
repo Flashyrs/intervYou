@@ -61,6 +61,7 @@ export default function InterviewPage() {
     metrics,
     onRun,
     onSubmitFinal,
+    resetExecutionState,
     setRunOutput,
     setCaseResults,
     setMetrics,
@@ -90,6 +91,11 @@ export default function InterviewPage() {
     if (result) {
       broadcastExecutionResult(result);
     }
+  };
+
+  const handleNextQuestion = () => {
+    resetExecutionState();
+    resetSessionForNextQuestion();
   };
 
   // Render remote cursors
@@ -150,7 +156,7 @@ export default function InterviewPage() {
             updateTimerState={updateTimerState}
             sessionId={sessionId}
             endSession={endSession}
-            onNextQuestion={resetSessionForNextQuestion}
+            onNextQuestion={handleNextQuestion}
           />
         </div>
       </header>

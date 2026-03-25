@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireAuth } from "@/lib/utils";
 import { prisma } from "@/lib/db";
+import { getInterviewerNotesForSessions } from "@/lib/interviewStateStore";
 
 export async function GET(req: Request) {
     try {
@@ -32,6 +33,7 @@ export async function GET(req: Request) {
             take: 15, // Optimization: Fetch only top 15 (buffer for limit 10)
             select: {
                 id: true,
+                createdBy: true,
                 status: true,
                 createdAt: true,
                 scheduledFor: true,
@@ -42,6 +44,11 @@ export async function GET(req: Request) {
                 participants: { select: { name: true, email: true } },
             }
         });
+
+        const notesBySessionId = await getInterviewerNotesForSessions(
+            userId,
+            sessions.map((s) => s.id)
+        );
 
         const now = new Date();
         const upcoming: any[] = [];
@@ -62,7 +69,11 @@ export async function GET(req: Request) {
                 }
             }
 
-            const sessionWithCorrectName = { ...s, inviteeName: displayInviteeName };
+            const sessionWithCorrectName = {
+                ...s,
+                inviteeName: displayInviteeName,
+                interviewerNotes: s.createdBy === userId ? (notesBySessionId[s.id] || null) : null,
+            };
 
             if (sessions.indexOf(s) >= 10 && (isEnded || past.length >= 10)) {
                 // Hard limit 10 for display if needed, but let's process 15 and just slice at end if we want strict 10

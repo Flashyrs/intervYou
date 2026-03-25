@@ -14,6 +14,7 @@ type Submission = {
   attempts: number;
   createdAt: string;
   updatedAt: string;
+  interviewerNotes?: string | null;
 };
 
 export default function SubmissionsPage() {
@@ -145,6 +146,15 @@ function DetailsModal({ sub, onClose }: { sub: Submission, onClose: () => void }
             })}
           </div>
         </div>
+
+        {sub.interviewerNotes && (
+          <div>
+            <div className="text-sm text-gray-600 mb-2">Private Interviewer Notes</div>
+            <div className="rounded border border-amber-200 bg-amber-50 p-3 text-sm whitespace-pre-wrap text-amber-900">
+              {sub.interviewerNotes}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

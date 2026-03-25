@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Role } from "@/lib/types";
 import { buildHarness, prettyResult } from "@/lib/interviewUtils";
 import { Sparkles, Play, Lock, FileText, Code2, Layers, AlertCircle, Plus, Trash2 } from "lucide-react";
@@ -46,12 +46,17 @@ export function TestPanel({
 }: TestPanelProps) {
     const [enhancing, setEnhancing] = useState(false);
     const [activeTab, setActiveTab] = useState<'problem' | 'tests' | 'notes'>('problem');
+    const enhanceInFlightRef = useRef(false);
 
     const enhanceWithAI = async () => {
+        if (enhanceInFlightRef.current) {
+            return;
+        }
         if (!problemText.trim()) {
             alert("Please paste a problem description first.");
             return;
         }
+        enhanceInFlightRef.current = true;
         setEnhancing(true);
         try {
             const res = await fetch("/api/ai/enhance", {
@@ -92,6 +97,7 @@ export function TestPanel({
             console.error(e);
             alert("Failed to call AI service");
         } finally {
+            enhanceInFlightRef.current = false;
             setEnhancing(false);
         }
     };

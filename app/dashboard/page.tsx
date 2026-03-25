@@ -285,6 +285,12 @@ export default function DashboardPage() {
         {isExpanded && (
           <div className="border-t bg-gray-50 p-4">
             <h4 className="text-sm font-semibold text-gray-600 mb-3 uppercase tracking-wider">Session Records</h4>
+            {s.interviewerNotes && (
+              <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-4">
+                <div className="text-xs font-semibold uppercase tracking-wider text-amber-700 mb-2">Private Interviewer Notes</div>
+                <div className="whitespace-pre-wrap text-sm text-amber-900">{s.interviewerNotes}</div>
+              </div>
+            )}
             {loadingSessionSubmissions ? (
               <div className="text-center py-4 text-gray-500 text-sm">Loading records...</div>
             ) : sessionSubmissions.length > 0 ? (
@@ -375,6 +381,13 @@ export default function DashboardPage() {
                   <span className="font-medium text-gray-700">{(Number(sub.memory) / 1024).toFixed(2)} MB</span>
                 </div>
               )}
+            </div>
+          )}
+
+          {sub.interviewerNotes && (
+            <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-4">
+              <div className="text-xs font-semibold uppercase tracking-wider text-amber-700 mb-2">Private Interviewer Notes</div>
+              <div className="whitespace-pre-wrap text-sm text-amber-900">{sub.interviewerNotes}</div>
             </div>
           )}
 

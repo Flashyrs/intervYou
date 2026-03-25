@@ -176,6 +176,12 @@ export function useCodeExecution({
         setSubmitting(false);
     };
 
+    const resetExecutionState = () => {
+        setRunOutput("");
+        setCaseResults([]);
+        setMetrics({});
+    };
+
     return {
         runOutput,
         caseResults,
@@ -183,6 +189,7 @@ export function useCodeExecution({
         metrics,
         onRun,
         onSubmitFinal,
+        resetExecutionState,
         setRunOutput,
         setCaseResults,
         setMetrics

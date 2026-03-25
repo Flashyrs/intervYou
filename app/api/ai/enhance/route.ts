@@ -54,7 +54,7 @@ Problem: ${problemText}
             try {
                 console.log(`Attempting AI Enhance with model: ${model}`);
                 const controller = new AbortController();
-                const timeout = setTimeout(() => controller.abort(), 25000);
+                const timeout = setTimeout(() => controller.abort(), 60000);
                 try {
                     response = await fetch(
                         `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,

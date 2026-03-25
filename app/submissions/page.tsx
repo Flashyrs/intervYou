@@ -14,6 +14,7 @@ interface Submission {
     memory: number | null;
     createdAt: string;
     results: any;
+    interviewerNotes?: string | null;
 }
 
 export default function SubmissionsPage() {
@@ -170,6 +171,13 @@ export default function SubmissionsPage() {
                                                         <span className="font-medium text-gray-700">{(submission.memory / 1024).toFixed(2)} MB</span>
                                                     </div>
                                                 )}
+                                            </div>
+                                        )}
+
+                                        {submission.interviewerNotes && (
+                                            <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-4">
+                                                <div className="text-xs font-semibold uppercase tracking-wider text-amber-700 mb-2">Private Interviewer Notes</div>
+                                                <div className="whitespace-pre-wrap text-sm text-amber-900">{submission.interviewerNotes}</div>
                                             </div>
                                         )}
 

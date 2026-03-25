@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireAuth } from "@/lib/utils";
 import { prisma } from "@/lib/db";
+import { getInterviewerNotesForSessions } from "@/lib/interviewStateStore";
 
 const EXEMPT_EMAILS = new Set([
   process.env.EXEMPT_EMAIL1 || "",
@@ -38,18 +39,31 @@ export async function GET(req: Request) {
       take: 50,
       include: {
         session: {
-          include: {
+          select: {
+            id: true,
+            createdAt: true,
+            createdBy: true,
             participants: {
               select: { id: true, name: true, email: true }
             }
-          }
+          },
         },
         user: {
           select: { id: true, name: true, email: true }
         }
       }
     });
-    return NextResponse.json(rows, { status: 200 });
+    const notesBySessionId = await getInterviewerNotesForSessions(
+      userId,
+      rows.map((row) => row.sessionId)
+    );
+
+    const payload = rows.map((row: any) => ({
+      ...row,
+      interviewerNotes: row.session?.createdBy === userId ? (notesBySessionId[row.sessionId] || null) : null,
+    }));
+
+    return NextResponse.json(payload, { status: 200 });
   } catch (e: any) {
     return NextResponse.json({ error: e?.message || "failed" }, { status: 500 });
   }
