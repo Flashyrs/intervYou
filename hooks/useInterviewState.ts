@@ -31,6 +31,7 @@ export function useInterviewState(sessionId: string) {
     const [timerState, setTimerState] = useState<{ active: boolean, startTimestamp: number | null, accumulated: number }>({ active: false, startTimestamp: null, accumulated: 0 });
     const [stateVersion, setStateVersion] = useState(0);
     const [interviewerNotes, setInterviewerNotes] = useState("");
+    const [notesLoaded, setNotesLoaded] = useState(false);
 
     const channelRef = useRef<any>(null);
     const saveTimeout = useRef<any>(null);
@@ -67,7 +68,6 @@ export function useInterviewState(sessionId: string) {
         if (typeof stateData.problemId === "string") setProblemId(stateData.problemId);
         if (typeof stateData.sampleTests === "string") setSampleTests(stateData.sampleTests);
         if (typeof stateData.privateTests === "string") setPrivateTests(stateData.privateTests);
-        if (typeof stateData.interviewerNotes === "string") setInterviewerNotes(stateData.interviewerNotes);
         if (typeof stateData.version === "number") {
             setStateVersion(stateData.version);
             stateVersionRef.current = stateData.version;
@@ -142,6 +142,29 @@ export function useInterviewState(sessionId: string) {
         };
     }, [sessionId, userId]);
 
+    useEffect(() => {
+        if (role !== "interviewer") return;
+
+        let cancelled = false;
+        (async () => {
+            try {
+                const res = await fetch(`/api/interview/notes?sessionId=${sessionId}`, { cache: "no-store" });
+                if (!res.ok) return;
+                const data = await res.json();
+                if (!cancelled && typeof data.notes === "string") {
+                    setInterviewerNotes(data.notes);
+                    setNotesLoaded(true);
+                }
+            } catch {
+                // Ignore notes bootstrap failures
+            }
+        })();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [role, sessionId]);
+
     const [executionResult, setExecutionResult] = useState<any>(null);
 
 
@@ -201,9 +224,6 @@ export function useInterviewState(sessionId: string) {
                             }
                             if (typeof stateData.privateTests === "string") {
                                 setPrivateTests(prev => stateData.privateTests !== prev ? stateData.privateTests : prev);
-                            }
-                            if (typeof stateData.interviewerNotes === "string") {
-                                setInterviewerNotes(prev => stateData.interviewerNotes !== prev ? stateData.interviewerNotes : prev);
                             }
                             if (typeof stateData.version === "number" && stateData.version !== stateVersionRef.current) {
                                 setStateVersion(stateData.version);
@@ -445,9 +465,6 @@ export function useInterviewState(sessionId: string) {
                         setStateVersion(data.version);
                         stateVersionRef.current = data.version;
                     }
-                    if (typeof data.interviewerNotes === "string") {
-                        setInterviewerNotes(data.interviewerNotes);
-                    }
                 } else if (res.status === 409) {
                     await reloadAuthoritativeState();
                 }
@@ -457,26 +474,22 @@ export function useInterviewState(sessionId: string) {
 
     const persistInterviewerNotes = (notes: string) => {
         setInterviewerNotes(notes);
+        setNotesLoaded(true);
         if (notesSaveTimeout.current) clearTimeout(notesSaveTimeout.current);
         notesSaveTimeout.current = setTimeout(async () => {
             try {
-                const res = await fetch("/api/interview/state", {
+                const res = await fetch("/api/interview/notes", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
                         sessionId,
-                        interviewerNotes: notes,
-                        baseVersion: stateVersionRef.current,
+                        notes,
                     }),
                 });
                 if (res.ok) {
                     const data = await res.json();
-                    if (typeof data.interviewerNotes === "string") {
-                        setInterviewerNotes(data.interviewerNotes);
-                    }
-                    if (typeof data.version === "number") {
-                        setStateVersion(data.version);
-                        stateVersionRef.current = data.version;
+                    if (typeof data.notes === "string") {
+                        setInterviewerNotes(data.notes);
                     }
                 }
             } catch {
@@ -634,6 +647,7 @@ export function useInterviewState(sessionId: string) {
         driverMap,
         role,
         interviewerNotes,
+        notesLoaded,
         showAuthModal,
         setShowAuthModal,
         setPrivateTests: (text: string) => {

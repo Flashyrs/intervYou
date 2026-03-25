@@ -55,6 +55,7 @@ Important:
 `;
 
     const models = [
+      "gemini-2.5-flash-lite",
       "gemini-2.5-flash"
     ];
 
@@ -74,7 +75,14 @@ Important:
               method: "POST",
               headers: { "Content-Type": "application/json" },
               signal: controller.signal,
-              body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
+              body: JSON.stringify({
+                contents: [{ parts: [{ text: prompt }] }],
+                generationConfig: {
+                  temperature: 0.2,
+                  maxOutputTokens: 2048,
+                  responseMimeType: "application/json",
+                },
+              }),
             }
           );
         } finally {

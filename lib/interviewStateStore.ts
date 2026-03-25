@@ -358,3 +358,25 @@ export async function getInterviewerNotesForSessions(
     throw error;
   }
 }
+
+export async function getInterviewerNotes(sessionId: string, userId: string) {
+  const session = await fetchSessionContext(sessionId);
+  if (!session) throw new Error("Session not found");
+  if (session.createdBy !== userId) throw new Error("Forbidden");
+
+  const durableState = await readDurableSessionState(sessionId);
+  return durableState.interviewerNotes || "";
+}
+
+export async function updateInterviewerNotes(sessionId: string, userId: string, notes: string) {
+  const session = await fetchSessionContext(sessionId);
+  if (!session) throw new Error("Session not found");
+  if (session.createdBy !== userId) throw new Error("Forbidden");
+
+  await writeDurableSessionState({
+    sessionId,
+    interviewerNotes: notes,
+  });
+
+  return notes;
+}

@@ -42,6 +42,7 @@ Problem: ${problemText}
 
         // Updated model list: prioritize stable models, then experimental
         const models = [
+            "gemini-2.5-flash-lite",
             "gemini-2.5-flash"
         ];
 
@@ -66,6 +67,7 @@ Problem: ${problemText}
                                 contents: [{ parts: [{ text: prompt }] }],
                                 generationConfig: {
                                     temperature: 0.3,
+                                    maxOutputTokens: 2048,
                                     responseMimeType: "application/json" // Hint for JSON output
                                 }
                             })
