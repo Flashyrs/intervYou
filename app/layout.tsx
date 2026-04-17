@@ -5,6 +5,7 @@ import { Footer } from '@/components/Footer';
 import Providers from './providers';
 import { ToastProvider } from '@/components/Toast';
 import { LatencyMonitor } from '@/components/LatencyMonitor';
+import { MatchmakingProvider } from '@/components/MatchmakingProvider';
 
 export const metadata = {
   title: 'IntervYou',
@@ -17,12 +18,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="min-h-screen bg-white text-gray-900 flex flex-col">
         <Providers>
           <ToastProvider>
+            <MatchmakingProvider>
             <Navbar />
             <div className="flex-1">
               {children}
             </div>
             <Footer />
             <LatencyMonitor />
+          </MatchmakingProvider>
           </ToastProvider>
         </Providers>
       </body>

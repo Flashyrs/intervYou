@@ -1,23 +1,16 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
 import { useSession, signIn } from "next-auth/react";
-import { presenceChannel } from "@/lib/presence";
+import { useMatchmaking } from "@/components/MatchmakingProvider";
 import { useToast } from "@/components/Toast";
 import { ScheduleModal } from "@/components/interview/ScheduleModal";
 import { Clock, HardDrive, Code2, Calendar, CheckCircle, XCircle, Eye, Play, Plus } from "lucide-react";
 
 export default function DashboardPage() {
   const { data: session, status: authStatus } = useSession();
-  const [incoming, setIncoming] = useState<{ from: string; tempId: string; initiatorId?: string; name?: string }[]>([]);
-  const [status, setStatus] = useState<string>("");
-  const [tempId, setTempId] = useState<string | null>(null);
-  const [lobbyReady, setLobbyReady] = useState(false);
-  const channelRef = useRef<any | null>(null);
-  const tempIdRef = useRef<string | null>(null);
-  const presenceRef = useRef<any | null>(null);
-  const [online, setOnline] = useState<string[]>([]);
+  const { online, incoming, status, startRandom, acceptRandom, declineRandom } = useMatchmaking();
+
   const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [activeTab, setActiveTab] = useState<"interviews" | "submissions" | "upcoming" | "history">("interviews");
   const [history, setHistory] = useState<{ upcoming: any[]; past: any[] }>({ upcoming: [], past: [] });
@@ -37,10 +30,7 @@ export default function DashboardPage() {
 
   const userId = (session?.user as any)?.id as string | undefined;
 
-  useEffect(() => {
-    tempIdRef.current = tempId;
-  }, [tempId]);
-
+  
   useEffect(() => {
     if (session?.user) {
       setLoadingHistory(true);
@@ -71,143 +61,11 @@ export default function DashboardPage() {
     }
   }, [activeTab, viewingSessionId]);
 
-  const userName = session?.user?.name;
-  const userEmail = session?.user?.email;
-
-  useEffect(() => {
-    if (!supabase) return;
-
-    const ch = supabase.channel("random-call-lobby");
-    channelRef.current = ch;
-
-    ch.on("broadcast", { event: "lobby" }, (payload: any) => {
-      const msg = payload?.payload;
-      if (msg?.type === "random-invite") {
-        if (msg.initiatorId && userId && msg.initiatorId === userId) return;
-        setIncoming((prev) => { if (prev.find(p => p.initiatorId === msg.initiatorId)) return prev; return [...prev, { from: msg.from, tempId: msg.tempId, initiatorId: msg.initiatorId, name: msg.name }]; });
-      } else if (msg?.type === "random-accept") {
-        if (tempIdRef.current && msg.tempId === tempIdRef.current && msg.sessionId) {
-          push({ message: "Matched! Redirecting…", type: "success" });
-          router.push(`/interview/${msg.sessionId}`);
-        }
-      }
-    });
-
-    ch.subscribe((channelStatus) => {
-      setLobbyReady(channelStatus === "SUBSCRIBED");
-    });
-
-    return () => {
-      if (channelRef.current && supabase) supabase.removeChannel(channelRef.current);
-    };
-  }, [router, userId, push]);
-
-  useEffect(() => {
-    if (!supabase || !userId) return;
-
-    const presenceKey = userEmail || userId;
-    const pres = presenceChannel("presence-lobby", presenceKey);
-    presenceRef.current = pres;
-
-    const syncOnlineUsers = () => {
-      const state = pres?.presenceState();
-      const users = Object.values(state || {})
-        .flatMap((arr: any) => arr.map((i: any) => i.name || i.email || i.userId))
-        .filter((u: any) => u && u !== "undefined" && u !== "null");
-      setOnline(Array.from(new Set(users)) as string[]);
-    };
-
-    pres?.on("presence", { event: "sync" }, syncOnlineUsers);
-    pres?.on("presence", { event: "join" }, syncOnlineUsers);
-    pres?.on("presence", { event: "leave" }, syncOnlineUsers);
-
-    pres?.subscribe(async (presenceStatus: any) => {
-      if (presenceStatus === "SUBSCRIBED") {
-        try {
-          await pres.track({ userId, name: userName, email: userEmail });
-          syncOnlineUsers();
-        } catch (error) {
-          console.error("Presence track failed", error);
-        }
-      }
-    });
-
-    return () => {
-      setOnline([]);
-      if (presenceRef.current && supabase) supabase.removeChannel(presenceRef.current);
-    };
-  }, [userId, userName, userEmail]);
-
-  const startRandom = async () => {
-    if (!session) { signIn(); return; }
-    if (!supabase) { push({ message: "Realtime not configured", type: "error" }); return; }
-
-    if (!userId) {
-      push({ message: "User ID missing. Please sign out and sign in again.", type: "error" });
-      return;
-    }
-    if (!lobbyReady) {
-      push({ message: "Matchmaking is still connecting. Please try again in a moment.", type: "error" });
-      return;
-    }
-
-    setStatus("Looking for interviewer...");
-    const id = Math.random().toString(36).slice(2, 10);
-    setTempId(id);
-
-    const payload = {
-      type: "random-invite",
-      from: "interviewee",
-      tempId: id,
-      initiatorId: userId,
-      name: session.user?.name || "Unknown User"
-    };
-
-    channelRef.current?.send({
-      type: "broadcast",
-      event: "lobby",
-      payload,
-    }).catch(() => {
-      push({ message: "Failed to broadcast matchmaking request", type: "error" });
-    });
-  };
-
-  const accept = async (invite: { tempId: string, initiatorId?: string }) => {
-    if (!supabase || !invite) return;
-    if (!session) { signIn(); return; }
-
-    const res = await fetch("/api/random/accept", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ tempId: invite.tempId, initiatorId: invite.initiatorId || "" }),
-    });
-    const data = await res.json();
-    if (!res.ok) {
-      if (res.status === 409) {
-        setIncoming((prev) => prev.filter((p) => p.tempId !== invite.tempId));
-      }
-      push({ message: data?.error || "Accept failed", type: "error" });
-      return;
-    }
-
-    const sessionId = data.sessionId;
-    if (!lobbyReady) {
-      push({ message: "Matchmaking channel is reconnecting. Please try accepting again.", type: "error" });
-      return;
-    }
-    channelRef.current?.send({
-      type: "broadcast",
-      event: "lobby",
-      payload: { type: "random-accept", from: "interviewer", tempId: invite.tempId, sessionId },
-    }).catch(() => {
-      push({ message: "Failed to confirm match", type: "error" });
-      return;
-    });
-    setIncoming([]); // Clear all requests as we are entering a room
-    router.push(`/interview/${sessionId}`);
-  };
-
+  
+  
+  
   const handleViewRecords = (sessionId: string) => {
+
     setSubmissions([]); // Clear previous
     setViewingSessionId(sessionId);
     setActiveTab('submissions');
@@ -460,13 +318,13 @@ export default function DashboardPage() {
                 <div className="flex gap-3">
                   <button
                     className="flex-1 px-4 py-2 bg-black text-white rounded hover:bg-gray-800 transition text-sm font-medium"
-                    onClick={() => accept(invite)}
+                    onClick={() => acceptRandom(invite)}
                   >
                     Accept
                   </button>
                   <button
                     className="flex-1 px-4 py-2 border border-gray-300 rounded hover:bg-gray-50 transition text-sm font-medium text-gray-700 bg-white"
-                    onClick={() => setIncoming((prev) => prev.filter((p) => p.tempId !== invite.tempId))}
+                    onClick={() => declineRandom(invite.tempId)}
                   >
                     Decline
                   </button>
@@ -516,10 +374,9 @@ export default function DashboardPage() {
                 <button
                   className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-black text-white text-sm font-medium rounded-md shadow-sm hover:bg-gray-800 transition disabled:opacity-50 disabled:cursor-not-allowed"
                   onClick={startRandom}
-                  disabled={!lobbyReady}
                 >
                   <Play className="w-4 h-4" />
-                  {lobbyReady ? "Random Match" : "Connecting Matchmaking..."}
+                  Random Match
                 </button>
 
                 <button

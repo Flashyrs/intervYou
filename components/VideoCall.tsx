@@ -41,6 +41,8 @@ export default function VideoCall({
   const remoteRef = useRef<HTMLVideoElement>(null);
   const remoteScreenRef = useRef<HTMLVideoElement>(null);
   const remoteScreenStreamRef = useRef<MediaStream | null>(null);
+  const localStreamRef = useRef<MediaStream | null>(null);
+  const remoteStreamRef = useRef<MediaStream | null>(null);
   const pcRef = useRef<RTCPeerConnection | null>(null);
   const channelRef = useRef<any>(null);
   const screenSharePcRef = useRef<RTCPeerConnection | null>(null);
@@ -532,7 +534,7 @@ export default function VideoCall({
   }, [focusView, active, remoteScreenActive, camOn, screenShareActive]);
 
 
-  const isVideoFullscreen = focusView === "screen" || focusView === "local" || focusView === "remote";
+  const isVideoFullscreen = focusView === "screen";
   const isScreenShareStandard = !isVideoFullscreen && (screenShareActive || remoteScreenActive);
 
   return (
@@ -577,7 +579,7 @@ export default function VideoCall({
           {/* Videos Row (State 1 & 2) */}
           <div className={`w-full flex flex-row gap-2 ${isScreenShareStandard ? 'h-[30%]' : 'flex-1'}`}>
             {/* Local Video */}
-            <div className="flex-1 relative bg-gray-900 rounded-lg overflow-hidden group flex items-center justify-center">
+            {(focusView === null || focusView === "local") && (<div className={`relative bg-gray-900 rounded-lg overflow-hidden group flex items-center justify-center min-h-0 min-w-0 ${focusView === "local" && !remoteScreenActive && !screenShareActive ? "w-full" : "flex-1"}`}>
                {!camOn ? (
                   <div className="flex flex-col items-center justify-center text-white/50">
                      <VideoOff className="w-8 h-8 md:w-10 md:h-10 mb-2" />
@@ -588,8 +590,8 @@ export default function VideoCall({
                     <button
                       type="button"
                       className="absolute top-2 right-2 z-10 rounded-full bg-black/60 p-2 text-white opacity-0 transition group-hover:opacity-100 hover:bg-black/75"
-                      onClick={() => setFocusView("local")}
-                      title="Maximize your camera"
+                      onClick={() => setFocusView(focusView === "local" ? null : "local")}
+                      title={focusView === "local" ? "Minimize your camera" : "Maximize your camera"}
                     >
                       <Maximize2 className="w-3.5 h-3.5" />
                     </button>
@@ -606,15 +608,15 @@ export default function VideoCall({
                   <div className={`w-1.5 h-1.5 rounded-full ${micOn ? 'bg-green-500' : 'bg-red-500'}`} />
                   You
                </div>
-            </div>
+            </div>)}
 
             {/* Remote Video */}
-            <div className="flex-1 relative bg-gray-900 rounded-lg overflow-hidden group flex items-center justify-center">
+            {(focusView === null || focusView === "remote") && (<div className={`relative bg-gray-900 rounded-lg overflow-hidden group flex items-center justify-center min-h-0 min-w-0 ${focusView === "remote" && !remoteScreenActive && !screenShareActive ? "w-full" : "flex-1"}`}>
                <button
                   type="button"
                   className="absolute top-2 right-2 z-10 rounded-full bg-black/60 p-2 text-white opacity-0 transition group-hover:opacity-100 hover:bg-black/75"
-                  onClick={() => setFocusView("remote")}
-                  title="Maximize remote camera"
+                  onClick={() => setFocusView(focusView === "remote" ? null : "remote")}
+                  title={focusView === "remote" ? "Minimize remote camera" : "Maximize remote camera"}
                 >
                   <Maximize2 className="w-3.5 h-3.5" />
                 </button>
@@ -628,7 +630,7 @@ export default function VideoCall({
                   <div className={`w-1.5 h-1.5 rounded-full ${active ? 'bg-green-500' : 'bg-yellow-500 animate-pulse'}`} />
                   {active ? "Remote" : connectionState === "new" ? "Connecting..." : "Disconnected"}
                 </div>
-            </div>
+            </div>)}
           </div>
         </div>
       )}
@@ -696,7 +698,7 @@ export default function VideoCall({
                     ref={focusVideoRef}
                     playsInline
                     autoPlay
-                    muted={focusView === "local" || (focusView === "screen" && screenShareActive)}
+                    muted={screenShareActive}
                     className="max-h-full max-w-full object-contain shrink-0 flex-1"
                   />
                )}
@@ -770,7 +772,7 @@ export default function VideoCall({
                           autoPlay
                           playsInline
                           className="max-h-full max-w-full object-contain"
-                          ref={focusView === "local" ? undefined : localRef} 
+                          ref={(el) => { if (el && localStreamRef.current && el.srcObject !== localStreamRef.current) el.srcObject = localStreamRef.current; }}
                         />
                       )}
                       <div className="absolute bottom-2 left-2 bg-black/60 backdrop-blur-md text-white text-[10px] px-2 py-0.5 rounded-full flex items-center gap-1.5 z-10">
@@ -785,7 +787,7 @@ export default function VideoCall({
                         autoPlay
                         playsInline
                         className="max-h-full max-w-full object-contain"
-                        ref={focusView === "remote" ? undefined : remoteRef}
+                        ref={(el) => { if (el && remoteStreamRef.current && el.srcObject !== remoteStreamRef.current) el.srcObject = remoteStreamRef.current; }}
                       />
                       <div className="absolute bottom-2 left-2 bg-black/60 backdrop-blur-md text-white text-[10px] px-2 py-0.5 rounded-full flex items-center gap-1.5 z-10 w-fit">
                         <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${active ? 'bg-green-500' : 'bg-yellow-500 animate-pulse'}`} />
