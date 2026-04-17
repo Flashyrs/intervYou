@@ -144,7 +144,7 @@ export default function VideoCall({
       };
 
       displayStream.getVideoTracks()[0]?.addEventListener("ended", () => {
-        stopScreenShare().catch(() => {});
+        stopScreenShare().catch(() => { });
       });
 
       const offer = await createOffer(pc);
@@ -642,9 +642,9 @@ export default function VideoCall({
               }`}
             onClick={() => {
               if (screenShareActive) {
-                stopScreenShare().catch(() => {});
+                stopScreenShare().catch(() => { });
               } else {
-                startScreenShare().catch(() => {});
+                startScreenShare().catch(() => { });
               }
             }}
             title={screenShareActive ? "Stop Screen Share" : "Start Screen Share"}
@@ -735,7 +735,7 @@ export default function VideoCall({
 
       {focusView && (
         <div className="fixed inset-0 z-[100] bg-black/95 flex flex-col">
-          <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
+          <div className="absolute top-0 left-0 right-0 z-10 flex items-center justify-between px-4 py-3 bg-black/40 backdrop-blur">
             <div>
               <h3 className="text-sm font-semibold text-white">
                 {focusView === "local"
@@ -767,8 +767,8 @@ export default function VideoCall({
               </button>
             </div>
           </div>
-          <div className="flex-1 p-4">
-            <div className="h-full w-full rounded-2xl overflow-hidden border border-white/10 bg-black flex items-center justify-center">
+          <div className="flex-1 flex items-center justify-center p-4">
+            <div className="max-h-full max-w-full rounded-2xl overflow-hidden border border-white/10 bg-black flex items-center justify-center">
               {focusView === "screen" && !remoteScreenActive ? (
                 <div className="text-center text-white/70">
                   <Monitor className="w-8 h-8 mx-auto mb-3" />
@@ -780,7 +780,7 @@ export default function VideoCall({
                   playsInline
                   autoPlay
                   muted={focusView === "local"}
-                  className={`h-full w-full ${focusView === "screen" ? "object-contain bg-black" : "object-cover"}`}
+                  className="max-h-full max-w-full object-contain"
                 />
               )}
             </div>
