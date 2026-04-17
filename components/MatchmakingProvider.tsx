@@ -226,7 +226,7 @@ export function MatchmakingProvider({ children }: { children: React.ReactNode })
         <div className="fixed bottom-6 right-6 z-[100] flex flex-col gap-3 max-w-sm">
           {incoming.map((req, i) => (
             <div key={i} className="bg-white border rounded-lg shadow-xl overflow-hidden animate-in slide-in-from-right-4 fade-in duration-300">
-               <div className="bg-indigo-600 px-4 py-2 flex items-center justify-between">
+               <div className="bg-black px-4 py-3 flex items-center justify-between border-b border-gray-200">
                   <span className="text-white font-medium text-sm flex items-center gap-2">
                      <Users className="w-4 h-4" /> Incoming Code Match
                   </span>
@@ -241,13 +241,13 @@ export function MatchmakingProvider({ children }: { children: React.ReactNode })
                   <div className="flex gap-2">
                      <button
                         onClick={() => acceptRandom(req)}
-                        className="flex-1 bg-green-500 hover:bg-green-600 text-white text-xs font-semibold py-2 rounded flex items-center justify-center gap-2 transition"
+                        className="flex-1 bg-black hover:bg-gray-800 text-white text-xs font-semibold py-2 rounded flex items-center justify-center gap-2 transition"
                      >
                         <PhoneCall className="w-3.5 h-3.5" /> Accept Match
                      </button>
                      <button
                         onClick={() => declineRandom(req.tempId)}
-                        className="px-3 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-semibold py-2 rounded transition"
+                        className="px-3 border border-gray-300 hover:bg-gray-50 text-gray-800 text-xs font-semibold py-2 rounded transition"
                      >
                         Cancel
                      </button>

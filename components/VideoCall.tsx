@@ -573,9 +573,9 @@ export default function VideoCall({
           )}
 
           {/* Videos Row (State 1 & 2) */}
-          <div className={`w-full flex flex-row gap-2 ${isScreenShareStandard ? 'h-[30%]' : 'flex-1'}`}>
+          <div className={`relative w-full flex flex-row gap-2 ${isScreenShareStandard ? "h-[30%]" : "flex-1"}`}>
             {/* Local Video */}
-            {(focusView === null || focusView === "local") && (<div className={`relative bg-gray-900 rounded-lg overflow-hidden group flex items-center justify-center min-h-0 min-w-0 ${focusView === "local" && !remoteScreenActive && !screenShareActive ? "w-full" : "flex-1"}`}>
+            <div className={`relative bg-gray-900 rounded-lg overflow-hidden group flex items-center justify-center min-h-0 min-w-0 ${focusView === "remote" ? "absolute z-20 top-4 right-4 w-32 md:w-48 aspect-[4/3] shadow-xl border border-white/20 transition-all duration-300" : "flex-1 transition-all duration-300"}`}>
                {!camOn ? (
                   <div className="flex flex-col items-center justify-center text-white/50">
                      <VideoOff className="w-8 h-8 md:w-10 md:h-10 mb-2" />
@@ -604,10 +604,10 @@ export default function VideoCall({
                   <div className={`w-1.5 h-1.5 rounded-full ${micOn ? 'bg-green-500' : 'bg-red-500'}`} />
                   You
                </div>
-            </div>)}
+            </div>
 
             {/* Remote Video */}
-            {(focusView === null || focusView === "remote") && (<div className={`relative bg-gray-900 rounded-lg overflow-hidden group flex items-center justify-center min-h-0 min-w-0 ${focusView === "remote" && !remoteScreenActive && !screenShareActive ? "w-full" : "flex-1"}`}>
+            <div className={`relative bg-gray-900 rounded-lg overflow-hidden group flex items-center justify-center min-h-0 min-w-0 ${focusView === "local" ? "absolute z-20 top-4 right-4 w-32 md:w-48 aspect-[4/3] shadow-xl border border-white/20 transition-all duration-300" : "flex-1 transition-all duration-300"}`}>
                <button
                   type="button"
                   className="absolute top-2 right-2 z-10 rounded-full bg-black/60 p-2 text-white opacity-0 transition group-hover:opacity-100 hover:bg-black/75"
@@ -626,7 +626,7 @@ export default function VideoCall({
                   <div className={`w-1.5 h-1.5 rounded-full ${active ? 'bg-green-500' : 'bg-yellow-500 animate-pulse'}`} />
                   {active ? "Remote" : connectionState === "new" ? "Connecting..." : "Disconnected"}
                 </div>
-            </div>)}
+            </div>
           </div>
         </div>
       )}
