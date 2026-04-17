@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { applyAnswer, createAnswer, createOffer, setupPeerConnection } from "@/lib/webrtc";
 import { broadcast, onSignal } from "@/lib/realtime";
-import { Mic, MicOff, Video, VideoOff, Settings, Monitor, Maximize2, Minimize2, X } from "lucide-react";
+import { Mic, MicOff, Video, VideoOff, Settings, Monitor, Maximize2, Minimize2, X, Users } from "lucide-react";
 
 /**
  * Safely call play() only when the element is actually paused and has a src.
@@ -78,11 +78,7 @@ export default function VideoCall({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 
-  // Auto fullscreen when screen sharing starts
-  useEffect(() => {
-    if (remoteScreenActive) setFocusView("screen");
-  }, [remoteScreenActive]);
-
+  
   const startCall = useCallback(async () => {
     if (!pcRef.current) {
       setError("Connection not initialized");
@@ -600,7 +596,7 @@ export default function VideoCall({
                       playsInline
                       muted
                       autoPlay
-                      className="max-h-full max-w-full object-contain"
+                      className="absolute inset-0 w-full h-full object-contain"
                     />
                   </>
                )}
@@ -624,7 +620,7 @@ export default function VideoCall({
                   ref={remoteRef}
                   playsInline
                   autoPlay
-                  className="max-h-full max-w-full object-contain"
+                  className="absolute inset-0 w-full h-full object-contain"
                 />
                 <div className="absolute bottom-2 left-2 bg-black/60 backdrop-blur-md text-white text-[10px] px-2 py-0.5 rounded-full flex items-center gap-1.5">
                   <div className={`w-1.5 h-1.5 rounded-full ${active ? 'bg-green-500' : 'bg-yellow-500 animate-pulse'}`} />
@@ -740,6 +736,18 @@ export default function VideoCall({
                )}
             </div>
 
+            
+            {/* Show Sidebar Floating Button when Hidden */}
+            {sidebarMode === "hidden" && isVideoFullscreen && (
+               <button 
+                  onClick={() => setSidebarMode("full")}
+                  className="absolute top-4 right-4 z-[110] bg-black/60 hover:bg-black/80 backdrop-blur-md text-white p-2 rounded-lg shadow-2xl transition border border-white/10 flex items-center gap-2"
+               >
+                  <Users className="w-5 h-5" />
+                  <span className="text-xs font-semibold pr-1">Show Participants</span>
+               </button>
+            )}
+
             {/* Right Sidebar */}
             {sidebarMode !== "hidden" && (
               <div 
@@ -760,7 +768,7 @@ export default function VideoCall({
                 {sidebarMode === "full" && (
                   <div className="flex-1 flex flex-row md:flex-col p-2 gap-2 overflow-auto">
                     {/* Sidebar Local Video */}
-                    <div className="flex-1 w-1/2 md:w-full md:max-h-[50%] bg-gray-900 rounded-lg overflow-hidden relative flex items-center justify-center shrink-0">
+                    <div className="w-1/2 md:w-full aspect-[4/3] bg-gray-900 rounded-lg overflow-hidden relative flex items-center justify-center shrink-0">
                       {!camOn ? (
                         <div className="flex flex-col items-center justify-center text-white/50">
                           <VideoOff className="w-6 h-6 mb-1" />
@@ -771,7 +779,7 @@ export default function VideoCall({
                           muted
                           autoPlay
                           playsInline
-                          className="max-h-full max-w-full object-contain"
+                          className="absolute inset-0 w-full h-full object-contain"
                           ref={(el) => { if (el && localStreamRef.current && el.srcObject !== localStreamRef.current) el.srcObject = localStreamRef.current; }}
                         />
                       )}
@@ -782,11 +790,11 @@ export default function VideoCall({
                     </div>
 
                     {/* Sidebar Remote Video */}
-                    <div className="flex-1 w-1/2 md:w-full md:max-h-[50%] bg-gray-900 rounded-lg overflow-hidden relative flex items-center justify-center shrink-0">
+                    <div className="w-1/2 md:w-full aspect-[4/3] bg-gray-900 rounded-lg overflow-hidden relative flex items-center justify-center shrink-0">
                       <video
                         autoPlay
                         playsInline
-                        className="max-h-full max-w-full object-contain"
+                        className="absolute inset-0 w-full h-full object-contain"
                         ref={(el) => { if (el && remoteStreamRef.current && el.srcObject !== remoteStreamRef.current) el.srcObject = remoteStreamRef.current; }}
                       />
                       <div className="absolute bottom-2 left-2 bg-black/60 backdrop-blur-md text-white text-[10px] px-2 py-0.5 rounded-full flex items-center gap-1.5 z-10 w-fit">
