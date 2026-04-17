@@ -734,7 +734,7 @@ export default function VideoCall({
       )}
 
       {focusView && (
-        <div className="absolute inset-0 z-[60] bg-black/95 flex flex-col">
+        <div className="fixed inset-0 z-[100] bg-black/95 flex flex-col">
           <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
             <div>
               <h3 className="text-sm font-semibold text-white">

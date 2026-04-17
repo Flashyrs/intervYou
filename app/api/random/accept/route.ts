@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireAuth } from "@/lib/utils";
 import { prisma } from "@/lib/db";
+import { redis } from "@/lib/redis";
 
 const EXEMPT_EMAILS = new Set([
   "roshanshuklayt@gmail.com",
@@ -16,12 +17,18 @@ export async function POST(req: Request) {
     if (!tempId) return NextResponse.json({ error: 'tempId required' }, { status: 400 });
     if (!initiatorId) return NextResponse.json({ error: 'initiatorId required' }, { status: 400 });
 
-    
+    const key = `random_match_claim:${tempId}`;
+    const claimed = await redis.set(key, userId!, "EX", 3600, "NX");
+    if (!claimed) {
+        return NextResponse.json({ error: 'Interview claim already accepted by another user' }, { status: 409 });
+    }
+
     const userExists = await prisma.user.count({ where: { id: userId } });
     const initiatorExists = await prisma.user.count({ where: { id: initiatorId } });
 
     if (userExists === 0 || initiatorExists === 0) {
-      return NextResponse.json({ error: 'One or both users not found in DB' }, { status: 400 });
+      await redis.del(key); // Unlock if invalid
+      return NextResponse.json({ error: 'One or both users not found' }, { status: 400 });
     }
 
     if (!EXEMPT_EMAILS.has(email)) {

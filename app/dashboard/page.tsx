@@ -10,7 +10,7 @@ import { Clock, HardDrive, Code2, Calendar, CheckCircle, XCircle, Eye, Play, Plu
 
 export default function DashboardPage() {
   const { data: session, status: authStatus } = useSession();
-  const [incoming, setIncoming] = useState<{ from: string; tempId: string; initiatorId?: string; name?: string } | null>(null);
+  const [incoming, setIncoming] = useState<{ from: string; tempId: string; initiatorId?: string; name?: string }[]>([]);
   const [status, setStatus] = useState<string>("");
   const [tempId, setTempId] = useState<string | null>(null);
   const [lobbyReady, setLobbyReady] = useState(false);
@@ -84,7 +84,7 @@ export default function DashboardPage() {
       const msg = payload?.payload;
       if (msg?.type === "random-invite") {
         if (msg.initiatorId && userId && msg.initiatorId === userId) return;
-        setIncoming({ from: msg.from, tempId: msg.tempId, initiatorId: msg.initiatorId, name: msg.name });
+        setIncoming((prev) => { if (prev.find(p => p.initiatorId === msg.initiatorId)) return prev; return [...prev, { from: msg.from, tempId: msg.tempId, initiatorId: msg.initiatorId, name: msg.name }]; });
       } else if (msg?.type === "random-accept") {
         if (tempIdRef.current && msg.tempId === tempIdRef.current && msg.sessionId) {
           push({ message: "Matched! Redirecting…", type: "success" });
@@ -172,17 +172,20 @@ export default function DashboardPage() {
     });
   };
 
-  const accept = async () => {
-    if (!supabase || !incoming) return;
+  const accept = async (invite: { tempId: string, initiatorId?: string }) => {
+    if (!supabase || !invite) return;
     if (!session) { signIn(); return; }
 
     const res = await fetch("/api/random/accept", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ tempId: incoming.tempId, initiatorId: incoming.initiatorId || "" }),
+      body: JSON.stringify({ tempId: invite.tempId, initiatorId: invite.initiatorId || "" }),
     });
     const data = await res.json();
     if (!res.ok) {
+      if (res.status === 409) {
+        setIncoming((prev) => prev.filter((p) => p.tempId !== invite.tempId));
+      }
       push({ message: data?.error || "Accept failed", type: "error" });
       return;
     }
@@ -195,12 +198,12 @@ export default function DashboardPage() {
     channelRef.current?.send({
       type: "broadcast",
       event: "lobby",
-      payload: { type: "random-accept", from: "interviewer", tempId: incoming.tempId, sessionId },
+      payload: { type: "random-accept", from: "interviewer", tempId: invite.tempId, sessionId },
     }).catch(() => {
       push({ message: "Failed to confirm match", type: "error" });
       return;
     });
-    setIncoming(null);
+    setIncoming([]); // Clear all requests as we are entering a room
     router.push(`/interview/${sessionId}`);
   };
 
@@ -444,32 +447,35 @@ export default function DashboardPage() {
 
   return (
     <div className="mx-auto max-w-4xl p-2 md:p-4 space-y-3 md:space-y-6">
-      {incoming && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
-            <h2 className="text-xl font-semibold mb-4">Random Interview Request</h2>
-            <p className="text-gray-700 mb-6">
-              <span className="font-medium">{incoming.name || "A user"}</span> is looking for an interviewer.
-              Would you like to accept this random interview?
-            </p>
-            <div className="flex gap-3">
-              <button
-                className="flex-1 px-4 py-2 bg-black text-white rounded hover:bg-gray-800 transition"
-                onClick={accept}
-              >
-                Accept
-              </button>
-              <button
-                className="flex-1 px-4 py-2 border border-gray-300 rounded hover:bg-gray-50 transition"
-                onClick={() => setIncoming(null)}
-              >
-                Decline
-              </button>
-            </div>
+      {incoming.length > 0 && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full shadow-xl max-h-[80vh] overflow-y-auto space-y-4">
+            <h2 className="text-xl font-semibold mb-2">Random Interview Requests</h2>
+            <p className="text-gray-500 mb-4 text-sm">Multiple users are looking for an interviewer. Accepting one will automatically decline the rest.</p>
+            {incoming.map((invite) => (
+              <div key={invite.tempId} className="border border-gray-200 rounded-lg p-4 bg-gray-50 shadow-sm">
+                <p className="text-gray-800 font-medium mb-3">
+                  {invite.name || "A user"} <span className="font-normal text-gray-500">is looking for an interviewer.</span>
+                </p>
+                <div className="flex gap-3">
+                  <button
+                    className="flex-1 px-4 py-2 bg-black text-white rounded hover:bg-gray-800 transition text-sm font-medium"
+                    onClick={() => accept(invite)}
+                  >
+                    Accept
+                  </button>
+                  <button
+                    className="flex-1 px-4 py-2 border border-gray-300 rounded hover:bg-gray-50 transition text-sm font-medium text-gray-700 bg-white"
+                    onClick={() => setIncoming((prev) => prev.filter((p) => p.tempId !== invite.tempId))}
+                  >
+                    Decline
+                  </button>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       )}
-
       <div className="flex flex-col md:flex-row items-center justify-between gap-4">
         <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Dashboard</h1>
       </div>
