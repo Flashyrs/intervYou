@@ -541,7 +541,7 @@ export default function VideoCall({
         STATE 1 & 2: Default and Screen Share (non-fullscreen) 
       */}
       {!isVideoFullscreen && (
-        <div className="flex-1 w-full h-full flex flex-col p-2 space-y-2 relative">
+        <div className="flex-1 w-full flex flex-col p-2 space-y-2 relative min-h-0">
           
           {/* Main Screenshare Area (State 2) */}
           {isScreenShareStandard && (
