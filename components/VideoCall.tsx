@@ -1,34 +1,206 @@
 "use client";
-import { useEffect, useRef, useState, useCallback } from "react";
+
+import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import { applyAnswer, createAnswer, createOffer, setupPeerConnection } from "@/lib/webrtc";
 import { broadcast, onSignal } from "@/lib/realtime";
-import { Mic, MicOff, Video, VideoOff, Settings, Monitor, Maximize2, Minimize2, X, Users } from "lucide-react";
+import { Maximize2, Mic, MicOff, Minimize2, Monitor, Settings, Users, Video, VideoOff, X } from "lucide-react";
 
-/**
- * Safely call play() only when the element is actually paused and has a src.
- * This prevents the DOMException: "play() request was interrupted" that occurs
- * when play() is called while another play/load is already in-flight.
- */
 function safePlay(el: HTMLVideoElement, label: string) {
-  // readyState 0 = HAVE_NOTHING (no src yet) — nothing to play
   if (!el.srcObject && !el.src) return;
-  if (!el.paused) return; // already playing, no-op
+  if (!el.paused) return;
   const promise = el.play();
   if (promise !== undefined) {
     promise.catch((err: unknown) => {
-      // AbortError is expected when the component unmounts mid-play — suppress it.
-      // Any other error is worth logging.
       if (err instanceof DOMException && err.name === "AbortError") return;
       console.warn(`[VideoCall] ${label} play() failed:`, err);
     });
   }
 }
 
+function stopStream(stream: MediaStream | null) {
+  stream?.getTracks().forEach((track) => track.stop());
+}
+
+function ScreenPlaceholder() {
+  return (
+    <div className="flex h-full w-full flex-col items-center justify-center text-white/60">
+      <Monitor className="mb-3 h-8 w-8" />
+      <p className="text-sm">No screen share is active right now.</p>
+    </div>
+  );
+}
+
+function StreamVideo({
+  stream,
+  muted = false,
+  label,
+  className,
+}: {
+  stream: MediaStream | null;
+  muted?: boolean;
+  label: string;
+  className: string;
+}) {
+  const ref = useRef<HTMLVideoElement>(null);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+
+    el.srcObject = stream;
+    if (stream) {
+      safePlay(el, label);
+    } else {
+      el.removeAttribute("src");
+      el.load();
+    }
+
+    const resumePlayback = () => {
+      if (ref.current) safePlay(ref.current, `${label}-resume`);
+    };
+
+    el.addEventListener("loadedmetadata", resumePlayback);
+    document.addEventListener("visibilitychange", resumePlayback);
+    window.addEventListener("focus", resumePlayback);
+    window.addEventListener("resize", resumePlayback);
+
+    return () => {
+      el.removeEventListener("loadedmetadata", resumePlayback);
+      document.removeEventListener("visibilitychange", resumePlayback);
+      window.removeEventListener("focus", resumePlayback);
+      window.removeEventListener("resize", resumePlayback);
+    };
+  }, [stream, label]);
+
+  return <video ref={ref} playsInline autoPlay muted={muted} className={className} />;
+}
+
+function VideoTile({
+  title,
+  status,
+  stream,
+  muted = false,
+  empty,
+  action,
+  actionTitle,
+  pinned = false,
+}: {
+  title: string;
+  status?: "live" | "waiting" | "muted";
+  stream: MediaStream | null;
+  muted?: boolean;
+  empty: ReactNode;
+  action?: () => void;
+  actionTitle?: string;
+  pinned?: boolean;
+}) {
+  return (
+    <div
+      className={`group relative flex min-h-0 min-w-0 items-center justify-center overflow-hidden rounded-xl border ${
+        pinned ? "border-white/20 shadow-xl" : "border-white/10"
+      } bg-gray-950`}
+    >
+      {action ? (
+        <button
+          type="button"
+          className="absolute right-2 top-2 z-20 rounded-full bg-black/60 p-2 text-white opacity-0 transition hover:bg-black/80 group-hover:opacity-100"
+          onClick={action}
+          title={actionTitle}
+        >
+          {pinned ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
+        </button>
+      ) : null}
+
+      {stream ? (
+        <StreamVideo stream={stream} muted={muted} label={title} className="absolute inset-0 h-full w-full object-contain" />
+      ) : (
+        empty
+      )}
+
+      <div className="absolute bottom-2 left-2 z-10 flex items-center gap-1.5 rounded-full bg-black/60 px-2 py-0.5 text-[10px] text-white backdrop-blur-md">
+        {status ? (
+          <div
+            className={`h-1.5 w-1.5 rounded-full ${
+              status === "live"
+                ? "bg-green-500"
+                : status === "muted"
+                  ? "bg-red-500"
+                  : "animate-pulse bg-yellow-500"
+            }`}
+          />
+        ) : null}
+        <span>{title}</span>
+      </div>
+    </div>
+  );
+}
+
+function Controls({
+  micOn,
+  camOn,
+  screenShareActive,
+  showSettings,
+  onToggleMic,
+  onToggleCam,
+  onToggleScreenShare,
+  onToggleSettings,
+}: {
+  micOn: boolean;
+  camOn: boolean;
+  screenShareActive: boolean;
+  showSettings: boolean;
+  onToggleMic: () => void;
+  onToggleCam: () => void;
+  onToggleScreenShare: () => void;
+  onToggleSettings: () => void;
+}) {
+  return (
+    <>
+      <button
+        className={`rounded-full p-2 md:p-3 transition-all duration-200 ${
+          micOn ? "bg-gray-700 text-white hover:bg-gray-600" : "bg-red-500 text-white hover:bg-red-600"
+        }`}
+        onClick={onToggleMic}
+        title={micOn ? "Mute" : "Unmute"}
+      >
+        {micOn ? <Mic className="h-4 w-4 md:h-5 md:w-5" /> : <MicOff className="h-4 w-4 md:h-5 md:w-5" />}
+      </button>
+      <button
+        className={`rounded-full p-2 md:p-3 transition-all duration-200 ${
+          camOn ? "bg-gray-700 text-white hover:bg-gray-600" : "bg-red-500 text-white hover:bg-red-600"
+        }`}
+        onClick={onToggleCam}
+        title={camOn ? "Stop Camera" : "Start Camera"}
+      >
+        {camOn ? <Video className="h-4 w-4 md:h-5 md:w-5" /> : <VideoOff className="h-4 w-4 md:h-5 md:w-5" />}
+      </button>
+      <button
+        className={`rounded-full p-2 md:p-3 transition-all duration-200 ${
+          screenShareActive ? "bg-indigo-600 text-white hover:bg-indigo-700" : "bg-gray-700 text-white hover:bg-gray-600"
+        }`}
+        onClick={onToggleScreenShare}
+        title={screenShareActive ? "Stop Screen Share" : "Start Screen Share"}
+      >
+        <Monitor className="h-4 w-4 md:h-5 md:w-5" />
+      </button>
+      <button
+        className={`rounded-full p-2 md:p-3 transition-all duration-200 ${
+          showSettings ? "bg-indigo-600 text-white" : "bg-gray-700 text-white hover:bg-gray-600"
+        }`}
+        onClick={onToggleSettings}
+        title="Settings"
+      >
+        <Settings className="h-4 w-4 md:h-5 md:w-5" />
+      </button>
+    </>
+  );
+}
+
 export default function VideoCall({
   room,
   screenShareRoom,
   role,
-  autoStart = true
+  autoStart = true,
 }: {
   room: string;
   screenShareRoom?: string;
@@ -37,65 +209,80 @@ export default function VideoCall({
 }) {
   const roleRef = useRef(role);
   const hasAutoStartedRef = useRef(false);
-  const localRef = useRef<HTMLVideoElement>(null);
-  const remoteRef = useRef<HTMLVideoElement>(null);
-  const remoteScreenRef = useRef<HTMLVideoElement>(null);
-  const remoteScreenStreamRef = useRef<MediaStream | null>(null);
-  const localStreamRef = useRef<MediaStream | null>(null);
-  const remoteStreamRef = useRef<MediaStream | null>(null);
   const pcRef = useRef<RTCPeerConnection | null>(null);
   const channelRef = useRef<any>(null);
   const screenSharePcRef = useRef<RTCPeerConnection | null>(null);
   const screenShareChannelRef = useRef<any>(null);
+  const localStreamRef = useRef<MediaStream | null>(null);
+  const remoteStreamRef = useRef<MediaStream | null>(null);
   const localScreenStreamRef = useRef<MediaStream | null>(null);
+  const remoteScreenStreamRef = useRef<MediaStream | null>(null);
+
+  const [localStream, setLocalStream] = useState<MediaStream | null>(null);
+  const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
+  const [localScreenStream, setLocalScreenStream] = useState<MediaStream | null>(null);
+  const [remoteScreenStream, setRemoteScreenStream] = useState<MediaStream | null>(null);
   const [active, setActive] = useState(false);
   const [micOn, setMicOn] = useState(true);
   const [camOn, setCamOn] = useState(true);
   const [screenShareActive, setScreenShareActive] = useState(false);
-  const [remoteScreenActive, setRemoteScreenActive] = useState(false);
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
-  const [videoDeviceId, setVideoDeviceId] = useState<string>("");
-  const [audioDeviceId, setAudioDeviceId] = useState<string>("");
-  const [connectionState, setConnectionState] = useState<string>("new");
-  const [error, setError] = useState<string>("");
+  const [videoDeviceId, setVideoDeviceId] = useState("");
+  const [audioDeviceId, setAudioDeviceId] = useState("");
+  const [connectionState, setConnectionState] = useState("new");
+  const [error, setError] = useState("");
   const [showSettings, setShowSettings] = useState(false);
   const [callChannelReady, setCallChannelReady] = useState(false);
   const [screenShareChannelReady, setScreenShareChannelReady] = useState(false);
   const [focusView, setFocusView] = useState<"local" | "remote" | "screen" | null>(null);
   const [sidebarMode, setSidebarMode] = useState<"full" | "compact" | "hidden">("full");
-  const focusVideoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
     roleRef.current = role;
   }, [role]);
 
-  // Handle ESC key to exit focus view
+  const activeScreenStream = localScreenStream || remoteScreenStream;
+  const hasAnyScreenShare = !!activeScreenStream;
+
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setFocusView(null);
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        if (focusView === "screen") {
+          setFocusView(null);
+          setSidebarMode("full");
+          return;
+        }
+        setFocusView(null);
+      }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, []);
+  }, [focusView]);
 
-  
+  useEffect(() => {
+    if (!hasAnyScreenShare && focusView === "screen") {
+      setFocusView(null);
+      setSidebarMode("full");
+    }
+  }, [focusView, hasAnyScreenShare]);
+
   const startCall = useCallback(async () => {
     if (!pcRef.current) {
       setError("Connection not initialized");
       return;
     }
+    if (!channelRef.current) {
+      setError("Signal channel not ready");
+      return;
+    }
 
     try {
-      if (!channelRef.current) {
-        setError("Signal channel not ready");
-        return;
-      }
       const offer = await createOffer(pcRef.current);
       broadcast(channelRef.current, {
         type: "call-offer",
         from: roleRef.current,
         sessionId: room,
-        sdp: offer
+        sdp: offer,
       });
       setError("");
     } catch (e) {
@@ -105,8 +292,9 @@ export default function VideoCall({
   }, [room]);
 
   const stopScreenShare = useCallback(async () => {
-    localScreenStreamRef.current?.getTracks().forEach((track) => track.stop());
+    stopStream(localScreenStreamRef.current);
     localScreenStreamRef.current = null;
+    setLocalScreenStream(null);
     screenSharePcRef.current?.close();
     screenSharePcRef.current = null;
     setScreenShareActive(false);
@@ -140,24 +328,27 @@ export default function VideoCall({
         iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
         iceCandidatePoolSize: 10,
       });
+
       screenSharePcRef.current = pc;
       localScreenStreamRef.current = displayStream;
+      setLocalScreenStream(displayStream);
+      setScreenShareActive(true);
 
       displayStream.getTracks().forEach((track) => pc.addTrack(track, displayStream));
 
-      pc.onicecandidate = (e) => {
-        if (e.candidate && screenShareChannelRef.current) {
+      pc.onicecandidate = (event) => {
+        if (event.candidate && screenShareChannelRef.current) {
           broadcast(screenShareChannelRef.current, {
             type: "screen-share-ice-candidate",
             from: roleRef.current,
             sessionId: screenShareRoom,
-            candidate: e.candidate,
+            candidate: event.candidate,
           });
         }
       };
 
       displayStream.getVideoTracks()[0]?.addEventListener("ended", () => {
-        stopScreenShare().catch(() => { });
+        stopScreenShare().catch(() => {});
       });
 
       const offer = await createOffer(pc);
@@ -170,7 +361,6 @@ export default function VideoCall({
         });
       }
 
-      setScreenShareActive(true);
       setError("");
     } catch (e) {
       console.error("Failed to start screen share", e);
@@ -185,27 +375,22 @@ export default function VideoCall({
 
     (async () => {
       try {
-        console.log("Initializing Video Call Peer Connection...");
-        const { pc, localStream, remoteStream } = await setupPeerConnection();
-
+        const { pc, localStream: setupLocalStream, remoteStream: setupRemoteStream } = await setupPeerConnection();
         if (!mounted) {
-          localStream?.getTracks().forEach(track => track.stop());
+          stopStream(setupLocalStream);
           pc.close();
           return;
         }
 
         pcRef.current = pc;
+        localStreamRef.current = setupLocalStream;
+        remoteStreamRef.current = setupRemoteStream;
+        setLocalStream(setupLocalStream);
+        setRemoteStream(setupRemoteStream);
+        setMicOn(setupLocalStream ? setupLocalStream.getAudioTracks().some((track) => track.enabled) : false);
+        setCamOn(setupLocalStream ? setupLocalStream.getVideoTracks().some((track) => track.enabled) : false);
+
         const pendingIceCandidates: RTCIceCandidate[] = [];
-
-        if (localRef.current && localStream) {
-          localRef.current.srcObject = localStream;
-          safePlay(localRef.current, "local");
-        }
-
-        if (remoteRef.current) {
-          remoteRef.current.srcObject = remoteStream;
-          safePlay(remoteRef.current, "remote");
-        }
 
         try {
           const devs = await navigator.mediaDevices.enumerateDevices();
@@ -215,94 +400,86 @@ export default function VideoCall({
         }
 
         pc.onconnectionstatechange = () => {
-          console.log(`PC Connection State: ${pc.connectionState}`);
-          if (mounted) {
-            setConnectionState(pc.connectionState);
-            if (pc.connectionState === "connected") {
-              setActive(true);
-              setError("");
-            } else if (pc.connectionState === "failed") {
+          if (!mounted) return;
+          setConnectionState(pc.connectionState);
+          if (pc.connectionState === "connected") {
+            setActive(true);
+            setError("");
+          } else if (pc.connectionState === "failed" || pc.connectionState === "disconnected") {
+            setActive(false);
+            if (pc.connectionState === "failed") {
               setError("Connection failed. Please check your network or firewall.");
-              setActive(false);
             }
           }
         };
 
-        pc.onicecandidate = (e) => {
-          if (e.candidate && channelRef.current) {
+        pc.onicecandidate = (event) => {
+          if (event.candidate && channelRef.current) {
             broadcast(channelRef.current, {
               type: "ice-candidate",
               from: roleRef.current,
               sessionId: room,
-              candidate: e.candidate
+              candidate: event.candidate,
             });
           }
         };
 
-        const ch = onSignal(room, async (payload) => {
-          if (!payload || !mounted) return;
+        const ch = onSignal(
+          room,
+          async (payload) => {
+            if (!payload || !mounted) return;
+            try {
+              if (payload.type === "call-offer" && roleRef.current === "interviewer") {
+                const answer = await createAnswer(pc, payload.sdp);
+                if (channelRef.current) {
+                  broadcast(channelRef.current, {
+                    type: "call-answer",
+                    from: roleRef.current,
+                    sessionId: room,
+                    sdp: answer,
+                  });
+                }
 
-          try {
-            console.log(`Processing signal: ${payload.type} from ${payload.from}`);
-
-            if (payload.type === "call-offer" && roleRef.current === "interviewer") {
-              console.log("Received Offer, creating Answer...");
-              const answer = await createAnswer(pc, payload.sdp);
-              if (channelRef.current) {
-                broadcast(channelRef.current, {
-                  type: "call-answer",
-                  from: roleRef.current,
-                  sessionId: room,
-                  sdp: answer
-                });
-              }
-
-              // Apply loose ICE candidates
-              while (pendingIceCandidates.length > 0) {
-                const candidate = pendingIceCandidates.shift();
-                if (candidate) {
-                  await pc.addIceCandidate(candidate).catch(e => console.warn("Failed adding queued ICE", e));
+                while (pendingIceCandidates.length > 0) {
+                  const candidate = pendingIceCandidates.shift();
+                  if (candidate) {
+                    await pc.addIceCandidate(candidate).catch((e) => console.warn("Failed adding queued ICE", e));
+                  }
+                }
+              } else if (payload.type === "call-answer" && roleRef.current === "interviewee") {
+                await applyAnswer(pc, payload.sdp);
+                while (pendingIceCandidates.length > 0) {
+                  const candidate = pendingIceCandidates.shift();
+                  if (candidate) {
+                    await pc.addIceCandidate(candidate).catch((e) => console.warn("Failed adding queued ICE", e));
+                  }
+                }
+              } else if (payload.type === "ice-candidate") {
+                const candidate = new RTCIceCandidate(payload.candidate);
+                if (pc.remoteDescription?.type) {
+                  await pc.addIceCandidate(candidate).catch((e) => console.warn("Failed adding ICE", e));
+                } else {
+                  pendingIceCandidates.push(candidate);
                 }
               }
-
-            } else if (payload.type === "call-answer" && roleRef.current === "interviewee") {
-              console.log("Received Answer, applying...");
-              await applyAnswer(pc, payload.sdp);
-
-              while (pendingIceCandidates.length > 0) {
-                const candidate = pendingIceCandidates.shift();
-                if (candidate) {
-                  await pc.addIceCandidate(candidate).catch(e => console.warn("Failed adding queued ICE", e));
-                }
-              }
-
-            } else if (payload.type === "ice-candidate") {
-              // Only add ICE if we have a remote description, otherwise queue
-              const candidate = new RTCIceCandidate(payload.candidate);
-              if (pc.remoteDescription && pc.remoteDescription.type) {
-                await pc.addIceCandidate(candidate).catch(e => console.warn("Failed adding ICE", e));
-              } else {
-                console.log("Queueing ICE candidate (no remote description yet)");
-                pendingIceCandidates.push(candidate);
-              }
+            } catch (e) {
+              console.error("Signaling processing error", e);
             }
-          } catch (e) {
-            console.error("Signaling processing error", e);
+          },
+          (status) => {
+            if (!mounted) return;
+            setCallChannelReady(status === "SUBSCRIBED");
+            if (status === "SUBSCRIBED" && roleRef.current === "interviewee" && autoStart && !hasAutoStartedRef.current) {
+              hasAutoStartedRef.current = true;
+              startCall().catch((e) => {
+                console.error("Auto-start failed", e);
+                if (mounted) setError("Failed to start call");
+              });
+            }
           }
-        }, (status) => {
-          if (!mounted) return;
-          setCallChannelReady(status === "SUBSCRIBED");
-          if (status === "SUBSCRIBED" && roleRef.current === "interviewee" && autoStart && !hasAutoStartedRef.current) {
-            hasAutoStartedRef.current = true;
-            startCall().catch((e) => {
-              console.error("Auto-start failed", e);
-              if (mounted) setError("Failed to start call");
-            });
-          }
-        });
+        );
 
         channelRef.current = ch;
-
       } catch (e) {
         console.error("Setup error", e);
         if (mounted) setError("Failed to initialize video call");
@@ -315,141 +492,118 @@ export default function VideoCall({
       channelRef.current = null;
       screenShareChannelRef.current?.unsubscribe();
       screenShareChannelRef.current = null;
-      localScreenStreamRef.current?.getTracks().forEach((track) => track.stop());
+      stopStream(localScreenStreamRef.current);
+      stopStream(localStreamRef.current);
       localScreenStreamRef.current = null;
-      if (screenSharePcRef.current) {
-        screenSharePcRef.current.close();
-        screenSharePcRef.current = null;
-      }
-      if (pcRef.current) {
-        pcRef.current.close();
-        pcRef.current = null;
-      }
+      localStreamRef.current = null;
+      remoteStreamRef.current = null;
+      remoteScreenStreamRef.current = null;
+      screenSharePcRef.current?.close();
+      screenSharePcRef.current = null;
+      pcRef.current?.close();
+      pcRef.current = null;
     };
-  }, [room, autoStart, startCall]);
+  }, [autoStart, room, startCall]);
 
   useEffect(() => {
     if (!screenShareRoom) return;
 
     let mounted = true;
     setScreenShareChannelReady(false);
-    const remoteScreenStream = new MediaStream();
     const pendingIceCandidates: RTCIceCandidate[] = [];
-    remoteScreenStreamRef.current = remoteScreenStream;
-    const remoteScreenEl = remoteScreenRef.current;
 
-    const ch = onSignal(screenShareRoom, async (payload) => {
-      if (!payload || !mounted) return;
+    const ch = onSignal(
+      screenShareRoom,
+      async (payload) => {
+        if (!payload || !mounted) return;
 
-      try {
-        if (payload.type === "screen-share-offer" && payload.from !== roleRef.current) {
-          const pc = new RTCPeerConnection({
-            iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
-            iceCandidatePoolSize: 10,
-          });
-          screenSharePcRef.current = pc;
-
-          pc.ontrack = (event) => {
-            event.streams[0].getTracks().forEach((track) => {
-              remoteScreenStream.addTrack(track);
+        try {
+          if (payload.type === "screen-share-offer" && payload.from !== roleRef.current) {
+            const pc = new RTCPeerConnection({
+              iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
+              iceCandidatePoolSize: 10,
             });
-            if (remoteScreenRef.current) {
-              remoteScreenRef.current.srcObject = remoteScreenStream;
-              safePlay(remoteScreenRef.current, "remote-screen");
-            }
-            setRemoteScreenActive(true);
-          };
 
-          pc.onicecandidate = (e) => {
-            if (e.candidate && screenShareChannelRef.current) {
+            const incomingRemoteScreen = new MediaStream();
+            remoteScreenStreamRef.current = incomingRemoteScreen;
+            setRemoteScreenStream(incomingRemoteScreen);
+            screenSharePcRef.current = pc;
+
+            pc.ontrack = (event) => {
+              event.streams[0].getTracks().forEach((track) => {
+                const exists = incomingRemoteScreen.getTracks().some((existingTrack) => existingTrack.id === track.id);
+                if (!exists) incomingRemoteScreen.addTrack(track);
+              });
+              setRemoteScreenStream(new MediaStream(incomingRemoteScreen.getTracks()));
+            };
+
+            pc.onicecandidate = (event) => {
+              if (event.candidate && screenShareChannelRef.current) {
+                broadcast(screenShareChannelRef.current, {
+                  type: "screen-share-ice-candidate",
+                  from: roleRef.current,
+                  sessionId: screenShareRoom,
+                  candidate: event.candidate,
+                });
+              }
+            };
+
+            const answer = await createAnswer(pc, payload.sdp);
+            if (screenShareChannelRef.current) {
               broadcast(screenShareChannelRef.current, {
-                type: "screen-share-ice-candidate",
+                type: "screen-share-answer",
                 from: roleRef.current,
                 sessionId: screenShareRoom,
-                candidate: e.candidate,
+                sdp: answer,
               });
             }
-          };
 
-          const answer = await createAnswer(pc, payload.sdp);
-          if (screenShareChannelRef.current) {
-            broadcast(screenShareChannelRef.current, {
-              type: "screen-share-answer",
-              from: roleRef.current,
-              sessionId: screenShareRoom,
-              sdp: answer,
-            });
-          }
-
-          while (pendingIceCandidates.length > 0) {
-            const candidate = pendingIceCandidates.shift();
-            if (candidate) {
-              await pc.addIceCandidate(candidate).catch((e) => console.warn("Failed adding queued screen-share ICE", e));
+            while (pendingIceCandidates.length > 0) {
+              const candidate = pendingIceCandidates.shift();
+              if (candidate) {
+                await pc.addIceCandidate(candidate).catch((e) => console.warn("Failed adding queued screen-share ICE", e));
+              }
             }
-          }
-        } else if (payload.type === "screen-share-answer" && payload.from !== roleRef.current && screenSharePcRef.current) {
-          await applyAnswer(screenSharePcRef.current, payload.sdp);
-          while (pendingIceCandidates.length > 0) {
-            const candidate = pendingIceCandidates.shift();
-            if (candidate) {
-              await screenSharePcRef.current.addIceCandidate(candidate).catch((e) => console.warn("Failed adding queued screen-share ICE", e));
+          } else if (payload.type === "screen-share-answer" && payload.from !== roleRef.current && screenSharePcRef.current) {
+            await applyAnswer(screenSharePcRef.current, payload.sdp);
+            while (pendingIceCandidates.length > 0) {
+              const candidate = pendingIceCandidates.shift();
+              if (candidate) {
+                await screenSharePcRef.current.addIceCandidate(candidate).catch((e) => console.warn("Failed adding queued screen-share ICE", e));
+              }
             }
+          } else if (payload.type === "screen-share-ice-candidate") {
+            const candidate = new RTCIceCandidate(payload.candidate);
+            const targetPc = screenSharePcRef.current;
+            if (targetPc?.remoteDescription?.type) {
+              await targetPc.addIceCandidate(candidate).catch((e) => console.warn("Failed adding screen-share ICE", e));
+            } else {
+              pendingIceCandidates.push(candidate);
+            }
+          } else if (payload.type === "screen-share-stopped") {
+            remoteScreenStreamRef.current = null;
+            setRemoteScreenStream(null);
+            screenSharePcRef.current?.close();
+            screenSharePcRef.current = null;
           }
-        } else if (payload.type === "screen-share-ice-candidate") {
-          const candidate = new RTCIceCandidate(payload.candidate);
-          const targetPc = screenSharePcRef.current;
-          if (targetPc?.remoteDescription && targetPc.remoteDescription.type) {
-            await targetPc.addIceCandidate(candidate).catch((e) => console.warn("Failed adding screen-share ICE", e));
-          } else {
-            pendingIceCandidates.push(candidate);
-          }
-        } else if (payload.type === "screen-share-stopped") {
-          setRemoteScreenActive(false);
-          if (remoteScreenRef.current) {
-            remoteScreenRef.current.srcObject = null;
-          }
-          remoteScreenStreamRef.current = null;
-          screenSharePcRef.current?.close();
-          screenSharePcRef.current = null;
+        } catch (e) {
+          console.error("Screen share signaling error", e);
         }
-      } catch (e) {
-        console.error("Screen share signaling error", e);
+      },
+      (status) => {
+        if (!mounted) return;
+        setScreenShareChannelReady(status === "SUBSCRIBED");
       }
-    }, (status) => {
-      if (!mounted) return;
-      setScreenShareChannelReady(status === "SUBSCRIBED");
-    });
+    );
 
     screenShareChannelRef.current = ch;
 
     return () => {
       mounted = false;
-      if (remoteScreenEl) {
-        remoteScreenEl.srcObject = null;
-      }
       remoteScreenStreamRef.current = null;
-      setRemoteScreenActive(false);
+      setRemoteScreenStream(null);
     };
   }, [screenShareRoom]);
-
-  useEffect(() => {
-    if (!remoteScreenActive || !remoteScreenRef.current || !remoteScreenStreamRef.current) return;
-    remoteScreenRef.current.srcObject = remoteScreenStreamRef.current;
-    safePlay(remoteScreenRef.current, "remote-screen-mounted");
-  }, [remoteScreenActive]);
-
-  const handleReconnect = async () => {
-    setError("");
-    setConnectionState("new");
-    if (pcRef.current) {
-      pcRef.current.close();
-      pcRef.current = null;
-    }
-    // Force re-mount effect
-    window.location.reload(); // Simple but effective for full reset
-  };
-
-
 
   const switchDevices = async () => {
     if (!pcRef.current) return;
@@ -461,25 +615,20 @@ export default function VideoCall({
       };
 
       const newStream = await navigator.mediaDevices.getUserMedia(constraints);
-      const videoTrack = newStream.getVideoTracks()[0];
-      const audioTrack = newStream.getAudioTracks()[0];
-
       const senders = pcRef.current.getSenders();
-      const videoSender = senders.find((s) => s.track?.kind === "video");
-      const audioSender = senders.find((s) => s.track?.kind === "audio");
+      const videoSender = senders.find((sender) => sender.track?.kind === "video");
+      const audioSender = senders.find((sender) => sender.track?.kind === "audio");
+      const nextVideoTrack = newStream.getVideoTracks()[0] || null;
+      const nextAudioTrack = newStream.getAudioTracks()[0] || null;
 
-      if (videoSender && videoTrack) {
-        await videoSender.replaceTrack(videoTrack);
-      }
-      if (audioSender && audioTrack) {
-        await audioSender.replaceTrack(audioTrack);
-      }
+      if (videoSender) await videoSender.replaceTrack(nextVideoTrack);
+      if (audioSender) await audioSender.replaceTrack(nextAudioTrack);
 
-      if (localRef.current) {
-        localRef.current.srcObject = newStream;
-        safePlay(localRef.current, "local (device switch)");
-      }
-
+      stopStream(localStreamRef.current);
+      localStreamRef.current = newStream;
+      setLocalStream(newStream);
+      setMicOn(newStream.getAudioTracks().some((track) => track.enabled));
+      setCamOn(newStream.getVideoTracks().some((track) => track.enabled));
       setError("");
       setShowSettings(false);
     } catch (e) {
@@ -489,415 +638,316 @@ export default function VideoCall({
   };
 
   const toggleMic = () => {
-    const stream = localRef.current?.srcObject as MediaStream | null;
-    if (stream) {
-      stream.getAudioTracks().forEach((track) => {
-        track.enabled = !track.enabled;
-      });
-      setMicOn((prev) => !prev);
-    }
+    const stream = localStreamRef.current;
+    if (!stream) return;
+    const nextOn = stream.getAudioTracks().every((track) => track.enabled === false);
+    stream.getAudioTracks().forEach((track) => {
+      track.enabled = nextOn;
+    });
+    setMicOn(nextOn);
   };
 
   const toggleCam = () => {
-    const stream = localRef.current?.srcObject as MediaStream | null;
-    if (stream) {
-      stream.getVideoTracks().forEach((track) => {
-        track.enabled = !track.enabled;
-      });
-      setCamOn((prev) => !prev);
-    }
+    const stream = localStreamRef.current;
+    if (!stream) return;
+    const nextOn = stream.getVideoTracks().every((track) => track.enabled === false);
+    stream.getVideoTracks().forEach((track) => {
+      track.enabled = nextOn;
+    });
+    setCamOn(nextOn);
   };
 
-  useEffect(() => {
-    if (!focusView || !focusVideoRef.current) return;
-    const focusVideoEl = focusVideoRef.current;
+  const toggleScreenShare = () => {
+    if (screenShareActive) {
+      stopScreenShare().catch(() => {});
+      return;
+    }
+    startScreenShare().catch(() => {});
+  };
 
-    const source =
-      focusView === "local"
-        ? localRef.current
-        : focusView === "remote"
-          ? remoteRef.current
-          : remoteScreenRef.current;
+  const localPlaceholder = (
+    <div className="flex flex-col items-center justify-center text-white/50">
+      <VideoOff className="mb-2 h-8 w-8 md:h-10 md:w-10" />
+      <span className="text-xs">Camera Off</span>
+    </div>
+  );
 
-    if (!source?.srcObject) return;
+  const remotePlaceholder = (
+    <div className="flex flex-col items-center justify-center text-white/50">
+      <Users className="mb-2 h-8 w-8 md:h-10 md:w-10" />
+      <span className="text-xs">{active ? "Remote camera unavailable" : "Waiting for participant"}</span>
+    </div>
+  );
 
-    focusVideoEl.srcObject = source.srcObject;
-    safePlay(focusVideoEl, `focus-${focusView}`);
+  const screenTile = (
+    <div className="group relative flex h-full w-full items-center justify-center overflow-hidden rounded-xl border border-white/10 bg-gray-950">
+      {hasAnyScreenShare ? (
+        <>
+          <button
+            type="button"
+            className="absolute right-2 top-2 z-20 rounded-full bg-black/60 p-2 text-white opacity-0 transition group-hover:opacity-100 hover:bg-black/80"
+            onClick={() => {
+              setFocusView("screen");
+              setSidebarMode("full");
+            }}
+            title="Maximize shared screen"
+          >
+            <Maximize2 className="h-3.5 w-3.5" />
+          </button>
+          <StreamVideo
+            stream={activeScreenStream}
+            muted={!!localScreenStream}
+            label="screen-share"
+            className="absolute inset-0 h-full w-full object-contain"
+          />
+          <div className="absolute bottom-2 left-2 z-10 rounded-full bg-black/60 px-2 py-0.5 text-[10px] text-white backdrop-blur-md">
+            Screen Share
+          </div>
+        </>
+      ) : (
+        <ScreenPlaceholder />
+      )}
+    </div>
+  );
 
-    return () => {
-      focusVideoEl.srcObject = null;
-    };
-  }, [focusView, active, remoteScreenActive, camOn, screenShareActive]);
+  const localTile = (
+    <VideoTile
+      title="You"
+      status={micOn ? "live" : "muted"}
+      stream={camOn ? localStream : null}
+      muted
+      empty={localPlaceholder}
+      action={() => setFocusView((current) => (current === "local" ? null : "local"))}
+      actionTitle={focusView === "local" ? "Minimize your camera" : "Maximize your camera"}
+      pinned={focusView === "local"}
+    />
+  );
 
+  const remoteTile = (
+    <VideoTile
+      title={active ? "Remote" : connectionState === "new" ? "Connecting..." : "Disconnected"}
+      status={active ? "live" : "waiting"}
+      stream={remoteStream}
+      empty={remotePlaceholder}
+      action={() => setFocusView((current) => (current === "remote" ? null : "remote"))}
+      actionTitle={focusView === "remote" ? "Minimize remote camera" : "Maximize remote camera"}
+      pinned={focusView === "remote"}
+    />
+  );
 
-  const isVideoFullscreen = focusView === "screen";
-  const isScreenShareStandard = !isVideoFullscreen && (screenShareActive || remoteScreenActive);
+  const screenIsFullscreen = focusView === "screen";
 
   return (
-    <div className={`relative flex flex-col w-full h-full bg-black/95 ${!autoStart ? 'rounded-none' : ''}`}>
-      {/* 
-        STATE 1 & 2: Default and Screen Share (non-fullscreen) 
-      */}
-      {!isVideoFullscreen && (
-        <div className="flex-1 w-full flex flex-col p-2 space-y-2 relative min-h-0">
-          
-          {/* Main Screenshare Area (State 2) */}
-          {isScreenShareStandard && (
-             <div className="flex-1 w-full flex bg-gray-950 rounded-lg overflow-hidden relative group border border-white/10 items-center justify-center">
-               <button
-                  type="button"
-                  className="absolute top-2 right-2 z-10 rounded-full bg-black/60 p-2 text-white opacity-0 transition group-hover:opacity-100 hover:bg-black/75"
-                  onClick={() => setFocusView("screen")}
-                  title="Maximize shared screen"
-                >
-                  <Maximize2 className="w-3.5 h-3.5" />
-                </button>
-                <video
-                  ref={(el) => {
-                     if (!el) return;
-                     if (screenShareActive && localScreenStreamRef.current) {
-                        el.srcObject = localScreenStreamRef.current;
-                     } else if (remoteScreenRef) {
-                        (remoteScreenRef as any).current = el;
-                     }
-                  }}
-                  playsInline
-                  autoPlay
-                  muted={screenShareActive}
-                  className="max-h-full max-w-full object-contain"
-                />
-                <div className="absolute bottom-2 left-2 bg-black/60 backdrop-blur-md text-white text-[10px] px-2 py-0.5 rounded-full">
-                  Screen Share
-                </div>
-             </div>
-          )}
-
-          {/* Videos Row (State 1 & 2) */}
-          <div className={`relative w-full flex flex-row gap-2 ${isScreenShareStandard ? "h-[30%]" : "flex-1"}`}>
-            {/* Local Video */}
-            <div className={`relative bg-gray-900 rounded-lg overflow-hidden group flex items-center justify-center min-h-0 min-w-0 ${focusView === "remote" ? "absolute z-20 top-4 right-4 w-32 md:w-48 aspect-[4/3] shadow-xl border border-white/20 transition-all duration-300" : "flex-1 transition-all duration-300"}`}>
-               {!camOn ? (
-                  <div className="flex flex-col items-center justify-center text-white/50">
-                     <VideoOff className="w-8 h-8 md:w-10 md:h-10 mb-2" />
-                     <span className="text-xs">Camera Off</span>
-                  </div>
-               ) : (
-                  <>
-                    <button
-                      type="button"
-                      className="absolute top-2 right-2 z-10 rounded-full bg-black/60 p-2 text-white opacity-0 transition group-hover:opacity-100 hover:bg-black/75"
-                      onClick={() => setFocusView(focusView === "local" ? null : "local")}
-                      title={focusView === "local" ? "Minimize your camera" : "Maximize your camera"}
-                    >
-                      <Maximize2 className="w-3.5 h-3.5" />
-                    </button>
-                    <video
-                      ref={localRef}
-                      playsInline
-                      muted
-                      autoPlay
-                      className="absolute inset-0 w-full h-full object-contain"
-                    />
-                  </>
-               )}
-               <div className="absolute bottom-2 left-2 bg-black/60 backdrop-blur-md text-white text-[10px] px-2 py-0.5 rounded-full flex items-center gap-1.5">
-                  <div className={`w-1.5 h-1.5 rounded-full ${micOn ? 'bg-green-500' : 'bg-red-500'}`} />
-                  You
-               </div>
-            </div>
-
-            {/* Remote Video */}
-            <div className={`relative bg-gray-900 rounded-lg overflow-hidden group flex items-center justify-center min-h-0 min-w-0 ${focusView === "local" ? "absolute z-20 top-4 right-4 w-32 md:w-48 aspect-[4/3] shadow-xl border border-white/20 transition-all duration-300" : "flex-1 transition-all duration-300"}`}>
-               <button
-                  type="button"
-                  className="absolute top-2 right-2 z-10 rounded-full bg-black/60 p-2 text-white opacity-0 transition group-hover:opacity-100 hover:bg-black/75"
-                  onClick={() => setFocusView(focusView === "remote" ? null : "remote")}
-                  title={focusView === "remote" ? "Minimize remote camera" : "Maximize remote camera"}
-                >
-                  <Maximize2 className="w-3.5 h-3.5" />
-                </button>
-                <video
-                  ref={remoteRef}
-                  playsInline
-                  autoPlay
-                  className="absolute inset-0 w-full h-full object-contain"
-                />
-                <div className="absolute bottom-2 left-2 bg-black/60 backdrop-blur-md text-white text-[10px] px-2 py-0.5 rounded-full flex items-center gap-1.5">
-                  <div className={`w-1.5 h-1.5 rounded-full ${active ? 'bg-green-500' : 'bg-yellow-500 animate-pulse'}`} />
-                  {active ? "Remote" : connectionState === "new" ? "Connecting..." : "Disconnected"}
-                </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Global Non-Fullscreen Bottom Toolbar (State 1 & 2) */}
-      {!isVideoFullscreen && (
-        <div className="h-12 md:h-16 bg-gray-900/90 backdrop-blur border-t border-white/10 flex items-center justify-between px-2 md:px-6 shrink-0 z-20">
-          <div className="flex flex-col truncate w-[30%]">
-            <span className="text-[10px] md:text-[11px] text-white/70 uppercase tracking-wider font-medium truncate">
-              {active ? "Call Connected" : callChannelReady ? (role === "interviewee" ? "Starting Call..." : "Waiting For Candidate...") : "Connecting..."}
-            </span>
-          </div>
-
-          <div className="flex items-center justify-center gap-2 md:gap-3 shrink-0">
-            <button
-              className={`p-2 md:p-3 rounded-full transition-all duration-200 ${micOn ? "bg-gray-700 text-white hover:bg-gray-600 hover:scale-105" : "bg-red-500 text-white hover:bg-red-600 hover:scale-105"}`}
-              onClick={toggleMic}
-              title={micOn ? "Mute" : "Unmute"}
-            >
-              {micOn ? <Mic className="w-4 h-4 md:w-5 md:h-5" /> : <MicOff className="w-4 h-4 md:w-5 md:h-5" />}
-            </button>
-            <button
-              className={`p-2 md:p-3 rounded-full transition-all duration-200 ${camOn ? "bg-gray-700 text-white hover:bg-gray-600 hover:scale-105" : "bg-red-500 text-white hover:bg-red-600 hover:scale-105"}`}
-              onClick={toggleCam}
-              title={camOn ? "Stop Camera" : "Start Camera"}
-            >
-              {camOn ? <Video className="w-4 h-4 md:w-5 md:h-5" /> : <VideoOff className="w-4 h-4 md:w-5 md:h-5" />}
-            </button>
-            <button
-              className={`p-2 md:p-3 rounded-full transition-all duration-200 ${screenShareActive ? "bg-indigo-600 text-white hover:bg-indigo-700 hover:scale-105" : "bg-gray-700 text-white hover:bg-gray-600 hover:scale-105"}`}
-              onClick={() => screenShareActive ? stopScreenShare().catch(()=>{}) : startScreenShare().catch(()=>{})}
-              title={screenShareActive ? "Stop Screen Share" : "Start Screen Share"}
-            >
-              <Monitor className="w-4 h-4 md:w-5 md:h-5" />
-            </button>
-            <div className="w-px h-8 bg-gray-700 mx-1" />
-            <button
-              className={`p-3 rounded-full transition-all duration-200 ${showSettings ? "bg-indigo-600 text-white shadow-lg" : "bg-gray-700 text-white hover:bg-gray-600"}`}
-              onClick={() => setShowSettings(!showSettings)}
-              title="Settings"
-            >
-              <Settings className="w-4 h-4 md:w-5 md:h-5" />
-            </button>
-          </div>
-          
-          <div className="w-[30%] flex justify-end">
-             {/* Empty placeholder for alignment */}
-          </div>
-        </div>
-      )}
-
-      {/* STATE 3: Fullscreen Focus View */}
-      {isVideoFullscreen && (
-        <div className="fixed inset-0 z-[100] h-[100dvh] w-screen bg-black flex flex-col md:flex-row">
-            
-            {/* Main Fullscreen Area */}
-            <div className="flex-1 h-full flex flex-col items-center justify-center relative p-2 md:p-6 transition-all duration-300">
-               {focusView === "screen" && (!remoteScreenActive && !screenShareActive) ? (
-                  <div className="text-center text-white/70">
-                     <Monitor className="w-8 h-8 mx-auto mb-3" />
-                     <p className="text-sm">No screen share is active right now.</p>
-                  </div>
-               ) : (
-                  <video
-                    ref={focusVideoRef}
-                    playsInline
-                    autoPlay
-                    muted={screenShareActive}
-                    className="max-h-full max-w-full object-contain shrink-0 flex-1"
-                  />
-               )}
-               
-               {/* Fixed Toggle Sidebar Button inside main area if sidebar is hidden */}
-               {sidebarMode === "hidden" && (
-                  <button 
-                    onClick={() => setSidebarMode("full")}
-                    className="absolute top-6 right-6 bg-black/50 hover:bg-black/80 text-white p-2 rounded-full backdrop-blur z-50 transition"
-                    title="Show Sidebar"
-                  >
-                    <Settings className="w-5 h-5" />
-                  </button>
-               )}
-               <button 
-                  onClick={() => setFocusView(null)}
-                  className="absolute top-6 left-6 bg-black/50 hover:bg-black/80 text-white p-2 rounded-full backdrop-blur z-50 transition"
-                  title="Exit Fullscreen (Esc)"
-               >
-                  <Minimize2 className="w-5 h-5" />
-               </button>
-
-               {/* Absolute bottom controls if sidebar is hidden */}
-               {sidebarMode === "hidden" && (
-                  <div className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-gray-900/90 backdrop-blur border border-white/10 rounded-full px-6 py-3 flex items-center gap-4 shadow-2xl z-50">
-                     <button
-                        className={`p-3 rounded-full transition-all duration-200 ${micOn ? "bg-gray-700 text-white" : "bg-red-500 text-white"}`}
-                        onClick={toggleMic}
-                     >
-                        {micOn ? <Mic className="w-5 h-5" /> : <MicOff className="w-5 h-5" />}
-                     </button>
-                     <button
-                        className={`p-3 rounded-full transition-all duration-200 ${camOn ? "bg-gray-700 text-white" : "bg-red-500 text-white"}`}
-                        onClick={toggleCam}
-                     >
-                        {camOn ? <Video className="w-5 h-5" /> : <VideoOff className="w-5 h-5" />}
-                     </button>
-                  </div>
-               )}
-            </div>
-
-            
-            {/* Show Sidebar Floating Button when Hidden */}
-            {sidebarMode === "hidden" && isVideoFullscreen && (
-               <button 
-                  onClick={() => setSidebarMode("full")}
-                  className="absolute top-4 right-4 z-[110] bg-black/60 hover:bg-black/80 backdrop-blur-md text-white p-2 rounded-lg shadow-2xl transition border border-white/10 flex items-center gap-2"
-               >
-                  <Users className="w-5 h-5" />
-                  <span className="text-xs font-semibold pr-1">Show Participants</span>
-               </button>
-            )}
-
-            {/* Right Sidebar */}
-            {sidebarMode !== "hidden" && (
-              <div 
-                className={`h-1/3 md:h-full border-t md:border-t-0 md:border-l border-white/10 bg-black/60 backdrop-blur transition-all duration-300 flex flex-col ${sidebarMode === "full" ? 'w-full md:w-[25%] lg:w-[20%] min-w-[200px]' : 'w-full md:w-20'}`}
-              >
-                {/* Sidebar Header */}
-                <div className="hidden md:flex h-14 items-center justify-between px-4 border-b border-white/10 shrink-0">
-                  {sidebarMode === "full" && <span className="text-white text-sm font-semibold tracking-wide">Interview</span>}
-                  <button 
-                    onClick={() => setSidebarMode(sidebarMode === "full" ? "compact" : sidebarMode === "compact" ? "hidden" : "full")}
-                    className="text-white/70 hover:text-white p-1 rounded transition ml-auto"
-                  >
-                    {sidebarMode === "full" ? <Minimize2 className="w-4 h-4" /> : <Settings className="w-4 h-4" />}
-                  </button>
-                </div>
-
-                {/* Sidebar Videos (Full mode only) */}
-                {sidebarMode === "full" && (
-                  <div className="flex-1 flex flex-row md:flex-col p-2 gap-2 overflow-auto">
-                    {/* Sidebar Local Video */}
-                    <div className="w-1/2 md:w-full aspect-[4/3] bg-gray-900 rounded-lg overflow-hidden relative flex items-center justify-center shrink-0">
-                      {!camOn ? (
-                        <div className="flex flex-col items-center justify-center text-white/50">
-                          <VideoOff className="w-6 h-6 mb-1" />
-                          <span className="text-[10px]">Camera Off</span>
-                        </div>
-                      ) : (
-                        <video
-                          muted
-                          autoPlay
-                          playsInline
-                          className="absolute inset-0 w-full h-full object-contain"
-                          ref={(el) => { if (el && localStreamRef.current && el.srcObject !== localStreamRef.current) el.srcObject = localStreamRef.current; }}
-                        />
-                      )}
-                      <div className="absolute bottom-2 left-2 bg-black/60 backdrop-blur-md text-white text-[10px] px-2 py-0.5 rounded-full flex items-center gap-1.5 z-10">
-                        <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${micOn ? 'bg-green-500' : 'bg-red-500'}`} />
-                        <span className="truncate max-w-[80px]">You</span>
-                      </div>
-                    </div>
-
-                    {/* Sidebar Remote Video */}
-                    <div className="w-1/2 md:w-full aspect-[4/3] bg-gray-900 rounded-lg overflow-hidden relative flex items-center justify-center shrink-0">
-                      <video
-                        autoPlay
-                        playsInline
-                        className="absolute inset-0 w-full h-full object-contain"
-                        ref={(el) => { if (el && remoteStreamRef.current && el.srcObject !== remoteStreamRef.current) el.srcObject = remoteStreamRef.current; }}
-                      />
-                      <div className="absolute bottom-2 left-2 bg-black/60 backdrop-blur-md text-white text-[10px] px-2 py-0.5 rounded-full flex items-center gap-1.5 z-10 w-fit">
-                        <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${active ? 'bg-green-500' : 'bg-yellow-500 animate-pulse'}`} />
-                        <span className="truncate max-w-[80px]">{active ? "Remote" : "Connecting"}</span>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Sidebar Controls (Compact & Full) */}
-                <div className={`mt-auto md:border-t border-white/10 shrink-0 ${sidebarMode === "compact" ? "p-3 flex flex-row md:flex-col gap-4 items-center justify-center" : "p-4 flex flex-wrap gap-2 justify-center"}`}>
-                  <button
-                    className={`${sidebarMode === "compact" ? "p-3" : "p-2 md:p-3"} shrink-0 rounded-full transition-all ${micOn ? "bg-gray-700 text-white" : "bg-red-500 text-white"}`}
-                    onClick={toggleMic}
-                  >
-                    {micOn ? <Mic className="w-4 h-4 md:w-5 md:h-5" /> : <MicOff className="w-4 h-4 md:w-5 md:h-5" />}
-                  </button>
-                  <button
-                    className={`${sidebarMode === "compact" ? "p-3" : "p-2 md:p-3"} shrink-0 rounded-full transition-all ${camOn ? "bg-gray-700 text-white" : "bg-red-500 text-white"}`}
-                    onClick={toggleCam}
-                  >
-                    {camOn ? <Video className="w-4 h-4 md:w-5 md:h-5" /> : <VideoOff className="w-4 h-4 md:w-5 md:h-5" />}
-                  </button>
-                  <button
-                    className={`${sidebarMode === "compact" ? "p-3" : "p-2 md:p-3"} shrink-0 rounded-full transition-all ${screenShareActive ? "bg-indigo-600 text-white" : "bg-gray-700 text-white hover:bg-gray-600"}`}
-                    onClick={() => screenShareActive ? stopScreenShare().catch(()=>{}) : startScreenShare().catch(()=>{})}
-                  >
-                    <Monitor className="w-4 h-4 md:w-5 md:h-5" />
-                  </button>
-                  <button
-                    className={`${sidebarMode === "compact" ? "p-3" : "p-2 md:p-3"} shrink-0 rounded-full transition-all ${showSettings ? "bg-indigo-600 text-white" : "bg-gray-700 text-white hover:bg-gray-600"}`}
-                    onClick={() => setShowSettings(!showSettings)}
-                  >
-                    <Settings className="w-4 h-4 md:w-5 md:h-5" />
-                  </button>
-                  
-                  {/* Exit full screen button for mobile compact mode */}
-                  <div className="md:hidden">
-                    <button
-                      className="p-3 bg-red-600 hover:bg-red-700 text-white shrink-0 rounded-full transition-all"
-                      onClick={() => setFocusView(null)}
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  </div>
+    <div className={`relative flex h-full w-full flex-col bg-black/95 ${!autoStart ? "rounded-none" : ""}`}>
+      {!screenIsFullscreen && (
+        <>
+          <div className="relative flex-1 min-h-0 w-full p-2">
+            {hasAnyScreenShare ? (
+              <div className="grid h-full min-h-0 grid-rows-[minmax(0,1fr)_180px] gap-2 md:grid-rows-[minmax(0,1fr)_32%]">
+                <div className="min-h-0">{screenTile}</div>
+                <div className="grid min-h-0 grid-cols-2 gap-2">
+                  {localTile}
+                  {remoteTile}
                 </div>
               </div>
+            ) : focusView === "local" || focusView === "remote" ? (
+              <div className="relative h-full min-h-0">
+                <div className="h-full min-h-0">{focusView === "local" ? localTile : remoteTile}</div>
+                <div className="absolute bottom-4 right-4 z-20 h-28 w-40 md:h-36 md:w-52">
+                  {focusView === "local" ? remoteTile : localTile}
+                </div>
+              </div>
+            ) : (
+              <div className="grid h-full min-h-0 grid-cols-2 gap-2">
+                {localTile}
+                {remoteTile}
+              </div>
             )}
+          </div>
+
+          <div className="z-20 flex h-12 shrink-0 items-center justify-between border-t border-white/10 bg-gray-900/90 px-2 backdrop-blur md:h-16 md:px-6">
+            <div className="flex w-[30%] flex-col truncate">
+              <span className="truncate text-[10px] font-medium uppercase tracking-wider text-white/70 md:text-[11px]">
+                {error
+                  ? error
+                  : active
+                    ? "Call Connected"
+                    : callChannelReady
+                      ? role === "interviewee"
+                        ? "Starting Call..."
+                        : "Waiting For Candidate..."
+                      : "Connecting..."}
+              </span>
+            </div>
+
+            <div className="flex shrink-0 items-center justify-center gap-2 md:gap-3">
+              <Controls
+                micOn={micOn}
+                camOn={camOn}
+                screenShareActive={screenShareActive}
+                showSettings={showSettings}
+                onToggleMic={toggleMic}
+                onToggleCam={toggleCam}
+                onToggleScreenShare={toggleScreenShare}
+                onToggleSettings={() => setShowSettings((value) => !value)}
+              />
+            </div>
+
+            <div className="w-[30%]" />
+          </div>
+        </>
+      )}
+
+      {screenIsFullscreen && (
+        <div className="fixed inset-0 z-[100] flex h-[100dvh] w-screen flex-col bg-black md:flex-row">
+          <div className="relative flex min-h-0 flex-1 items-center justify-center p-2 md:p-6">
+            <div className="h-full w-full">{screenTile}</div>
+
+            <button
+              onClick={() => {
+                setFocusView(null);
+                setSidebarMode("full");
+              }}
+              className="absolute left-6 top-6 z-50 rounded-full bg-black/50 p-2 text-white backdrop-blur transition hover:bg-black/80"
+              title="Exit Fullscreen (Esc)"
+            >
+              <Minimize2 className="h-5 w-5" />
+            </button>
+
+            {sidebarMode === "hidden" && (
+              <>
+                <button
+                  onClick={() => setSidebarMode("full")}
+                  className="absolute right-6 top-6 z-50 rounded-full bg-black/50 p-2 text-white backdrop-blur transition hover:bg-black/80"
+                  title="Show Participants"
+                >
+                  <Users className="h-5 w-5" />
+                </button>
+                <div className="absolute bottom-6 left-1/2 z-50 flex -translate-x-1/2 items-center gap-4 rounded-full border border-white/10 bg-gray-900/90 px-6 py-3 backdrop-blur shadow-2xl">
+                  <Controls
+                    micOn={micOn}
+                    camOn={camOn}
+                    screenShareActive={screenShareActive}
+                    showSettings={showSettings}
+                    onToggleMic={toggleMic}
+                    onToggleCam={toggleCam}
+                    onToggleScreenShare={toggleScreenShare}
+                    onToggleSettings={() => setShowSettings((value) => !value)}
+                  />
+                </div>
+              </>
+            )}
+          </div>
+
+          {sidebarMode !== "hidden" && (
+            <div
+              className={`flex shrink-0 flex-col border-t border-white/10 bg-black/60 backdrop-blur transition-all duration-300 md:h-full md:border-l md:border-t-0 ${
+                sidebarMode === "full" ? "h-[34%] w-full md:w-[24rem]" : "h-[34%] w-full md:w-24"
+              }`}
+            >
+              <div className="hidden h-14 items-center justify-between border-b border-white/10 px-4 md:flex">
+                {sidebarMode === "full" ? <span className="text-sm font-semibold tracking-wide text-white">Participants</span> : null}
+                <button
+                  onClick={() => setSidebarMode((value) => (value === "full" ? "compact" : value === "compact" ? "hidden" : "full"))}
+                  className="ml-auto rounded p-1 text-white/70 transition hover:text-white"
+                  title={sidebarMode === "full" ? "Collapse cameras" : sidebarMode === "compact" ? "Hide sidebar" : "Expand sidebar"}
+                >
+                  {sidebarMode === "full" ? <Minimize2 className="h-4 w-4" /> : <Settings className="h-4 w-4" />}
+                </button>
+              </div>
+
+              {sidebarMode === "full" && (
+                <div className="flex flex-1 items-center justify-center overflow-auto p-2">
+                  <div className="flex w-full max-w-[260px] flex-row gap-2 md:flex-col">
+                    <div className="aspect-[4/3] flex-1">{localTile}</div>
+                    <div className="aspect-[4/3] flex-1">{remoteTile}</div>
+                  </div>
+                </div>
+              )}
+
+              <div
+                className={`mt-auto shrink-0 border-white/10 ${
+                  sidebarMode === "compact"
+                    ? "flex flex-row items-center justify-center gap-4 p-3 md:flex-col"
+                    : "flex flex-wrap justify-center gap-2 border-t p-4"
+                }`}
+              >
+                <Controls
+                  micOn={micOn}
+                  camOn={camOn}
+                  screenShareActive={screenShareActive}
+                  showSettings={showSettings}
+                  onToggleMic={toggleMic}
+                  onToggleCam={toggleCam}
+                  onToggleScreenShare={toggleScreenShare}
+                  onToggleSettings={() => setShowSettings((value) => !value)}
+                />
+
+                <div className="md:hidden">
+                  <button
+                    className="rounded-full bg-red-600 p-3 text-white transition hover:bg-red-700"
+                    onClick={() => {
+                      setFocusView(null);
+                      setSidebarMode("full");
+                    }}
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
-      {/* Global Settings Modal */}
       {showSettings && (
-        <div className="absolute inset-0 bg-black/80 backdrop-blur-sm z-[200] flex items-center justify-center p-6 animate-in fade-in duration-200 text-left">
-          <div className="bg-gray-900 border border-white/10 rounded-2xl p-6 w-full max-w-sm shadow-2xl">
-            <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
-              <Settings className="w-4 h-4" /> Device Settings
+        <div className="absolute inset-0 z-[200] flex items-center justify-center bg-black/80 p-6 text-left backdrop-blur-sm">
+          <div className="w-full max-w-sm rounded-2xl border border-white/10 bg-gray-900 p-6 shadow-2xl">
+            <h3 className="mb-4 flex items-center gap-2 font-semibold text-white">
+              <Settings className="h-4 w-4" /> Device Settings
             </h3>
             <div className="space-y-4">
               <div className="space-y-2">
-                <label className="text-xs text-gray-400 uppercase font-medium tracking-wider">Camera</label>
+                <label className="text-xs font-medium uppercase tracking-wider text-gray-400">Camera</label>
                 <select
-                  className="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                  className="w-full rounded-lg border border-gray-700 bg-gray-800 px-3 py-2 text-sm text-white outline-none focus:ring-2 focus:ring-indigo-500"
                   value={videoDeviceId}
-                  onChange={(e) => setVideoDeviceId(e.target.value)}
+                  onChange={(event) => setVideoDeviceId(event.target.value)}
                 >
                   <option value="">Default Camera</option>
-                  {devices.filter((d) => d.kind === "videoinput").map((d) => {
-                    return (
-                      <option key={d.deviceId} value={d.deviceId}>
-                        {d.label || `Camera ${d.deviceId.slice(0, 8)}`}
-                      </option>
-                    );
-                  })}
+                  {devices.filter((device) => device.kind === "videoinput").map((device) => (
+                    <option key={device.deviceId} value={device.deviceId}>
+                      {device.label || `Camera ${device.deviceId.slice(0, 8)}`}
+                    </option>
+                  ))}
                 </select>
               </div>
+
               <div className="space-y-2">
-                <label className="text-xs text-gray-400 uppercase font-medium tracking-wider">Microphone</label>
+                <label className="text-xs font-medium uppercase tracking-wider text-gray-400">Microphone</label>
                 <select
-                  className="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                  className="w-full rounded-lg border border-gray-700 bg-gray-800 px-3 py-2 text-sm text-white outline-none focus:ring-2 focus:ring-indigo-500"
                   value={audioDeviceId}
-                  onChange={(e) => setAudioDeviceId(e.target.value)}
+                  onChange={(event) => setAudioDeviceId(event.target.value)}
                 >
                   <option value="">Default Microphone</option>
-                  {devices.filter((d) => d.kind === "audioinput").map((d) => {
-                    return (
-                      <option key={d.deviceId} value={d.deviceId}>
-                        {d.label || `Mic ${d.deviceId.slice(0, 8)}`}
-                      </option>
-                    );
-                  })}
+                  {devices.filter((device) => device.kind === "audioinput").map((device) => (
+                    <option key={device.deviceId} value={device.deviceId}>
+                      {device.label || `Mic ${device.deviceId.slice(0, 8)}`}
+                    </option>
+                  ))}
                 </select>
               </div>
-              <div className="pt-4 flex gap-2">
+
+              <div className="flex gap-2 pt-4">
                 <button
-                  className="flex-1 px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-700 transition text-sm"
+                  className="flex-1 rounded-lg bg-gray-800 px-4 py-2 text-sm text-white transition hover:bg-gray-700"
                   onClick={() => setShowSettings(false)}
                 >
                   Cancel
                 </button>
                 <button
-                  className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition text-sm font-medium"
+                  className="flex-1 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-indigo-700"
                   onClick={switchDevices}
                 >
                   Apply Changes

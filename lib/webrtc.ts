@@ -32,7 +32,10 @@ export async function setupPeerConnection(): Promise<RTCSetup> {
   
   pc.ontrack = (event) => {
     event.streams[0].getTracks().forEach((track) => {
-      remoteStream.addTrack(track);
+      const exists = remoteStream.getTracks().some((existingTrack) => existingTrack.id === track.id);
+      if (!exists) {
+        remoteStream.addTrack(track);
+      }
     });
   };
 
