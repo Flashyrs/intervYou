@@ -266,7 +266,7 @@ export default function VideoCall({
     }
   }, [focusView, hasAnyScreenShare]);
 
-  const startCall = useCallback(async () => {
+  const startCall = useCallback(async (iceRestart = false) => {
     if (!pcRef.current) {
       setError("Connection not initialized");
       return;
@@ -277,12 +277,17 @@ export default function VideoCall({
     }
 
     try {
-      const offer = await createOffer(pcRef.current);
+      const offer = await pcRef.current.createOffer({
+        offerToReceiveAudio: true,
+        offerToReceiveVideo: true,
+        iceRestart,
+      });
+      await pcRef.current.setLocalDescription(offer);
       broadcast(channelRef.current, {
         type: "call-offer",
         from: roleRef.current,
         sessionId: room,
-        sdp: offer,
+        sdp: { type: offer.type, sdp: offer.sdp },
       });
       setError("");
     } catch (e) {
@@ -342,7 +347,7 @@ export default function VideoCall({
             type: "screen-share-ice-candidate",
             from: roleRef.current,
             sessionId: screenShareRoom,
-            candidate: event.candidate,
+            candidate: event.candidate.toJSON(),
           });
         }
       };
@@ -357,7 +362,7 @@ export default function VideoCall({
           type: "screen-share-offer",
           from: roleRef.current,
           sessionId: screenShareRoom,
-          sdp: offer,
+          sdp: { type: offer.type, sdp: offer.sdp },
         });
       }
 
@@ -419,7 +424,7 @@ export default function VideoCall({
               type: "ice-candidate",
               from: roleRef.current,
               sessionId: room,
-              candidate: event.candidate,
+              candidate: event.candidate.toJSON(),
             });
           }
         };
@@ -436,7 +441,7 @@ export default function VideoCall({
                     type: "call-answer",
                     from: roleRef.current,
                     sessionId: room,
-                    sdp: answer,
+                    sdp: { type: answer.type, sdp: answer.sdp },
                   });
                 }
 
@@ -454,6 +459,19 @@ export default function VideoCall({
                     await pc.addIceCandidate(candidate).catch((e) => console.warn("Failed adding queued ICE", e));
                   }
                 }
+              } else if (payload.type === "call-ping" && payload.from !== roleRef.current) {
+                if (roleRef.current === "interviewee") {
+                   if (pc.signalingState === "have-local-offer" && pc.localDescription) {
+                      broadcast(channelRef.current!, {
+                        type: "call-offer",
+                        from: roleRef.current,
+                        sessionId: room,
+                        sdp: { type: pc.localDescription.type, sdp: pc.localDescription.sdp },
+                      });
+                   } else if (pc.connectionState !== "connected" && pc.connectionState !== "connecting") {
+                      startCall().catch(console.error);
+                   }
+                }
               } else if (payload.type === "ice-candidate") {
                 const candidate = new RTCIceCandidate(payload.candidate);
                 if (pc.remoteDescription?.type) {
@@ -469,6 +487,13 @@ export default function VideoCall({
           (status) => {
             if (!mounted) return;
             setCallChannelReady(status === "SUBSCRIBED");
+            if (status === "SUBSCRIBED" && channelRef.current) {
+               broadcast(channelRef.current, {
+                 type: "call-ping",
+                 from: roleRef.current,
+                 sessionId: room,
+               });
+            }
             if (status === "SUBSCRIBED" && roleRef.current === "interviewee" && autoStart && !hasAutoStartedRef.current) {
               hasAutoStartedRef.current = true;
               startCall().catch((e) => {
@@ -543,7 +568,7 @@ export default function VideoCall({
                   type: "screen-share-ice-candidate",
                   from: roleRef.current,
                   sessionId: screenShareRoom,
-                  candidate: event.candidate,
+                  candidate: event.candidate.toJSON(),
                 });
               }
             };
@@ -554,7 +579,7 @@ export default function VideoCall({
                 type: "screen-share-answer",
                 from: roleRef.current,
                 sessionId: screenShareRoom,
-                sdp: answer,
+                sdp: { type: answer.type, sdp: answer.sdp },
               });
             }
 
