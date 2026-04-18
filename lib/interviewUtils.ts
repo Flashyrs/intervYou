@@ -203,6 +203,12 @@ function buildJava(userCode: string, driver: string, tests: any[]) {
 
   driverCode = removeSolutionClass(driverCode);
 
+  // Runtime Hotfix: Replace the buggy normalise/ClassCastException-prone deepEquals in legacy drivers
+  if (driverCode.includes('normalise(a).equals(normalise(b))')) {
+    driverCode = driverCode.replace(/private static String normalise[\s\S]*?Main\.valToJson\(v\);\s*\}/g, "");
+    driverCode = driverCode.replace(/@SuppressWarnings\("unchecked"\)\s*private static boolean deepEquals[\s\S]*?normalise\(b\)\);\s*\}/g, `private static boolean deepEquals(Object a, Object b) {\n        if (a == b) return true;\n        if (a == null || b == null) return false;\n        return Main.valToJson(a).equals(Main.valToJson(b));\n    }`);
+  }
+
   const driverLines: string[] = [];
   driverCode.split('\n').forEach(line => {
     const trimmed = line.trim();

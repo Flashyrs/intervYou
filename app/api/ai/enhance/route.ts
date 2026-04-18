@@ -287,39 +287,10 @@ class Driver {
 
         return o;
     }
-
-    // Order-independent equality: sorts inner lists so [[1,-1,0]] == [[-1,0,1]]
-    @SuppressWarnings("unchecked")
     private static boolean deepEquals(Object a, Object b) {
         if (a == b) return true;
         if (a == null || b == null) return false;
-        return normalise(a).equals(normalise(b));
-    }
-
-    @SuppressWarnings("unchecked")
-    private static String normalise(Object v) {
-        if (v == null) return "null";
-        if (v instanceof List) {
-            List<?> list = (List<?>) v;
-            if (!list.isEmpty() && list.get(0) instanceof List) {
-                List<String> parts = new ArrayList<>();
-                for (Object inner : list) {
-                    List<?> il = (List<?>) inner;
-                    List<Long> nums = new ArrayList<>();
-                    for (Object x : il) nums.add(((Number) x).longValue());
-                    Collections.sort(nums);
-                    parts.add(nums.toString());
-                }
-                Collections.sort(parts);
-                return parts.toString();
-            }
-            List<String> items = new ArrayList<>();
-            for (Object x : list) items.add(String.valueOf(x instanceof Number ? ((Number)x).longValue() : x));
-            Collections.sort(items);
-            return items.toString();
-        }
-        if (v instanceof Number) return String.valueOf(((Number) v).longValue());
-        return Main.valToJson(v);
+        return Main.valToJson(a).equals(Main.valToJson(b));
     }
 }
 `,
