@@ -103,7 +103,9 @@ function VideoTile({
       {action ? (
         <button
           type="button"
-          className="absolute right-2 top-2 z-20 rounded-full bg-black/60 p-2 text-white opacity-0 transition hover:bg-black/80 group-hover:opacity-100"
+          className={`absolute right-2 top-2 z-20 rounded-full bg-black/60 p-2 text-white transition hover:bg-black/80 ${
+            pinned ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+          }`}
           onClick={action}
           title={actionTitle}
         >
@@ -784,9 +786,6 @@ export default function VideoCall({
             {focusView === "local" || focusView === "remote" ? (
               <div className="relative h-full w-full min-h-0">
                 <div className="h-full w-full min-h-0">{focusView === "local" ? localTile : remoteTile}</div>
-                <div className="absolute bottom-4 right-4 z-20 h-28 w-40 md:h-36 md:w-52 border border-white/20 rounded-xl overflow-hidden shadow-2xl bg-black">
-                  {focusView === "local" ? remoteTile : localTile}
-                </div>
               </div>
             ) : hasAnyScreenShare ? (
               <div className="grid h-full min-h-0 grid-rows-[minmax(0,1fr)_180px] gap-2 md:grid-rows-[minmax(0,1fr)_32%]">
