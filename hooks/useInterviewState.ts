@@ -45,6 +45,7 @@ export function useInterviewState(sessionId: string, initialRole: Role) {
     const lastUpdateRef = useRef<number>(0);
     const lastLocalEditRef = useRef<number>(0);
     const stateVersionRef = useRef<number>(0);
+    const channelReadyRef = useRef(false);
 
 
     const code = codeMap[language] || "";
@@ -266,6 +267,7 @@ export function useInterviewState(sessionId: string, initialRole: Role) {
         // Original Supabase real-time logic
         const channel = supabase.channel(getInterviewStateChannel(sessionId));
         channelRef.current = channel;
+        channelReadyRef.current = false;
 
         channel.on("broadcast", { event: "state" }, (payload: any) => {
             const { clientId: senderClientId, language: newLang, codeMap: newCodeMap, driverMap: newDriverMap, problemText: newProb, problemTitle: newTitle, problemId: newProblemId, sampleTests: newTests, workspaceMode: newWorkspaceMode, cursor, version } = payload?.payload || {};
@@ -376,13 +378,19 @@ export function useInterviewState(sessionId: string, initialRole: Role) {
 
         channel.subscribe((status) => {
             if (status === 'SUBSCRIBED') {
+                channelReadyRef.current = true;
                 console.log("✅ Supabase channel subscribed");
             } else if (status === 'CHANNEL_ERROR') {
+                channelReadyRef.current = false;
                 console.error("❌ Supabase channel error");
+            } else if (status === 'TIMED_OUT' || status === 'CLOSED') {
+                channelReadyRef.current = false;
+                console.error(`Interview state channel ${status.toLowerCase()}`);
             }
         });
 
         return () => {
+            channelReadyRef.current = false;
             supabase?.removeChannel(channel);
         };
     }, [sessionId]);
@@ -393,7 +401,7 @@ export function useInterviewState(sessionId: string, initialRole: Role) {
         if (cursorBroadcastTimeout.current) clearTimeout(cursorBroadcastTimeout.current);
         
         cursorBroadcastTimeout.current = setTimeout(() => {
-            if (channelRef.current) {
+            if (channelRef.current && channelReadyRef.current) {
                 const pos = pendingCursorRef.current;
                 channelRef.current.send({
                     type: "broadcast",
@@ -427,7 +435,7 @@ export function useInterviewState(sessionId: string, initialRole: Role) {
             pendingBroadcastRef.current = {};
 
             // Try Supabase broadcast
-            if (channelRef.current) {
+            if (channelRef.current && channelReadyRef.current) {
                 channelRef.current.send({
                     type: "broadcast",
                     event: "state",
@@ -441,8 +449,9 @@ export function useInterviewState(sessionId: string, initialRole: Role) {
     };
 
     const broadcastExecutionResult = (result: any) => {
-        if (!channelRef.current) {
+        if (!channelRef.current || !channelReadyRef.current) {
             console.warn("⚠️ Channel not ready for execution broadcast");
+            persist({ lastOutput: result });
             return;
         }
 
