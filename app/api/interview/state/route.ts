@@ -54,6 +54,7 @@ export async function POST(req: Request) {
     if (body.driverMap) patch.driverMap = body.driverMap;
     if (body.lastOutput !== undefined) patch.lastOutput = body.lastOutput;
     if (body.timerState) patch.timerState = body.timerState;
+    if (body.workspaceMode) patch.workspaceMode = body.workspaceMode;
     if (body.isFrozen !== undefined) patch.isFrozen = body.isFrozen;
 
     const result = await updateInterviewState({

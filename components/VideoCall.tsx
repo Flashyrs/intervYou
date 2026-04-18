@@ -603,6 +603,20 @@ export default function VideoCall({
             setRemoteScreenStream(null);
             screenSharePcRef.current?.close();
             screenSharePcRef.current = null;
+          } else if (payload.type === "screen-share-ping" && payload.from !== roleRef.current) {
+             if (screenShareActive && screenSharePcRef.current && screenShareChannelRef.current) {
+                screenSharePcRef.current.createOffer({ iceRestart: true })
+                  .then(async (offer) => {
+                     await screenSharePcRef.current!.setLocalDescription(offer);
+                     broadcast(screenShareChannelRef.current!, {
+                        type: "screen-share-offer",
+                        from: roleRef.current,
+                        sessionId: screenShareRoom,
+                        sdp: { type: offer.type, sdp: offer.sdp },
+                     });
+                  })
+                  .catch(console.error);
+             }
           }
         } catch (e) {
           console.error("Screen share signaling error", e);
@@ -611,6 +625,13 @@ export default function VideoCall({
       (status) => {
         if (!mounted) return;
         setScreenShareChannelReady(status === "SUBSCRIBED");
+        if (status === "SUBSCRIBED" && screenShareChannelRef.current) {
+          broadcast(screenShareChannelRef.current, {
+            type: "screen-share-ping",
+            from: roleRef.current,
+            sessionId: screenShareRoom,
+          });
+        }
       }
     );
 
@@ -763,10 +784,19 @@ export default function VideoCall({
             {hasAnyScreenShare ? (
               <div className="grid h-full min-h-0 grid-rows-[minmax(0,1fr)_180px] gap-2 md:grid-rows-[minmax(0,1fr)_32%]">
                 <div className="min-h-0">{screenTile}</div>
-                <div className="grid min-h-0 grid-cols-2 gap-2">
-                  {localTile}
-                  {remoteTile}
-                </div>
+                {focusView === "local" || focusView === "remote" ? (
+                  <div className="relative h-full w-full min-h-0">
+                    <div className="h-full w-full min-h-0">{focusView === "local" ? localTile : remoteTile}</div>
+                    <div className="absolute bottom-2 right-2 z-20 h-24 w-32 md:h-28 md:w-40 border border-white/20 rounded-[inherit] overflow-hidden shadow-2xl bg-black">
+                      {focusView === "local" ? remoteTile : localTile}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="grid min-h-0 grid-cols-2 gap-2">
+                    {localTile}
+                    {remoteTile}
+                  </div>
+                )}
               </div>
             ) : focusView === "local" || focusView === "remote" ? (
               <div className="relative h-full min-h-0">
@@ -852,6 +882,10 @@ export default function VideoCall({
                     onToggleScreenShare={toggleScreenShare}
                     onToggleSettings={() => setShowSettings((value) => !value)}
                   />
+                </div>
+                <div className="absolute right-6 top-6 z-50 flex flex-col gap-3 w-40 md:w-48 pointer-events-none">
+                  <div className="aspect-[4/3] w-full pointer-events-auto overflow-hidden shadow-2xl border border-white/10 rounded-xl relative bg-black shrink-0">{localTile}</div>
+                  <div className="aspect-[4/3] w-full pointer-events-auto overflow-hidden shadow-2xl border border-white/10 rounded-xl relative bg-black shrink-0">{remoteTile}</div>
                 </div>
               </>
             )}

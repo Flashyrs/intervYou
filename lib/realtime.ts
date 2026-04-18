@@ -9,6 +9,7 @@ export type SignalPayload =
   | { type: "screen-share-answer"; from: string; sessionId: string; sdp: any }
   | { type: "screen-share-ice-candidate"; from: string; sessionId: string; candidate: any }
   | { type: "screen-share-stopped"; from: string; sessionId: string }
+  | { type: "screen-share-ping"; from: string; sessionId: string }
   | { type: "call-cancel"; from: string; sessionId: string }
   | { type: "call-ping"; from: string; sessionId: string }
   | { type: "random-invite"; from: string; tempId: string; initiatorId?: string }
