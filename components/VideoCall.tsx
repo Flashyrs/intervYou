@@ -96,7 +96,7 @@ function VideoTile({
 }) {
   return (
     <div
-      className={`group relative flex min-h-0 min-w-0 items-center justify-center overflow-hidden rounded-xl border ${
+      className={`group relative flex h-full w-full min-h-0 min-w-0 items-center justify-center overflow-hidden rounded-xl border ${
         pinned ? "border-white/20 shadow-xl" : "border-white/10"
       } bg-gray-950`}
     >
@@ -781,28 +781,19 @@ export default function VideoCall({
       {!screenIsFullscreen && (
         <>
           <div className="relative flex-1 min-h-0 w-full p-2">
-            {hasAnyScreenShare ? (
+            {focusView === "local" || focusView === "remote" ? (
+              <div className="relative h-full w-full min-h-0">
+                <div className="h-full w-full min-h-0">{focusView === "local" ? localTile : remoteTile}</div>
+                <div className="absolute bottom-4 right-4 z-20 h-28 w-40 md:h-36 md:w-52 border border-white/20 rounded-xl overflow-hidden shadow-2xl bg-black">
+                  {focusView === "local" ? remoteTile : localTile}
+                </div>
+              </div>
+            ) : hasAnyScreenShare ? (
               <div className="grid h-full min-h-0 grid-rows-[minmax(0,1fr)_180px] gap-2 md:grid-rows-[minmax(0,1fr)_32%]">
                 <div className="min-h-0">{screenTile}</div>
-                {focusView === "local" || focusView === "remote" ? (
-                  <div className="relative h-full w-full min-h-0">
-                    <div className="h-full w-full min-h-0">{focusView === "local" ? localTile : remoteTile}</div>
-                    <div className="absolute bottom-2 right-2 z-20 h-24 w-32 md:h-28 md:w-40 border border-white/20 rounded-[inherit] overflow-hidden shadow-2xl bg-black">
-                      {focusView === "local" ? remoteTile : localTile}
-                    </div>
-                  </div>
-                ) : (
-                  <div className="grid min-h-0 grid-cols-2 gap-2">
-                    {localTile}
-                    {remoteTile}
-                  </div>
-                )}
-              </div>
-            ) : focusView === "local" || focusView === "remote" ? (
-              <div className="relative h-full min-h-0">
-                <div className="h-full min-h-0">{focusView === "local" ? localTile : remoteTile}</div>
-                <div className="absolute bottom-4 right-4 z-20 h-28 w-40 md:h-36 md:w-52">
-                  {focusView === "local" ? remoteTile : localTile}
+                <div className="grid min-h-0 grid-cols-2 gap-2">
+                  {localTile}
+                  {remoteTile}
                 </div>
               </div>
             ) : (
