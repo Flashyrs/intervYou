@@ -461,15 +461,8 @@ export default function VideoCall({
                 }
               } else if (payload.type === "call-ping" && payload.from !== roleRef.current) {
                 if (roleRef.current === "interviewee") {
-                   if (pc.signalingState === "have-local-offer" && pc.localDescription) {
-                      broadcast(channelRef.current!, {
-                        type: "call-offer",
-                        from: roleRef.current,
-                        sessionId: room,
-                        sdp: { type: pc.localDescription.type, sdp: pc.localDescription.sdp },
-                      });
-                   } else if (pc.connectionState !== "connected" && pc.connectionState !== "connecting") {
-                      startCall().catch(console.error);
+                   if (pc.connectionState !== "connected") {
+                      startCall(true).catch(console.error);
                    }
                 }
               } else if (payload.type === "ice-candidate") {
