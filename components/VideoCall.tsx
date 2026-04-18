@@ -436,7 +436,7 @@ export default function VideoCall({
           async (payload) => {
             if (!payload || !mounted) return;
             try {
-              if (payload.type === "call-offer" && roleRef.current === "interviewer") {
+              if (payload.type === "call-offer" && payload.from !== roleRef.current) {
                 const answer = await createAnswer(pc, payload.sdp);
                 if (channelRef.current) {
                   broadcast(channelRef.current, {
@@ -453,7 +453,7 @@ export default function VideoCall({
                     await pc.addIceCandidate(candidate).catch((e) => console.warn("Failed adding queued ICE", e));
                   }
                 }
-              } else if (payload.type === "call-answer" && roleRef.current === "interviewee") {
+              } else if (payload.type === "call-answer" && payload.from !== roleRef.current) {
                 await applyAnswer(pc, payload.sdp);
                 while (pendingIceCandidates.length > 0) {
                   const candidate = pendingIceCandidates.shift();
@@ -462,12 +462,10 @@ export default function VideoCall({
                   }
                 }
               } else if (payload.type === "call-ping" && payload.from !== roleRef.current) {
-                if (roleRef.current === "interviewee") {
-                   if (pc.connectionState !== "connected") {
-                      startCall(true).catch(console.error);
-                   }
-                }
-              } else if (payload.type === "ice-candidate") {
+                 if (pc.connectionState !== "connected" && pc.connectionState !== "connecting") {
+                    startCall(true).catch(console.error);
+                 }
+              } else if (payload.type === "ice-candidate" && payload.from !== roleRef.current) {
                 const candidate = new RTCIceCandidate(payload.candidate);
                 if (pc.remoteDescription?.type) {
                   await pc.addIceCandidate(candidate).catch((e) => console.warn("Failed adding ICE", e));

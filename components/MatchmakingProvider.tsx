@@ -173,41 +173,48 @@ export function MatchmakingProvider({ children }: { children: React.ReactNode })
     }, 15000);
   };
 
+  const acceptingRef = useRef<Set<string>>(new Set());
+
   const acceptRandom = async (invite: any) => {
-    if (!invite.tempId) return;
+    if (!invite.tempId || acceptingRef.current.has(invite.tempId)) return;
+    acceptingRef.current.add(invite.tempId);
 
-    const res = await fetch("/api/random/accept", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ tempId: invite.tempId, initiatorId: invite.initiatorId || "" }),
-    });
-    
-    const data = await res.json();
-    if (!res.ok) {
-      if (res.status === 409) {
-        setIncoming((prev) => prev.filter((p) => p.tempId !== invite.tempId));
+    try {
+      const res = await fetch("/api/random/accept", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tempId: invite.tempId, initiatorId: invite.initiatorId || "" }),
+      });
+      
+      const data = await res.json();
+      if (!res.ok) {
+        if (res.status === 409) {
+          setIncoming((prev) => prev.filter((p) => p.tempId !== invite.tempId));
+        }
+        push({ message: data?.error || "Accept failed", type: "error" });
+        return;
       }
-      push({ message: data?.error || "Accept failed", type: "error" });
-      return;
-    }
 
-    const sessionId = data.sessionId;
-    if (!lobbyReady) {
-      push({ message: "Matchmaking channel is reconnecting. Please try accepting again.", type: "error" });
-      return;
+      const sessionId = data.sessionId;
+      if (!lobbyReady) {
+        push({ message: "Matchmaking channel is reconnecting. Please try accepting again.", type: "error" });
+        return;
+      }
+      
+      channelRef.current?.send({
+        type: "broadcast",
+        event: "lobby",
+        payload: { type: "random-accept", from: "interviewer", tempId: invite.tempId, sessionId },
+      }).catch(() => {
+        push({ message: "Failed to confirm match", type: "error" });
+        return;
+      });
+      
+      setIncoming([]); // Clear all
+      router.push(`/interview/${sessionId}`);
+    } finally {
+      acceptingRef.current.delete(invite.tempId);
     }
-    
-    channelRef.current?.send({
-      type: "broadcast",
-      event: "lobby",
-      payload: { type: "random-accept", from: "interviewer", tempId: invite.tempId, sessionId },
-    }).catch(() => {
-      push({ message: "Failed to confirm match", type: "error" });
-      return;
-    });
-    
-    setIncoming([]); // Clear all
-    router.push(`/interview/${sessionId}`);
   };
 
   const declineRandom = (inviteId: string) => {
