@@ -11,14 +11,16 @@ if (!SUPABASE_URL || !SUPABASE_KEY) {
 
 const SESSION_ID = process.argv[2] || "perf-test-" + Math.random().toString(36).substring(7);
 const CONCURRENCY = parseInt(process.argv[3]) || 5;
-const DURATION_MS = 10000;
+const INTERVAL_MS = parseInt(process.argv[4]) || 500;
+const DURATION_MS = 15000; // Increased duration for slower tests
 
 // Supabase Free Tier allows 10 messages per second.
-// Each simulated user sends 2 pings/sec (every 500ms).
-const totalMsgsPerSec = CONCURRENCY * 2;
+const msgsPerUserPerSec = 1000 / INTERVAL_MS;
+const totalMsgsPerSec = CONCURRENCY * msgsPerUserPerSec;
 
 console.log(`🚀 Starting Load Test on session: ${SESSION_ID}`);
-console.log(`👥 Concurrency: ${CONCURRENCY} virtual users (~${totalMsgsPerSec} msgs/sec)`);
+console.log(`👥 Concurrency: ${CONCURRENCY} virtual users`);
+console.log(`⏱️  Interval: ${INTERVAL_MS}ms (~${totalMsgsPerSec.toFixed(1)} msgs/sec total)`);
 
 if (totalMsgsPerSec > 10) {
     console.warn("⚠️  WARNING: You are exceeding the 10 msg/sec limit for Supabase Free Tier.");
@@ -65,7 +67,7 @@ async function spawnUser(id) {
                 payload: { startTs, senderId: clientId }
             });
             totalSent++;
-        }, 500); 
+        }, INTERVAL_MS); 
 
         setTimeout(() => {
             clearInterval(interval);
