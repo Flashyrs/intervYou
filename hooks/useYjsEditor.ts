@@ -35,10 +35,10 @@ export function useYjsEditor(
     const ydoc = new Y.Doc();
     ydocRef.current = ydoc;
 
-    const isSupabaseYjsEnabled = process.env.NEXT_PUBLIC_YJS_SUPABASE_ENABLED === 'true';
+    const isSupabaseYjsEnabled = process.env.NEXT_PUBLIC_YJS_SUPABASE_ENABLED !== 'false';
 
     if (!isSupabaseYjsEnabled) {
-      console.log("[YjsEditor] Supabase Yjs Sync is DISABLED via feature flag.");
+      console.log("[YjsEditor] Supabase Yjs Sync is EXPLICITLY DISABLED via feature flag.");
       return () => {
         ydoc.destroy();
         ydocRef.current = null;
