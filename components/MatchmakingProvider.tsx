@@ -105,36 +105,53 @@ export function MatchmakingProvider({ children }: { children: React.ReactNode })
     }
 
     const presenceKey = userEmail || userId;
+    console.log(`[Presence] Initializing for ${presenceKey}...`);
     const pres = presenceChannel("presence-lobby", presenceKey);
     presenceRef.current = pres;
 
     const syncOnlineUsers = () => {
       const state = pres?.presenceState();
+      console.log("[Presence] Syncing state:", JSON.stringify(state));
       const users = Object.values(state || {})
         .flatMap((arr: any) => arr.map((i: any) => i.name || i.email || i.userId))
         .filter((u: any) => u && u !== "undefined" && u !== "null");
-      setOnline(Array.from(new Set(users)) as string[]);
+      
+      const uniqueUsers = Array.from(new Set(users)) as string[];
+      console.log(`[Presence] Online Users: ${uniqueUsers.length}`);
+      setOnline(uniqueUsers);
     };
 
     pres?.on("presence", { event: "sync" }, syncOnlineUsers);
-    pres?.on("presence", { event: "join" }, syncOnlineUsers);
-    pres?.on("presence", { event: "leave" }, syncOnlineUsers);
+    pres?.on("presence", { event: "join" }, ({ key, newPresences }) => {
+      console.log("[Presence] User joined:", key, newPresences);
+      syncOnlineUsers();
+    });
+    pres?.on("presence", { event: "leave" }, ({ key, leftPresences }) => {
+      console.log("[Presence] User left:", key, leftPresences);
+      syncOnlineUsers();
+    });
 
     pres?.subscribe(async (presenceStatus: any) => {
+      console.log(`[Presence] Status: ${presenceStatus}`);
       if (presenceStatus === "SUBSCRIBED") {
         try {
+          console.log("[Presence] Tracking user...");
           await pres.track({ userId, name: userName, email: userEmail });
+          console.log("[Presence] Track successful");
           syncOnlineUsers();
         } catch (error) {
-          console.error("Presence track failed", error);
+          console.error("[Presence] Track failed:", error);
         }
       }
     });
 
     return () => {
+      console.log("[Presence] Cleaning up...");
       setOnline([]);
       if (presenceRef.current && supabase) {
-        supabase.removeChannel(presenceRef.current);
+        supabase.removeChannel(presenceRef.current).then(() => {
+           console.log("[Presence] Channel removed");
+        });
         presenceRef.current = null;
       }
     };

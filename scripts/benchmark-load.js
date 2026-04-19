@@ -13,8 +13,18 @@ const SESSION_ID = process.argv[2] || "perf-test-" + Math.random().toString(36).
 const CONCURRENCY = parseInt(process.argv[3]) || 5;
 const DURATION_MS = 10000;
 
+// Supabase Free Tier allows 10 messages per second.
+// Each simulated user sends 2 pings/sec (every 500ms).
+const totalMsgsPerSec = CONCURRENCY * 2;
+
 console.log(`🚀 Starting Load Test on session: ${SESSION_ID}`);
-console.log(`👥 Concurrency: ${CONCURRENCY} virtual users`);
+console.log(`👥 Concurrency: ${CONCURRENCY} virtual users (~${totalMsgsPerSec} msgs/sec)`);
+
+if (totalMsgsPerSec > 10) {
+    console.warn("⚠️  WARNING: You are exceeding the 10 msg/sec limit for Supabase Free Tier.");
+    console.warn("   This will likely cause the connection to drop and fall back to REST (0% success).");
+    console.warn("   Recommended max concurrency for Free Tier: 5 users.\n");
+}
 
 const results = [];
 let totalSent = 0;
@@ -22,14 +32,14 @@ let totalReceived = 0;
 
 async function spawnUser(id) {
     const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
-    const channel = supabase.channel(`interview-${SESSION_ID}`);
+    // Align with getInterviewStateChannel() in lib/sessionChannels.ts
+    const channel = supabase.channel(`interview-state-${SESSION_ID}`);
 
-    channel.on("broadcast", { event: "perf_ping" }, ({ payload }) => {
-        if (payload.userId === id) {
-            const rtt = Date.now() - payload.ts;
-            results.push(rtt / 2);
-            totalReceived++;
-        }
+    channel.on("broadcast", { event: "diagnostic_pong" }, (payload) => {
+        // Echo cancellation happens in payload check or client filtering
+        const rtt = Date.now() - payload.payload.startTs;
+        results.push(rtt / 2);
+        totalReceived++;
     });
 
     await new Promise((resolve, reject) => {
@@ -43,16 +53,15 @@ async function spawnUser(id) {
         const interval = setInterval(() => {
             channel.send({
                 type: "broadcast",
-                event: "perf_ping",
-                payload: { ts: Date.now(), userId: id }
+                event: "diagnostic_ping",
+                payload: { startTs: Date.now(), userId: id }
             });
             totalSent++;
         }, 500); 
 
         setTimeout(() => {
             clearInterval(interval);
-            supabase.removeChannel(channel);
-            resolve();
+            supabase.removeChannel(channel).then(() => resolve());
         }, DURATION_MS);
     });
 }
