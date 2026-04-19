@@ -35,13 +35,16 @@ async function spawnUser(id) {
     const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
     const channel = supabase.channel(`interview-state-${SESSION_ID}`);
 
+    const pendingPings = new Set();
+
     channel.on("broadcast", { event: "diagnostic_pong" }, (payload) => {
         const p = payload.payload;
-        // Only count pongs meant for THIS bot
-        if (p.targetId === clientId) {
+        // Only count the FIRST pong for each unique ping timestamp
+        if (p.targetId === clientId && pendingPings.has(p.startTs)) {
             const rtt = Date.now() - p.startTs;
             results.push(rtt / 2);
             totalReceived++;
+            pendingPings.delete(p.startTs); // Ignore any other pongs (from other tabs) for this ping
         }
     });
 
@@ -54,10 +57,12 @@ async function spawnUser(id) {
 
     return new Promise((resolve) => {
         const interval = setInterval(() => {
+            const startTs = Date.now();
+            pendingPings.add(startTs);
             channel.send({
                 type: "broadcast",
                 event: "diagnostic_ping",
-                payload: { startTs: Date.now(), senderId: clientId }
+                payload: { startTs, senderId: clientId }
             });
             totalSent++;
         }, 500); 
