@@ -31,15 +31,18 @@ let totalSent = 0;
 let totalReceived = 0;
 
 async function spawnUser(id) {
+    const clientId = `bot-${id}-${Math.random().toString(36).substring(7)}`;
     const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
-    // Align with getInterviewStateChannel() in lib/sessionChannels.ts
     const channel = supabase.channel(`interview-state-${SESSION_ID}`);
 
     channel.on("broadcast", { event: "diagnostic_pong" }, (payload) => {
-        // Echo cancellation happens in payload check or client filtering
-        const rtt = Date.now() - payload.payload.startTs;
-        results.push(rtt / 2);
-        totalReceived++;
+        const p = payload.payload;
+        // Only count pongs meant for THIS bot
+        if (p.targetId === clientId) {
+            const rtt = Date.now() - p.startTs;
+            results.push(rtt / 2);
+            totalReceived++;
+        }
     });
 
     await new Promise((resolve, reject) => {
@@ -54,7 +57,7 @@ async function spawnUser(id) {
             channel.send({
                 type: "broadcast",
                 event: "diagnostic_ping",
-                payload: { startTs: Date.now(), userId: id }
+                payload: { startTs: Date.now(), senderId: clientId }
             });
             totalSent++;
         }, 500); 
@@ -83,19 +86,30 @@ async function run() {
     
     await new Promise(r => setTimeout(r, 1000));
 
+    const p50 = calculatePercentile(results, 50);
+    const p95 = calculatePercentile(results, 95);
+    const p99 = calculatePercentile(results, 99);
+    const rate = totalSent > 0 ? Math.round((totalReceived / totalSent) * 100) : 0;
+
     console.log("\n--- 📊 Performance Report ---");
     console.log(`Total Sent: ${totalSent}`);
     console.log(`Total Received: ${totalReceived}`);
-    const rate = totalSent > 0 ? Math.round((totalReceived / totalSent) * 100) : 0;
     console.log(`Success Rate: ${rate}%`);
-    console.log(`p50 Latency: ${calculatePercentile(results, 50)}ms`);
-    console.log(`p95 Latency: ${calculatePercentile(results, 95)}ms`);
-    console.log(`p99 Latency: ${calculatePercentile(results, 99)}ms`);
+    console.log(`p50 Latency: ${p50}ms`);
+    console.log(`p95 Latency: ${p95}ms`);
+    console.log(`p99 Latency: ${p99}ms`);
     console.log("-----------------------------\n");
     
-    if (results.length > 0) {
-        console.log("👉 VERDICT: " + (calculatePercentile(results, 50) < 100 ? "PASS ✅" : "FAIL ❌"));
+    let verdict = "FAIL ❌";
+    if (rate > 90) {
+        if (p50 < 100) verdict = "EXCELLENT 💎 (Ultra-fast sync)";
+        else if (p50 < 200) verdict = "GOOD ✅ (Standard sync)";
+        else if (p50 < 350) verdict = "FAIR ⚠️ (Noticeable lag)";
+    } else {
+        verdict = "UNSTABLE 🔴 (High packet loss)";
     }
+    
+    console.log("👉 VERDICT: " + verdict);
     process.exit(0);
 }
 

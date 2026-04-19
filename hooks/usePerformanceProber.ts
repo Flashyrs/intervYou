@@ -77,10 +77,11 @@ export function usePerformanceProber(channel: RealtimeChannel | null, isConnecte
         };
 
         const onPing = (payload: any) => {
+            const { startTs, senderId } = payload.payload;
             channel.send({
                 type: "broadcast",
                 event: "diagnostic_pong",
-                payload: { startTs: payload.payload.startTs }
+                payload: { startTs, targetId: senderId }
             });
         };
 
