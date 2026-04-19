@@ -125,7 +125,7 @@ export function useYjsEditor(
       if (currentYjsCode === newCode) return;
       
       isApplyingRemoteRef.current = true;
-      ydocRef.current.transact(() => {
+      ydoc.transact(() => {
         ytext.delete(0, ytext.length);
         ytext.insert(0, newCode);
       });

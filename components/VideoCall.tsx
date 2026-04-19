@@ -380,7 +380,7 @@ export default function VideoCall({
       pcRef.current?.close();
       pcRef.current = null;
     };
-  }, [autoStart, room, startCall]);
+  }, [autoStart, room, startCall, isPolite]);
 
   useEffect(() => {
     if (!screenShareRoom) return;
@@ -530,7 +530,7 @@ export default function VideoCall({
       remoteScreenStreamRef.current = null;
       setRemoteScreenStream(null);
     };
-  }, [screenShareRoom]);
+  }, [screenShareRoom, isPolite, screenShareActive]);
 
   const switchDevices = async () => {
     if (!pcRef.current) return;
