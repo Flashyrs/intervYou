@@ -3,6 +3,7 @@ import { useSession } from "next-auth/react";
 import { supabase } from "@/lib/supabase";
 import { maybeInjectSkeleton } from "@/lib/interviewUtils";
 import { getInterviewStateChannel } from "@/lib/sessionChannels";
+import { usePerformanceProber } from "./usePerformanceProber";
 
 export type Role = "interviewer" | "interviewee";
 
@@ -46,6 +47,9 @@ export function useInterviewState(sessionId: string, initialRole: Role) {
     const lastLocalEditRef = useRef<number>(0);
     const stateVersionRef = useRef<number>(0);
     const channelReadyRef = useRef(false);
+
+    const [isConnected, setIsConnected] = useState(false);
+    const performanceMetrics = usePerformanceProber(channelRef.current, isConnected);
 
 
     const code = codeMap[language] || "";
@@ -277,9 +281,6 @@ export function useInterviewState(sessionId: string, initialRole: Role) {
                 return;
             }
 
-            // Removed timestamp clock-sync check because it relies on local system time 
-            // which can differ between clients, causing valid messages to be dropped.
-
             // Update state from broadcast
 
             // 1. Language Update
@@ -289,13 +290,10 @@ export function useInterviewState(sessionId: string, initialRole: Role) {
 
             // 2. Code Update (Patch) - OPTIMIZED
             if (newCodeMap) {
-                // Reduced debounce to 50ms for sub-100ms perceived latency
-                // Just enough to prevent local-echo loops, but fast enough for collaboration
                 const timeSinceLastEdit = Date.now() - lastLocalEditRef.current;
 
                 if (senderClientId !== clientIdRef.current && timeSinceLastEdit > 50) {
                     setCodeMap(prev => {
-                        // Merge logic: only update if actual change
                         let hasChange = false;
                         for (const k of Object.keys(newCodeMap)) {
                             if (newCodeMap[k] !== prev[k]) { hasChange = true; break; }
@@ -360,7 +358,7 @@ export function useInterviewState(sessionId: string, initialRole: Role) {
                 stateVersionRef.current = version;
             }
 
-            // 7. Last Output Update (from persist patch, fallback for broadcast)
+            // 7. Last Output Update
             if (payload?.payload?.lastOutput) {
                 setExecutionResult(payload.payload.lastOutput);
             }
@@ -379,12 +377,15 @@ export function useInterviewState(sessionId: string, initialRole: Role) {
         channel.subscribe((status) => {
             if (status === 'SUBSCRIBED') {
                 channelReadyRef.current = true;
+                setIsConnected(true);
                 console.log("✅ Supabase channel subscribed");
             } else if (status === 'CHANNEL_ERROR') {
                 channelReadyRef.current = false;
+                setIsConnected(false);
                 console.error("❌ Supabase channel error");
             } else if (status === 'TIMED_OUT' || status === 'CLOSED') {
                 channelReadyRef.current = false;
+                setIsConnected(false);
                 console.error(`Interview state channel ${status.toLowerCase()}`);
             }
         });
@@ -427,14 +428,13 @@ export function useInterviewState(sessionId: string, initialRole: Role) {
             const payload = {
                 ...pendingBroadcastRef.current,
                 userId,
-                role, // Broadcast role for "Last edited by..."
+                role, 
                 clientId: clientIdRef.current,
                 timestamp,
                 version: stateVersionRef.current + 1
             };
             pendingBroadcastRef.current = {};
 
-            // Try Supabase broadcast
             if (channelRef.current && channelReadyRef.current) {
                 channelRef.current.send({
                     type: "broadcast",
@@ -455,7 +455,6 @@ export function useInterviewState(sessionId: string, initialRole: Role) {
             return;
         }
 
-        // Immediate send, no debounce for results
         channelRef.current.send({
             type: "broadcast",
             event: "execution_result",
@@ -466,7 +465,6 @@ export function useInterviewState(sessionId: string, initialRole: Role) {
             console.error("❌ Execution result broadcast failed:", e);
         });
 
-        // ALSO persist to DB for reliability
         persist({ lastOutput: result });
     };
 
@@ -516,7 +514,6 @@ export function useInterviewState(sessionId: string, initialRole: Role) {
                     }
                 }
             } catch {
-                // Ignore note persistence failures and allow retry on next edit.
             }
         }, 500);
     };
@@ -525,7 +522,6 @@ export function useInterviewState(sessionId: string, initialRole: Role) {
         setLanguage(lang);
         setCodeMap(prev => {
             const current = prev[lang] || "";
-            // Skeleton injection ONLY for interviewee
             let nextCode = current;
             if (role === 'interviewee') {
                 nextCode = maybeInjectSkeleton(current, lang);
@@ -546,20 +542,17 @@ export function useInterviewState(sessionId: string, initialRole: Role) {
     };
 
     const updateCode = (newCode: string) => {
-        lastLocalEditRef.current = Date.now(); // Mark local edit time
+        lastLocalEditRef.current = Date.now();
         setCodeMap(prev => {
             const next = { ...prev, [language]: newCode };
-            // Broadcast PATCH only
-            const patch = { codeMap: { [language]: newCode } };
-            broadcast(patch);
-            persist(patch);
+            // Yjs handles real-time sync; we only persist to Redis for recovery.
+            persist({ codeMap: { [language]: newCode } });
             return next;
         });
     };
 
     const setCodeMapFull = (map: Record<string, string>) => {
         setCodeMap(map);
-        broadcast({ codeMap: map });
         persist({ codeMap: map });
     };
 
@@ -651,7 +644,6 @@ export function useInterviewState(sessionId: string, initialRole: Role) {
     };
 
     const endSession = async () => {
-        // Broadcast first so others leave
         if (channelRef.current && channelRef.current.state === 'joined') {
             await channelRef.current.send({
                 type: "broadcast",
@@ -660,7 +652,6 @@ export function useInterviewState(sessionId: string, initialRole: Role) {
             });
         }
 
-        // Call API to close
         await fetch(`/api/session/${sessionId}/end`, { method: "POST" });
         window.location.href = "/dashboard";
     };
@@ -710,6 +701,7 @@ export function useInterviewState(sessionId: string, initialRole: Role) {
         stateVersion,
         persistInterviewerNotes,
         resetSessionForNextQuestion,
-        endSession
+        endSession,
+        performanceMetrics
     };
 }

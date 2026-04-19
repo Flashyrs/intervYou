@@ -1,35 +1,47 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import { CheckCircle2, Code2, PenSquare } from "lucide-react";
 import { useSession, signIn } from "next-auth/react";
 import VideoCall from "@/components/VideoCall";
 import { useInterviewState } from "@/hooks/useInterviewState";
+
 import { useCodeExecution } from "@/hooks/useCodeExecution";
+import { useYjsEditor } from "@/hooks/useYjsEditor";
 import { ControlBar } from "@/components/interview/ControlBar";
 import { OutputPanel } from "@/components/interview/OutputPanel";
 import { TestPanel } from "@/components/interview/TestPanel";
 import { AuthModal } from "@/components/interview/AuthModal";
 import { getScreenShareChannel, getWebRtcChannel } from "@/lib/sessionChannels";
 import { WhiteboardPanel } from "@/components/interview/WhiteboardPanel";
+import { DiagnosticsOverlay } from "@/components/DiagnosticsOverlay";
 
 const MonacoEditor: any = dynamic(() => import("@monaco-editor/react"), { ssr: false });
 
 export default function InterviewPage() {
   const { sessionId } = useParams() as { sessionId: string };
   const router = useRouter();
-  const { status: authStatus } = useSession();
+  const { status: authStatus, data: session } = useSession();
   const [accessState, setAccessState] = useState<"checking" | "ready" | "ended" | "forbidden">("checking");
   const [accessRole, setAccessRole] = useState<"interviewer" | "interviewee" | null>(null);
+  const [isGhost, setIsGhost] = useState(false);
 
   useEffect(() => {
+    const searchParams = new URLSearchParams(window.location.search);
+    const ghostSecret = searchParams.get("ghost_secret");
+    const ghostUserId = searchParams.get("ghost_user_id");
+
     if (authStatus === "loading") return;
 
-    if (authStatus === "unauthenticated") {
+    if (authStatus === "unauthenticated" && !ghostSecret) {
       setAccessState("checking");
       return;
+    }
+
+    if (ghostSecret) {
+      setIsGhost(true);
     }
 
     let cancelled = false;
@@ -37,17 +49,17 @@ export default function InterviewPage() {
 
     (async () => {
       try {
-        const roleRes = await fetch(`/api/interview/role?sessionId=${sessionId}`, { cache: "no-store" });
-        if (cancelled) return;
-
-        if (roleRes.ok) {
-          const roleData = await roleRes.json();
-          if (roleData.role === "interviewer" || roleData.role === "interviewee") {
-            setAccessRole(roleData.role);
-          }
-          setAccessState("ready");
-          return;
+        const headers: Record<string, string> = {};
+        if (ghostSecret) {
+          headers["x-perf-test-secret"] = ghostSecret;
+          headers["x-perf-test-user-id"] = ghostUserId || "headless-bot";
         }
+
+        const roleRes = await fetch(`/api/interview/role?sessionId=${sessionId}`, { 
+          cache: "no-store",
+          headers 
+        });
+        if (cancelled) return;
 
         if (roleRes.status === 410) {
           setAccessState("ended");
@@ -59,44 +71,28 @@ export default function InterviewPage() {
           return;
         }
 
-        setAccessState("forbidden");
-      } catch {
-        if (!cancelled) {
-          setAccessState("forbidden");
+        if (roleRes.ok) {
+          const roleData = await roleRes.json();
+          if (roleData.role === "interviewer" || roleData.role === "interviewee") {
+            setAccessRole(roleData.role);
+          }
+          setAccessState("ready");
+          return;
         }
+      } catch (e) {
+        console.error(e);
       }
     })();
 
-    return () => {
-      cancelled = true;
-    };
-  }, [authStatus, sessionId]);
+    return () => { cancelled = true; };
+  }, [sessionId, authStatus]);
 
-  if (authStatus === "loading" || (authStatus === "authenticated" && accessState === "checking")) {
+  if (accessState === "checking") {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 px-6">
         <div className="rounded-xl border border-gray-200 bg-white px-6 py-8 shadow-sm text-center max-w-md w-full">
-          <h1 className="text-xl font-semibold text-gray-900">Checking Interview Room</h1>
-          <p className="mt-2 text-sm text-gray-500">Verifying your sign-in status and room access.</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (authStatus === "unauthenticated") {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 px-6">
-        <div className="rounded-xl border border-gray-200 bg-white px-6 py-8 shadow-sm text-center max-w-md w-full">
-          <h1 className="text-xl font-semibold text-gray-900">Sign In Required</h1>
-          <p className="mt-2 text-sm text-gray-500">
-            You need to sign in before entering this interview room. After sign-in, we will return you to this link.
-          </p>
-          <button
-            className="mt-6 w-full rounded-lg bg-black px-4 py-2.5 text-sm font-medium text-white hover:bg-gray-800 transition"
-            onClick={() => signIn("google", { callbackUrl: `/interview/${sessionId}` })}
-          >
-            Sign in with Google
-          </button>
+          <h1 className="text-xl font-semibold text-gray-900">Connecting...</h1>
+          <p className="mt-2 text-sm text-gray-500">Please wait while we verify your access to this interview.</p>
         </div>
       </div>
     );
@@ -190,8 +186,20 @@ function InterviewRoom({ sessionId, initialRole }: { sessionId: string; initialR
     interviewerNotes,
     persistInterviewerNotes,
     endSession,
-    resetSessionForNextQuestion
+    resetSessionForNextQuestion,
+    performanceMetrics
   } = useInterviewState(sessionId, initialRole);
+
+  // Yjs CRDT sync for code editor — P2P via y-webrtc, avoids Supabase 10 msg/s limit
+  const { bindEditor } = useYjsEditor(
+    sessionId,
+    language,
+    code,
+    // When remote peer sends code via Yjs, update local state for execution/persistence
+    useCallback((remoteCode: string) => {
+      updateCode(remoteCode);
+    }, [updateCode])
+  );
 
   const {
     runOutput,
@@ -398,7 +406,7 @@ function InterviewRoom({ sessionId, initialRole }: { sessionId: string; initialR
                   height="100%"
                   defaultLanguage="javascript"
                   language={language}
-                  value={code}
+                  defaultValue={code}
                   onChange={(v: string | undefined) => updateCode(v || "")}
                   onMount={(editor: any, monaco: any) => {
                     editor.onDidChangeCursorPosition((e: any) => {
@@ -406,6 +414,8 @@ function InterviewRoom({ sessionId, initialRole }: { sessionId: string; initialR
                     });
                     (window as any)[`__editor_${sessionId}`] = editor;
                     (window as any)[`__monaco_${sessionId}`] = monaco;
+                    // Bind Yjs CRDT to this editor for P2P real-time sync
+                    bindEditor(editor, monaco);
                   }}
                   options={{
                     minimap: { enabled: false },
@@ -468,6 +478,7 @@ function InterviewRoom({ sessionId, initialRole }: { sessionId: string; initialR
         </aside>
 
       </main>
+      <DiagnosticsOverlay metrics={performanceMetrics} />
     </div>
   );
 }

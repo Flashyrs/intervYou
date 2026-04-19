@@ -5,197 +5,13 @@ import { applyAnswer, createAnswer, createOffer, setupPeerConnection } from "@/l
 import { broadcast, onSignal } from "@/lib/realtime";
 import { Maximize2, Mic, MicOff, Minimize2, Monitor, Settings, Users, Video, VideoOff, X } from "lucide-react";
 
-function safePlay(el: HTMLVideoElement, label: string) {
-  if (!el.srcObject && !el.src) return;
-  if (!el.paused) return;
-  const promise = el.play();
-  if (promise !== undefined) {
-    promise.catch((err: unknown) => {
-      if (err instanceof DOMException && err.name === "AbortError") return;
-      console.warn(`[VideoCall] ${label} play() failed:`, err);
-    });
-  }
-}
+import { StreamVideo } from "./video/StreamVideo";
+import { VideoTile } from "./video/VideoTile";
+import { Controls } from "./video/Controls";
+import { ScreenPlaceholder } from "./video/ScreenPlaceholder";
 
 function stopStream(stream: MediaStream | null) {
   stream?.getTracks().forEach((track) => track.stop());
-}
-
-function ScreenPlaceholder() {
-  return (
-    <div className="flex h-full w-full flex-col items-center justify-center text-white/60">
-      <Monitor className="mb-3 h-8 w-8" />
-      <p className="text-sm">No screen share is active right now.</p>
-    </div>
-  );
-}
-
-function StreamVideo({
-  stream,
-  muted = false,
-  label,
-  className,
-}: {
-  stream: MediaStream | null;
-  muted?: boolean;
-  label: string;
-  className: string;
-}) {
-  const ref = useRef<HTMLVideoElement>(null);
-
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-
-    el.srcObject = stream;
-    if (stream) {
-      safePlay(el, label);
-    } else {
-      el.removeAttribute("src");
-      el.load();
-    }
-
-    const resumePlayback = () => {
-      if (ref.current) safePlay(ref.current, `${label}-resume`);
-    };
-
-    el.addEventListener("loadedmetadata", resumePlayback);
-    document.addEventListener("visibilitychange", resumePlayback);
-    window.addEventListener("focus", resumePlayback);
-    window.addEventListener("resize", resumePlayback);
-
-    return () => {
-      el.removeEventListener("loadedmetadata", resumePlayback);
-      document.removeEventListener("visibilitychange", resumePlayback);
-      window.removeEventListener("focus", resumePlayback);
-      window.removeEventListener("resize", resumePlayback);
-    };
-  }, [stream, label]);
-
-  return <video ref={ref} playsInline autoPlay muted={muted} className={className} />;
-}
-
-function VideoTile({
-  title,
-  status,
-  stream,
-  muted = false,
-  empty,
-  action,
-  actionTitle,
-  pinned = false,
-}: {
-  title: string;
-  status?: "live" | "waiting" | "muted";
-  stream: MediaStream | null;
-  muted?: boolean;
-  empty: ReactNode;
-  action?: () => void;
-  actionTitle?: string;
-  pinned?: boolean;
-}) {
-  return (
-    <div
-      className={`group relative flex h-full w-full min-h-0 min-w-0 items-center justify-center overflow-hidden rounded-xl border ${
-        pinned ? "border-white/20 shadow-xl" : "border-white/10"
-      } bg-gray-950`}
-    >
-      {action ? (
-        <button
-          type="button"
-          className={`absolute right-2 top-2 z-20 rounded-full bg-black/60 p-2 text-white transition hover:bg-black/80 ${
-            pinned ? "opacity-100" : "opacity-0 group-hover:opacity-100"
-          }`}
-          onClick={action}
-          title={actionTitle}
-        >
-          {pinned ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
-        </button>
-      ) : null}
-
-      {stream ? (
-        <StreamVideo stream={stream} muted={muted} label={title} className="absolute inset-0 h-full w-full object-contain" />
-      ) : (
-        empty
-      )}
-
-      <div className="absolute bottom-2 left-2 z-10 flex items-center gap-1.5 rounded-full bg-black/60 px-2 py-0.5 text-[10px] text-white backdrop-blur-md">
-        {status ? (
-          <div
-            className={`h-1.5 w-1.5 rounded-full ${
-              status === "live"
-                ? "bg-green-500"
-                : status === "muted"
-                  ? "bg-red-500"
-                  : "animate-pulse bg-yellow-500"
-            }`}
-          />
-        ) : null}
-        <span>{title}</span>
-      </div>
-    </div>
-  );
-}
-
-function Controls({
-  micOn,
-  camOn,
-  screenShareActive,
-  showSettings,
-  onToggleMic,
-  onToggleCam,
-  onToggleScreenShare,
-  onToggleSettings,
-}: {
-  micOn: boolean;
-  camOn: boolean;
-  screenShareActive: boolean;
-  showSettings: boolean;
-  onToggleMic: () => void;
-  onToggleCam: () => void;
-  onToggleScreenShare: () => void;
-  onToggleSettings: () => void;
-}) {
-  return (
-    <>
-      <button
-        className={`rounded-full p-2 md:p-3 transition-all duration-200 ${
-          micOn ? "bg-gray-700 text-white hover:bg-gray-600" : "bg-red-500 text-white hover:bg-red-600"
-        }`}
-        onClick={onToggleMic}
-        title={micOn ? "Mute" : "Unmute"}
-      >
-        {micOn ? <Mic className="h-4 w-4 md:h-5 md:w-5" /> : <MicOff className="h-4 w-4 md:h-5 md:w-5" />}
-      </button>
-      <button
-        className={`rounded-full p-2 md:p-3 transition-all duration-200 ${
-          camOn ? "bg-gray-700 text-white hover:bg-gray-600" : "bg-red-500 text-white hover:bg-red-600"
-        }`}
-        onClick={onToggleCam}
-        title={camOn ? "Stop Camera" : "Start Camera"}
-      >
-        {camOn ? <Video className="h-4 w-4 md:h-5 md:w-5" /> : <VideoOff className="h-4 w-4 md:h-5 md:w-5" />}
-      </button>
-      <button
-        className={`rounded-full p-2 md:p-3 transition-all duration-200 ${
-          screenShareActive ? "bg-indigo-600 text-white hover:bg-indigo-700" : "bg-gray-700 text-white hover:bg-gray-600"
-        }`}
-        onClick={onToggleScreenShare}
-        title={screenShareActive ? "Stop Screen Share" : "Start Screen Share"}
-      >
-        <Monitor className="h-4 w-4 md:h-5 md:w-5" />
-      </button>
-      <button
-        className={`rounded-full p-2 md:p-3 transition-all duration-200 ${
-          showSettings ? "bg-indigo-600 text-white" : "bg-gray-700 text-white hover:bg-gray-600"
-        }`}
-        onClick={onToggleSettings}
-        title="Settings"
-      >
-        <Settings className="h-4 w-4 md:h-5 md:w-5" />
-      </button>
-    </>
-  );
 }
 
 export default function VideoCall({
@@ -224,6 +40,17 @@ export default function VideoCall({
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
   const [localScreenStream, setLocalScreenStream] = useState<MediaStream | null>(null);
   const [remoteScreenStream, setRemoteScreenStream] = useState<MediaStream | null>(null);
+  
+  // Perfect Negotiation states for main call
+  const makingOfferRef = useRef(false);
+  const ignoreOfferRef = useRef(false);
+  const isSettingRemoteAnswerPendingRef = useRef(false);
+  const isPolite = role === "interviewee"; // Interviewee yields on glare
+
+  // Perfect Negotiation states for screen share
+  const makingScreenOfferRef = useRef(false);
+  const ignoreScreenOfferRef = useRef(false);
+  const isSettingRemoteScreenAnswerPendingRef = useRef(false);
   const [active, setActive] = useState(false);
   const [micOn, setMicOn] = useState(true);
   const [camOn, setCamOn] = useState(true);
@@ -269,21 +96,22 @@ export default function VideoCall({
   }, [focusView, hasAnyScreenShare]);
 
   const startCall = useCallback(async (iceRestart = false) => {
-    if (!pcRef.current) {
-      setError("Connection not initialized");
-      return;
-    }
-    if (!channelRef.current) {
-      setError("Signal channel not ready");
-      return;
-    }
+    if (!pcRef.current || !channelRef.current) return;
 
     try {
+      makingOfferRef.current = true;
       const offer = await pcRef.current.createOffer({
         offerToReceiveAudio: true,
         offerToReceiveVideo: true,
         iceRestart,
       });
+      
+      // Safety check: if signalingState is not stable/have-local-offer, we might be in glare
+      if (pcRef.current.signalingState !== "stable" && !iceRestart) {
+         // If we are polite, we should have yielded. If impolite, we keep our offer.
+         // But setLocalDescription will fail if not stable.
+      }
+
       await pcRef.current.setLocalDescription(offer);
       broadcast(channelRef.current, {
         type: "call-offer",
@@ -294,7 +122,8 @@ export default function VideoCall({
       setError("");
     } catch (e) {
       console.error("Failed to start call", e);
-      setError("Failed to start call");
+    } finally {
+      makingOfferRef.current = false;
     }
   }, [room]);
 
@@ -406,17 +235,25 @@ export default function VideoCall({
           console.warn("Failed to enumerate devices", e);
         }
 
+        pc.oniceconnectionstatechange = () => {
+          if (!mounted) return;
+          console.log(`[ICE] ${pc.iceConnectionState}`);
+          if (pc.iceConnectionState === "failed" || pc.iceConnectionState === "disconnected") {
+            // Auto-reconnect on drop
+            console.log("ICE failed/disconnected, attempting restart...");
+            startCall(true).catch(console.error);
+          }
+        };
+
         pc.onconnectionstatechange = () => {
           if (!mounted) return;
           setConnectionState(pc.connectionState);
           if (pc.connectionState === "connected") {
             setActive(true);
             setError("");
-          } else if (pc.connectionState === "failed" || pc.connectionState === "disconnected") {
+          } else if (pc.connectionState === "failed") {
             setActive(false);
-            if (pc.connectionState === "failed") {
-              setError("Connection failed. Please check your network or firewall.");
-            }
+            setError("Connection failed. Attempting to resume...");
           }
         };
 
@@ -434,10 +271,26 @@ export default function VideoCall({
         const ch = onSignal(
           room,
           async (payload) => {
-            if (!payload || !mounted) return;
+            if (!payload || !mounted || !pcRef.current) return;
+            const pc = pcRef.current;
             try {
               if (payload.type === "call-offer" && payload.from !== roleRef.current) {
-                const answer = await createAnswer(pc, payload.sdp);
+                const offerCollision = makingOfferRef.current || pc.signalingState !== "stable";
+                ignoreOfferRef.current = !isPolite && offerCollision;
+
+                if (ignoreOfferRef.current) {
+                  console.log("[Negotiation] Ignoring offer (impolite & glare)");
+                  return;
+                }
+
+                if (offerCollision && isPolite) {
+                  console.log("[Negotiation] Yielding to offer (polite & glare)");
+                }
+
+                await pc.setRemoteDescription(new RTCSessionDescription(payload.sdp));
+                const answer = await pc.createAnswer();
+                await pc.setLocalDescription(answer);
+                
                 if (channelRef.current) {
                   broadcast(channelRef.current, {
                     type: "call-answer",
@@ -450,15 +303,17 @@ export default function VideoCall({
                 while (pendingIceCandidates.length > 0) {
                   const candidate = pendingIceCandidates.shift();
                   if (candidate) {
-                    await pc.addIceCandidate(candidate).catch((e) => console.warn("Failed adding queued ICE", e));
+                    await pc.addIceCandidate(candidate).catch(e => console.warn("ICE error", e));
                   }
                 }
               } else if (payload.type === "call-answer" && payload.from !== roleRef.current) {
-                await applyAnswer(pc, payload.sdp);
+                if (pc.signalingState === "have-local-offer") {
+                  await pc.setRemoteDescription(new RTCSessionDescription(payload.sdp));
+                }
                 while (pendingIceCandidates.length > 0) {
                   const candidate = pendingIceCandidates.shift();
                   if (candidate) {
-                    await pc.addIceCandidate(candidate).catch((e) => console.warn("Failed adding queued ICE", e));
+                    await pc.addIceCandidate(candidate).catch(e => console.warn("ICE error", e));
                   }
                 }
               } else if (payload.type === "call-ping" && payload.from !== roleRef.current) {
@@ -467,10 +322,14 @@ export default function VideoCall({
                  }
               } else if (payload.type === "ice-candidate" && payload.from !== roleRef.current) {
                 const candidate = new RTCIceCandidate(payload.candidate);
-                if (pc.remoteDescription?.type) {
-                  await pc.addIceCandidate(candidate).catch((e) => console.warn("Failed adding ICE", e));
-                } else {
-                  pendingIceCandidates.push(candidate);
+                try {
+                  if (pc.remoteDescription?.type) {
+                    await pc.addIceCandidate(candidate);
+                  } else {
+                    pendingIceCandidates.push(candidate);
+                  }
+                } catch (e) {
+                  if (!ignoreOfferRef.current) console.warn("ICE error", e);
                 }
               }
             } catch (e) {
@@ -542,6 +401,15 @@ export default function VideoCall({
               iceCandidatePoolSize: 10,
             });
 
+            // Perfect Negotiation states for this PC
+            const offerCollision = makingScreenOfferRef.current || pc.signalingState !== "stable";
+            ignoreScreenOfferRef.current = !isPolite && offerCollision;
+
+            if (ignoreScreenOfferRef.current) {
+               console.log("[ScreenShare] Ignoring offer (glare)");
+               return;
+            }
+
             const incomingRemoteScreen = new MediaStream();
             remoteScreenStreamRef.current = incomingRemoteScreen;
             setRemoteScreenStream(incomingRemoteScreen);
@@ -565,8 +433,25 @@ export default function VideoCall({
                 });
               }
             };
+            
+            pc.oniceconnectionstatechange = () => {
+              if (!mounted) return;
+              if (pc.iceConnectionState === "failed" || pc.iceConnectionState === "disconnected") {
+                 // The sharer handles restarts, but the viewer can ping the sharer to trigger one
+                 if (screenShareChannelRef.current) {
+                    broadcast(screenShareChannelRef.current, {
+                      type: "screen-share-ping",
+                      from: roleRef.current,
+                      sessionId: screenShareRoom,
+                    });
+                 }
+              }
+            };
 
-            const answer = await createAnswer(pc, payload.sdp);
+            await pc.setRemoteDescription(new RTCSessionDescription(payload.sdp));
+            const answer = await pc.createAnswer();
+            await pc.setLocalDescription(answer);
+            
             if (screenShareChannelRef.current) {
               broadcast(screenShareChannelRef.current, {
                 type: "screen-share-answer",
@@ -579,15 +464,18 @@ export default function VideoCall({
             while (pendingIceCandidates.length > 0) {
               const candidate = pendingIceCandidates.shift();
               if (candidate) {
-                await pc.addIceCandidate(candidate).catch((e) => console.warn("Failed adding queued screen-share ICE", e));
+                await pc.addIceCandidate(candidate).catch(e => console.warn("Screen ICE error", e));
               }
             }
           } else if (payload.type === "screen-share-answer" && payload.from !== roleRef.current && screenSharePcRef.current) {
-            await applyAnswer(screenSharePcRef.current, payload.sdp);
+            const pc = screenSharePcRef.current;
+            if (pc.signalingState === "have-local-offer") {
+              await pc.setRemoteDescription(new RTCSessionDescription(payload.sdp));
+            }
             while (pendingIceCandidates.length > 0) {
               const candidate = pendingIceCandidates.shift();
               if (candidate) {
-                await screenSharePcRef.current.addIceCandidate(candidate).catch((e) => console.warn("Failed adding queued screen-share ICE", e));
+                await pc.addIceCandidate(candidate).catch(e => console.warn("Screen ICE error", e));
               }
             }
           } else if (payload.type === "screen-share-ice-candidate") {

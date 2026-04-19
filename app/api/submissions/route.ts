@@ -38,6 +38,7 @@ export async function GET(req: Request) {
       orderBy: { updatedAt: "desc" },
       take: 50,
       include: {
+        testResults: true,
         session: {
           select: {
             id: true,
@@ -60,6 +61,15 @@ export async function GET(req: Request) {
 
     const payload = rows.map((row: any) => ({
       ...row,
+      // Backwards compat: reconstruct a "results" JSON string from testResults for consuming clients
+      results: JSON.stringify(row.testResults.map((tr: any) => ({
+        pass: tr.passed,
+        got: tr.actualOutput,
+        exp: tr.expectedOutput,
+        error: tr.error,
+        time: tr.time,
+        memory: tr.memory,
+      }))),
       interviewerNotes: row.session?.createdBy === userId ? (notesBySessionId[row.sessionId] || null) : null,
     }));
 
@@ -81,36 +91,55 @@ export async function POST(req: Request) {
     const parsed = (() => { try { return JSON.parse(results); } catch { return []; } })();
     const passed = Array.isArray(parsed) && parsed.length > 0 && parsed.every((r: any) => r && r.pass && !r.error);
 
-
     const existing = await prisma.submission.findUnique({ where: { sessionId_problemId_userId: { sessionId, problemId, userId } } });
     if (existing && !EXEMPT_EMAILS.has(email) && existing.attempts >= 10) {
       return NextResponse.json({ error: "submission limit reached (10 per problem)" }, { status: 429 });
     }
 
-    const saved = await prisma.submission.upsert({
-      where: { sessionId_problemId_userId: { sessionId, problemId, userId } },
-      update: {
-        language,
-        code,
-        results,
-        passed,
-        attempts: { increment: 1 },
-        time: time !== undefined ? time : undefined,
-        memory: memory !== undefined ? memory : undefined,
-        problemText: problemText || undefined,
-      },
-      create: {
-        sessionId,
-        problemId,
-        userId,
-        language,
-        code,
-        results,
-        passed,
-        time: time !== undefined ? time : undefined,
-        memory: memory !== undefined ? memory : undefined,
-        problemText: problemText || undefined,
-      },
+    // Use a transaction: upsert the submission, then replace test results
+    const saved = await prisma.$transaction(async (tx) => {
+      const sub = await tx.submission.upsert({
+        where: { sessionId_problemId_userId: { sessionId, problemId, userId } },
+        update: {
+          language,
+          code,
+          passed,
+          attempts: { increment: 1 },
+          time: time !== undefined ? time : undefined,
+          memory: memory !== undefined ? memory : undefined,
+          problemText: problemText || undefined,
+        },
+        create: {
+          sessionId,
+          problemId,
+          userId,
+          language,
+          code,
+          passed,
+          time: time !== undefined ? time : undefined,
+          memory: memory !== undefined ? memory : undefined,
+          problemText: problemText || undefined,
+        },
+      });
+
+      // Clear old test results and insert new ones
+      await tx.testCaseResult.deleteMany({ where: { submissionId: sub.id } });
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        await tx.testCaseResult.createMany({
+          data: parsed.map((r: any) => ({
+            submissionId: sub.id,
+            passed: !!r.pass && !r.error,
+            time: r.time ? parseFloat(r.time) : null,
+            memory: r.memory ? parseFloat(r.memory) : null,
+            stdout: r.got ? String(r.got) : null,
+            error: r.error ? String(r.error) : null,
+            expectedOutput: r.exp ? String(r.exp) : null,
+            actualOutput: r.got ? String(r.got) : null,
+          })),
+        });
+      }
+
+      return sub;
     });
 
     return NextResponse.json(saved, { status: 200 });

@@ -23,8 +23,11 @@ export function safeJSON(v: any) {
 
 export function maybeInjectSkeleton(current: string, lang: string) {
   const trimmed = (current || '').trim();
+  const sigs = ['class ', 'function ', 'import ', 'package ', 'public ', 'private ', 'vector'];
+  const hasStructure = sigs.some(s => trimmed.includes(s));
   const looksEmpty = trimmed === '' || trimmed.startsWith('// Start coding');
-  if (!looksEmpty) return current;
+  
+  if (!looksEmpty || hasStructure) return current;
   switch ((lang || '').toLowerCase()) {
     case 'javascript':
       return `// Implement solve(...) and use tests to validate

@@ -2,10 +2,6 @@ import { prisma } from "./db";
 import { sendSessionArchivedEmail } from "./email";
 import { persistFinalInterviewState } from "./interviewStateStore";
 
-export interface ParticipantTracking {
-    [userId: string]: number;
-}
-
 /**
  * Track when a participant joins an interview session
  */
@@ -19,22 +15,16 @@ export async function trackParticipantJoin(sessionId: string, userId: string) {
             throw new Error("Session not found");
         }
 
-        const joinedAt = (session.participantJoinedAt as ParticipantTracking) || {};
-        joinedAt[userId] = Date.now();
-
-
-        const leftAt = (session.participantLeftAt as ParticipantTracking) || {};
-        delete leftAt[userId];
-
-        await persistFinalInterviewState(sessionId);
-
-        await prisma.interviewSession.update({
-            where: { id: sessionId },
+        // Record the join event
+        await prisma.participantEvent.create({
             data: {
-                participantJoinedAt: joinedAt as any,
-                participantLeftAt: leftAt as any,
+                sessionId,
+                userId,
+                eventType: "JOINED",
             },
         });
+
+        await persistFinalInterviewState(sessionId);
 
         return { success: true };
     } catch (error) {
@@ -57,19 +47,16 @@ export async function trackParticipantLeave(sessionId: string, userId: string) {
             throw new Error("Session not found");
         }
 
-        const leftAt = (session.participantLeftAt as ParticipantTracking) || {};
-        leftAt[userId] = Date.now();
-
-        await persistFinalInterviewState(sessionId);
-
-        await prisma.interviewSession.update({
-            where: { id: sessionId },
+        // Record the leave event
+        await prisma.participantEvent.create({
             data: {
-                participantLeftAt: leftAt as any,
+                sessionId,
+                userId,
+                eventType: "LEFT",
             },
         });
 
-
+        await persistFinalInterviewState(sessionId);
 
         scheduleExpirationCheck(sessionId);
 
@@ -85,9 +72,6 @@ export async function trackParticipantLeave(sessionId: string, userId: string) {
  * If users don't rejoin within 30 seconds, session expires
  */
 function scheduleExpirationCheck(sessionId: string) {
-
-
-
     console.log(`Scheduled expiration check for session ${sessionId}`);
 }
 
@@ -105,7 +89,6 @@ export async function endSession(sessionId: string, userId: string) {
             throw new Error("Session not found");
         }
 
-
         await prisma.interviewSession.update({
             where: { id: sessionId },
             data: {
@@ -114,7 +97,6 @@ export async function endSession(sessionId: string, userId: string) {
             },
         });
 
-
         await cleanupExpiredSession(sessionId);
 
         return { success: true, expired: true };
@@ -122,6 +104,30 @@ export async function endSession(sessionId: string, userId: string) {
         console.error("Error ending session:", error);
         throw error;
     }
+}
+
+/**
+ * Helper: get the latest event per user for a session
+ * Returns a map of userId -> { eventType, timestamp }
+ */
+async function getLatestEventsPerUser(sessionId: string) {
+    const events = await prisma.participantEvent.findMany({
+        where: { sessionId },
+        orderBy: { timestamp: "desc" },
+    });
+
+    // For each user, pick the most recent event
+    const latestByUser: Record<string, { eventType: string; timestamp: Date }> = {};
+    for (const event of events) {
+        if (!latestByUser[event.userId]) {
+            latestByUser[event.userId] = {
+                eventType: event.eventType,
+                timestamp: event.timestamp,
+            };
+        }
+    }
+
+    return latestByUser;
 }
 
 /**
@@ -141,36 +147,34 @@ export async function checkAndExpireSession(sessionId: string) {
             return { expired: false };
         }
 
-        const joinedAt = (session.participantJoinedAt as ParticipantTracking) || {};
-        const leftAt = (session.participantLeftAt as ParticipantTracking) || {};
+        const latestByUser = await getLatestEventsPerUser(sessionId);
+        const userIds = Object.keys(latestByUser);
 
-        const joinedUserIds = Object.keys(joinedAt);
-
-
-        if (joinedUserIds.length === 0) {
+        if (userIds.length === 0) {
             return { expired: false };
         }
 
-
-        const allLeft = joinedUserIds.every((userId) => leftAt[userId] !== undefined);
+        // Check if all users who ever joined have "LEFT" as their latest event
+        const allLeft = userIds.every((uid) => latestByUser[uid].eventType === "LEFT");
 
         if (!allLeft) {
             return { expired: false };
         }
 
-
         const GRACE_PERIOD_MS = 30 * 1000;
         const now = Date.now();
 
-
-        const lastLeaveTime = Math.max(...joinedUserIds.map(id => leftAt[id] || 0));
+        // Find the most recent leave timestamp
+        const lastLeaveTime = Math.max(
+            ...userIds
+                .filter((uid) => latestByUser[uid].eventType === "LEFT")
+                .map((uid) => latestByUser[uid].timestamp.getTime())
+        );
         const timeSinceLastLeave = now - lastLeaveTime;
-
 
         if (timeSinceLastLeave < GRACE_PERIOD_MS) {
             return { expired: false, gracePeriodRemaining: GRACE_PERIOD_MS - timeSinceLastLeave };
         }
-
 
         await prisma.interviewSession.update({
             where: { id: sessionId },
@@ -179,7 +183,6 @@ export async function checkAndExpireSession(sessionId: string) {
                 endedAt: new Date(),
             },
         });
-
 
         await cleanupExpiredSession(sessionId);
 
@@ -205,10 +208,6 @@ export async function cleanupExpiredSession(sessionId: string) {
         if (!session) {
             return;
         }
-
-
-
-
 
         const emails = session.participants
             .map(p => p.email)
@@ -237,8 +236,6 @@ export async function isSessionAccessible(sessionId: string): Promise<boolean> {
             select: {
                 status: true,
                 scheduledFor: true,
-                participantJoinedAt: true,
-                participantLeftAt: true,
             },
         });
 
@@ -246,17 +243,17 @@ export async function isSessionAccessible(sessionId: string): Promise<boolean> {
             return false;
         }
 
-
         if (session.status === "expired") {
+            // Check if within grace period using ParticipantEvent records
+            const latestByUser = await getLatestEventsPerUser(sessionId);
+            const leftTimestamps = Object.values(latestByUser)
+                .filter((e) => e.eventType === "LEFT")
+                .map((e) => e.timestamp.getTime());
 
-            const leftAt = (session.participantLeftAt as ParticipantTracking) || {};
-            const leaveTimestamps = Object.values(leftAt);
-
-            if (leaveTimestamps.length > 0) {
+            if (leftTimestamps.length > 0) {
                 const GRACE_PERIOD_MS = 30 * 1000;
-                const lastLeaveTime = Math.max(...leaveTimestamps);
+                const lastLeaveTime = Math.max(...leftTimestamps);
                 const timeSinceLastLeave = Date.now() - lastLeaveTime;
-
 
                 if (timeSinceLastLeave < GRACE_PERIOD_MS) {
                     return true;
@@ -266,10 +263,8 @@ export async function isSessionAccessible(sessionId: string): Promise<boolean> {
             return false;
         }
 
-
         if (session.status === "scheduled" && session.scheduledFor) {
             const now = new Date();
-
             const allowedTime = new Date(session.scheduledFor.getTime() - 5 * 60 * 1000);
             if (now < allowedTime) {
                 return false;
@@ -282,4 +277,3 @@ export async function isSessionAccessible(sessionId: string): Promise<boolean> {
         return false;
     }
 }
-

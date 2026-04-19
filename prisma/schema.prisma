@@ -18,6 +18,7 @@ model User {
   createdAt         DateTime           @default(now())
   interviewSessions InterviewSession[] @relation("InterviewParticipants")
   submissions       Submission[]
+  participantEvents ParticipantEvent[]
 }
 
 model Account {
@@ -74,9 +75,8 @@ model InterviewSession {
   startedAt           DateTime?
   endedAt             DateTime?
   lastActiveAt        DateTime?
-  participantJoinedAt Json?     // { userId: timestamp }
-  participantLeftAt   Json?     // { userId: timestamp }
   submissions         Submission[]
+  participantEvents   ParticipantEvent[]
   
   @@index([status])
   @@index([scheduledFor])
@@ -92,11 +92,11 @@ model Submission {
   language    String
   code        String
   problemText String?  // Store the problem description
-  results     Json     // structured JSON object of per-case results
   passed      Boolean
   attempts    Int      @default(1)
   time        Float?   // Execution time in milliseconds
   memory      Float?   // Memory used in kilobytes
+  testResults TestCaseResult[]
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   
@@ -127,3 +127,34 @@ model ExecutionLog {
       @@unique([sessionId, userId, problemId])
       @@index([sessionId, userId])
     }
+
+model ParticipantEvent {
+  id        String   @id @default(cuid())
+  sessionId String
+  userId    String
+  eventType String   // "JOINED", "LEFT"
+  timestamp DateTime @default(now())
+
+  session InterviewSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  user    User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+  @@index([userId])
+}
+
+model TestCaseResult {
+  id             String   @id @default(cuid())
+  submissionId   String
+  passed         Boolean
+  time           Float?
+  memory         Float?
+  stdout         String?  @db.Text
+  error          String?  @db.Text
+  expectedOutput String?  @db.Text
+  actualOutput   String?  @db.Text
+  createdAt      DateTime @default(now())
+
+  submission     Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+
+  @@index([submissionId])
+}

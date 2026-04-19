@@ -2,6 +2,9 @@
 import dynamic from "next/dynamic";
 import { useEffect, useState, useRef } from "react";
 import { usePathname } from "next/navigation";
+import * as Y from "yjs";
+import { WebrtcProvider } from "y-webrtc";
+import { MonacoBinding } from "y-monaco";
 
 const MonacoEditor: any = dynamic(() => import("@monaco-editor/react"), { ssr: false });
 
@@ -9,10 +12,12 @@ export function CodeEditor() {
   const [code, setCode] = useState("// Start coding...\n");
   const [isLoading, setIsLoading] = useState(true);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const lastServerCodeRef = useRef<string>("");
-  const isLocalChangeRef = useRef(false);
   const pathname = usePathname();
   const sessionId = pathname?.split("/").pop();
+
+  const editorRef = useRef<any>(null);
+  const providerRef = useRef<any>(null);
+  const ydocRef = useRef<Y.Doc | null>(null);
 
   // Load initial state
   useEffect(() => {
@@ -24,7 +29,6 @@ export function CodeEditor() {
         if (res.ok) {
           const data = await res.json();
           if (data.code) {
-            lastServerCodeRef.current = data.code;
             setCode(data.code);
           }
         }
@@ -38,19 +42,49 @@ export function CodeEditor() {
     loadState();
   }, [sessionId]);
 
+  function handleEditorMount(editor: any, monaco: any) {
+    editorRef.current = editor;
+
+    if (!sessionId) return;
+
+    if (!ydocRef.current) {
+        const ydoc = new Y.Doc();
+        ydocRef.current = ydoc;
+
+        // WebrtcProvider creates a peer-to-peer connection avoiding 10msg/sec supabase limit
+        const provider = new WebrtcProvider(`intervyou-${sessionId}`, ydoc, {
+            signaling: ['wss://signaling.yjs.dev', 'wss://y-webrtc-signaling-eu.herokuapp.com'] 
+        });
+        providerRef.current = provider;
+
+        const type = ydoc.getText("monaco");
+
+        new MonacoBinding(type, editorRef.current.getModel(), new Set([editorRef.current]), provider.awareness);
+
+        // Populate initially if type is empty but we have downloaded state
+        if (type.length === 0 && code) {
+          type.insert(0, code);
+        }
+    }
+  }
+
+  // Cleanup provider
+  useEffect(() => {
+    return () => {
+      providerRef.current?.destroy();
+      ydocRef.current?.destroy();
+    };
+  }, []);
+
   // Save code changes to server (debounced)
   useEffect(() => {
     if (!sessionId || isLoading) return;
 
-    // Clear existing timeout
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current);
     }
 
-    // Set flag to indicate this is a local change
-    isLocalChangeRef.current = true;
-
-    // Debounce save to avoid excessive API calls
+    // Still persist to DB to handle the case where both users disconnect
     saveTimeoutRef.current = setTimeout(async () => {
       try {
         await fetch("/api/interview/state", {
@@ -58,45 +92,15 @@ export function CodeEditor() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ sessionId, code }),
         });
-        lastServerCodeRef.current = code;
       } catch (err) {
         console.error("Failed to save code:", err);
       }
-    }, 500); // 500ms debounce
+    }, 1500);
 
     return () => {
-      if (saveTimeoutRef.current) {
-        clearTimeout(saveTimeoutRef.current);
-      }
+      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
     };
   }, [code, sessionId, isLoading]);
-
-  // Poll for changes from other participants
-  useEffect(() => {
-    if (!sessionId || isLoading) return;
-
-    const pollInterval = setInterval(async () => {
-      try {
-        const res = await fetch(`/api/interview/state?sessionId=${sessionId}`);
-        if (res.ok) {
-          const data = await res.json();
-          if (data.code && data.code !== lastServerCodeRef.current) {
-            // Only update if this wasn't our own change
-            if (!isLocalChangeRef.current) {
-              lastServerCodeRef.current = data.code;
-              setCode(data.code);
-            }
-          }
-        }
-        // Reset the local change flag after each poll
-        isLocalChangeRef.current = false;
-      } catch (err) {
-        console.error("Failed to poll for updates:", err);
-      }
-    }, 1000); // Poll every 1 second
-
-    return () => clearInterval(pollInterval);
-  }, [sessionId, isLoading]);
 
   // Update hidden textarea for code execution
   useEffect(() => {
@@ -119,6 +123,7 @@ export function CodeEditor() {
         defaultLanguage="javascript"
         value={code}
         onChange={(v: string | undefined) => setCode(v || "")}
+        onMount={handleEditorMount}
         options={{ minimap: { enabled: false } }}
       />
       <textarea name="__monaco_value" className="hidden" defaultValue={code} readOnly />

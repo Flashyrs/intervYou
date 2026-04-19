@@ -4,7 +4,6 @@ import { Navbar } from '@/components/Navbar';
 import { Footer } from '@/components/Footer';
 import Providers from './providers';
 import { ToastProvider } from '@/components/Toast';
-import { LatencyMonitor } from '@/components/LatencyMonitor';
 import { MatchmakingProvider } from '@/components/MatchmakingProvider';
 
 export const metadata = {
@@ -24,7 +23,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               {children}
             </div>
             <Footer />
-            <LatencyMonitor />
           </MatchmakingProvider>
           </ToastProvider>
         </Providers>
