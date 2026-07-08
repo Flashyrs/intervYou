@@ -190,6 +190,31 @@ function InterviewRoom({ sessionId, initialRole }: { sessionId: string; initialR
     performanceMetrics
   } = useInterviewState(sessionId, initialRole);
 
+  const [isDarkMode, setIsDarkMode] = useState(false);
+
+  useEffect(() => {
+    const isDark = localStorage.getItem("theme") === "dark" || 
+      (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches);
+    setIsDarkMode(isDark);
+    if (isDark) {
+      document.documentElement.classList.add("dark");
+    } else {
+      document.documentElement.classList.remove("dark");
+    }
+  }, []);
+
+  const toggleDarkMode = () => {
+    const nextDark = !isDarkMode;
+    setIsDarkMode(nextDark);
+    if (nextDark) {
+      document.documentElement.classList.add("dark");
+      localStorage.setItem("theme", "dark");
+    } else {
+      document.documentElement.classList.remove("dark");
+      localStorage.setItem("theme", "light");
+    }
+  };
+
   // Yjs CRDT sync for code editor — P2P via y-webrtc, avoids Supabase 10 msg/s limit
   const { bindEditor, applyLocalEdit } = useYjsEditor(
     sessionId,
@@ -310,6 +335,8 @@ function InterviewRoom({ sessionId, initialRole }: { sessionId: string; initialR
             sessionId={sessionId}
             endSession={endSession}
             onNextQuestion={handleNextQuestion}
+            isDarkMode={isDarkMode}
+            onToggleDarkMode={toggleDarkMode}
           />
         </div>
       </header>
@@ -416,6 +443,7 @@ function InterviewRoom({ sessionId, initialRole }: { sessionId: string; initialR
                   defaultLanguage="javascript"
                   language={language}
                   defaultValue={code}
+                  theme={isDarkMode ? "vs-dark" : "light"}
                   onChange={(v: string | undefined) => updateCode(v || "")}
                   onMount={(editor: any, monaco: any) => {
                     editor.onDidChangeCursorPosition((e: any) => {

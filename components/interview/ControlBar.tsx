@@ -1,6 +1,6 @@
 import { Role } from "@/lib/types";
 import { useState, useEffect } from "react";
-import { Play, Send, Code2, ChevronDown, RotateCcw, CheckCircle2, Square, LogOut, Clock, Pause, PlayCircle } from "lucide-react";
+import { Play, Send, Code2, ChevronDown, RotateCcw, CheckCircle2, Square, LogOut, Clock, Pause, PlayCircle, Sun, Moon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/Toast";
 
@@ -19,6 +19,8 @@ interface ControlBarProps {
     sessionId: string;
     endSession?: () => Promise<void>;
     onNextQuestion?: () => void;
+    isDarkMode?: boolean;
+    onToggleDarkMode?: () => void;
 }
 
 const allowedLangs = [
@@ -41,7 +43,9 @@ export function ControlBar({
     updateTimerState,
     sessionId,
     endSession,
-    onNextQuestion
+    onNextQuestion,
+    isDarkMode,
+    onToggleDarkMode
 }: ControlBarProps) {
     const [showEditorParams, setShowEditorParams] = useState(false);
     const [elapsed, setElapsed] = useState(0);
@@ -275,6 +279,17 @@ export function ControlBar({
                         </button>
                     )}
                 </div>
+
+                {/* Night Mode Toggle */}
+                {onToggleDarkMode && (
+                    <button
+                        onClick={onToggleDarkMode}
+                        className="p-2 text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-gray-800 rounded-md transition"
+                        title={isDarkMode ? "Switch to Day Mode" : "Switch to Night Mode"}
+                    >
+                        {isDarkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+                    </button>
+                )}
             </div>
         </div>
     );
