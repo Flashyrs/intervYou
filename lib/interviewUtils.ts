@@ -516,6 +516,17 @@ class Main {
       if (v instanceof Number || v instanceof Boolean) return String.valueOf(v); 
       if (v instanceof Map) return objToJson((Map<String,Object>)v);
       if (v instanceof List) return listToJson((List<?>)v);
+      if (v.getClass().isArray()) {
+          StringBuilder sb = new StringBuilder();
+          sb.append("[");
+          int len = java.lang.reflect.Array.getLength(v);
+          for (int i = 0; i < len; i++) {
+              if (i > 0) sb.append(",");
+              sb.append(valToJson(java.lang.reflect.Array.get(v, i)));
+          }
+          sb.append("]");
+          return sb.toString();
+      }
       return quote(String.valueOf(v)); 
   }
 }

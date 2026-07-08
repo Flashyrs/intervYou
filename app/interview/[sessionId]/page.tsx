@@ -191,7 +191,7 @@ function InterviewRoom({ sessionId, initialRole }: { sessionId: string; initialR
   } = useInterviewState(sessionId, initialRole);
 
   // Yjs CRDT sync for code editor — P2P via y-webrtc, avoids Supabase 10 msg/s limit
-  const { bindEditor } = useYjsEditor(
+  const { bindEditor, applyLocalEdit } = useYjsEditor(
     sessionId,
     language,
     code,
@@ -200,6 +200,14 @@ function InterviewRoom({ sessionId, initialRole }: { sessionId: string; initialR
       updateCode(remoteCode);
     }, [updateCode])
   );
+
+  const handleSetCodeMapFull = useCallback((map: Record<string, string>) => {
+    setCodeMapFull(map);
+    const newCode = map[language];
+    if (newCode !== undefined) {
+      applyLocalEdit(newCode);
+    }
+  }, [setCodeMapFull, language, applyLocalEdit]);
 
   const {
     runOutput,
@@ -242,6 +250,7 @@ function InterviewRoom({ sessionId, initialRole }: { sessionId: string; initialR
   const handleNextQuestion = () => {
     resetExecutionState();
     resetSessionForNextQuestion();
+    applyLocalEdit("// Start coding new problem...\n");
   };
 
   useEffect(() => {
@@ -332,7 +341,7 @@ function InterviewRoom({ sessionId, initialRole }: { sessionId: string; initialR
               driver={driver}
               sessionId={sessionId}
               setDriver={updateDriver}
-              setCodeMapFull={setCodeMapFull}
+              setCodeMapFull={handleSetCodeMapFull}
               setDriverMapFull={setDriverMapFull}
               interviewerNotes={interviewerNotes}
               setInterviewerNotes={persistInterviewerNotes}
