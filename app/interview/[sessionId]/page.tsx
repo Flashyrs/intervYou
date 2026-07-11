@@ -11,6 +11,7 @@ import { useInterviewState } from "@/hooks/useInterviewState";
 import { useCodeExecution } from "@/hooks/useCodeExecution";
 import { useYjsEditor } from "@/hooks/useYjsEditor";
 import { ControlBar } from "@/components/interview/ControlBar";
+import { useTheme } from "@/components/ThemeProvider";
 import { OutputPanel } from "@/components/interview/OutputPanel";
 import { TestPanel } from "@/components/interview/TestPanel";
 import { AuthModal } from "@/components/interview/AuthModal";
@@ -190,30 +191,7 @@ function InterviewRoom({ sessionId, initialRole }: { sessionId: string; initialR
     performanceMetrics
   } = useInterviewState(sessionId, initialRole);
 
-  const [isDarkMode, setIsDarkMode] = useState(false);
-
-  useEffect(() => {
-    const isDark = localStorage.getItem("theme") === "dark" || 
-      (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches);
-    setIsDarkMode(isDark);
-    if (isDark) {
-      document.documentElement.classList.add("dark");
-    } else {
-      document.documentElement.classList.remove("dark");
-    }
-  }, []);
-
-  const toggleDarkMode = () => {
-    const nextDark = !isDarkMode;
-    setIsDarkMode(nextDark);
-    if (nextDark) {
-      document.documentElement.classList.add("dark");
-      localStorage.setItem("theme", "dark");
-    } else {
-      document.documentElement.classList.remove("dark");
-      localStorage.setItem("theme", "light");
-    }
-  };
+  const { isDarkMode, toggleTheme: toggleDarkMode } = useTheme();
 
   // Yjs CRDT sync for code editor — P2P via y-webrtc, avoids Supabase 10 msg/s limit
   const { bindEditor, applyLocalEdit } = useYjsEditor(
