@@ -162,6 +162,10 @@ function buildJava(userCode: string, driver: string, tests: any[]) {
   // 2. Check for existing classes
   const hasSolutionClass = /class\s+Solution\b/.test(userCodeWithoutImports);
   const hasPairClass = /class\s+Pair\b/.test(userCodeWithoutImports);
+  const hasListNode = /class\s+ListNode\b/.test(userCodeWithoutImports);
+  const hasTreeNode = /class\s+TreeNode\b/.test(userCodeWithoutImports);
+  const hasNode = /class\s+Node\b/.test(userCodeWithoutImports);
+  const hasTrieNode = /class\s+TrieNode\b/.test(userCodeWithoutImports);
 
   // 3. Process Driver Code
   let driverCode = (driver && driver.trim().length) ? driver : '';
@@ -254,6 +258,56 @@ class Pair<K, V> {
         this.second = value;
     }
 }`;
+
+  const listNodeDef = hasListNode ? '' : `
+class ListNode {
+    public int val;
+    public ListNode next;
+    public ListNode() {}
+    public ListNode(int val) { this.val = val; }
+    public ListNode(int val, ListNode next) { this.val = val; this.next = next; }
+}`;
+
+  const treeNodeDef = hasTreeNode ? '' : `
+class TreeNode {
+    public int val;
+    public TreeNode left;
+    public TreeNode right;
+    public TreeNode() {}
+    public TreeNode(int val) { this.val = val; }
+    public TreeNode(int val, TreeNode left, TreeNode right) {
+        this.val = val;
+        this.left = left;
+        this.right = right;
+    }
+}`;
+
+  const nodeDef = hasNode ? '' : `
+class Node {
+    public int val;
+    public List<Node> neighbors;
+    public Node() {
+        this.val = 0;
+        this.neighbors = new java.util.ArrayList<Node>();
+    }
+    public Node(int val) {
+        this.val = val;
+        this.neighbors = new java.util.ArrayList<Node>();
+    }
+    public Node(int val, java.util.ArrayList<Node> neighbors) {
+        this.val = val;
+        this.neighbors = neighbors;
+    }
+}`;
+
+  const trieNodeDef = hasTrieNode ? '' : `
+class TrieNode {
+    public TrieNode[] children = new TrieNode[26];
+    public boolean isEndOfWord;
+    public TrieNode() {}
+}`;
+
+  const dataStructurePolyfills = `${listNodeDef}\n${treeNodeDef}\n${nodeDef}\n${trieNodeDef}`;
 
   const jsonPolyfills = `
 class JSONObject extends java.util.LinkedHashMap<String, Object> {
@@ -359,6 +413,7 @@ class ParseException extends Exception {
   return `${allImports}
 
 ${pairPolyfill}
+${dataStructurePolyfills}
 ${jsonPolyfills}
 
 ${finalUserCode}
@@ -527,7 +582,172 @@ class Main {
           sb.append("]");
           return sb.toString();
       }
+      String name = v.getClass().getSimpleName();
+      if (name.equals("ListNode")) {
+          return listToJson(listFromList(v));
+      }
+      if (name.equals("TreeNode")) {
+          return listToJson(listFromTree(v));
+      }
+      if (name.equals("Node")) {
+          try {
+              v.getClass().getField("neighbors");
+              return listToJson((List) listFromGraph(v));
+          } catch (Exception e) {}
+      }
       return quote(String.valueOf(v)); 
+  }
+
+  static List<Object> listFromList(Object head) {
+      List<Object> res = new ArrayList<>();
+      Object curr = head;
+      try {
+          while (curr != null) {
+              res.add(curr.getClass().getField("val").get(curr));
+              curr = curr.getClass().getField("next").get(curr);
+          }
+      } catch (Exception e) {}
+      return res;
+  }
+
+  static List<Object> listFromTree(Object root) {
+      List<Object> res = new ArrayList<>();
+      if (root == null) return res;
+      try {
+          java.util.Queue<Object> q = new java.util.LinkedList<>();
+          q.add(root);
+          while (!q.isEmpty()) {
+              Object curr = q.poll();
+              if (curr != null) {
+                  res.add(curr.getClass().getField("val").get(curr));
+                  q.add(curr.getClass().getField("left").get(curr));
+                  q.add(curr.getClass().getField("right").get(curr));
+              } else {
+                  res.add(null);
+              }
+          }
+          while (!res.isEmpty() && res.get(res.size() - 1) == null) {
+              res.remove(res.size() - 1);
+          }
+      } catch (Exception e) {}
+      return res;
+  }
+
+  static List<List<Integer>> listFromGraph(Object nodeObj) {
+      List<List<Integer>> res = new ArrayList<>();
+      if (nodeObj == null) return res;
+      try {
+          Class<?> nodeClass = nodeObj.getClass();
+          java.lang.reflect.Field valField = nodeClass.getField("val");
+          java.lang.reflect.Field neighborsField = nodeClass.getField("neighbors");
+          
+          java.util.Map<Integer, Object> map = new java.util.TreeMap<>();
+          java.util.Queue<Object> queue = new java.util.LinkedList<>();
+          
+          queue.add(nodeObj);
+          int startVal = valField.getInt(nodeObj);
+          map.put(startVal, nodeObj);
+          
+          while (!queue.isEmpty()) {
+              Object curr = queue.poll();
+              List<?> neighbors = (List<?>) neighborsField.get(curr);
+              if (neighbors != null) {
+                  for (Object neighbor : neighbors) {
+                      if (neighbor != null) {
+                          int neighborVal = valField.getInt(neighbor);
+                          if (!map.containsKey(neighborVal)) {
+                              map.put(neighborVal, neighbor);
+                              queue.add(neighbor);
+                          }
+                      }
+                  }
+              }
+          }
+          
+          for (java.util.Map.Entry<Integer, Object> entry : map.entrySet()) {
+              List<Integer> neighborVals = new ArrayList<>();
+              List<?> neighbors = (List<?>) neighborsField.get(entry.getValue());
+              if (neighbors != null) {
+                  for (Object neighbor : neighbors) {
+                      if (neighbor != null) {
+                          neighborVals.add(valField.getInt(neighbor));
+                      }
+                  }
+              }
+              res.add(neighborVals);
+          }
+      } catch (Exception e) {}
+      return res;
+  }
+
+  static ListNode buildList(Object o) {
+      if (o == null || !(o instanceof List)) return null;
+      List<?> list = (List<?>) o;
+      ListNode dummy = new ListNode(0);
+      ListNode curr = dummy;
+      for (Object val : list) {
+          if (val == null) continue;
+          int intVal = ((Number) val).intValue();
+          curr.next = new ListNode(intVal);
+          curr = curr.next;
+      }
+      return dummy.next;
+  }
+
+  static TreeNode buildTree(Object o) {
+      if (o == null || !(o instanceof List)) return null;
+      List<?> list = (List<?>) o;
+      if (list.isEmpty() || list.get(0) == null) return null;
+      
+      TreeNode root = new TreeNode(((Number) list.get(0)).intValue());
+      java.util.Queue<TreeNode> q = new java.util.LinkedList<>();
+      q.add(root);
+      
+      int i = 1;
+      while (!q.isEmpty() && i < list.size()) {
+          TreeNode curr = q.poll();
+          
+          if (i < list.size()) {
+              Object val = list.get(i++);
+              if (val != null) {
+                  curr.left = new TreeNode(((Number) val).intValue());
+                  q.add(curr.left);
+              }
+          }
+          
+          if (i < list.size()) {
+              Object val = list.get(i++);
+              if (val != null) {
+                  curr.right = new TreeNode(((Number) val).intValue());
+                  q.add(curr.right);
+              }
+          }
+      }
+      return root;
+  }
+
+  static Node buildGraph(Object o) {
+      if (o == null || !(o instanceof List)) return null;
+      List<?> adjList = (List<?>) o;
+      if (adjList.isEmpty()) return null;
+      
+      int n = adjList.size();
+      java.util.Map<Integer, Node> map = new java.util.HashMap<>();
+      for (int idx = 1; idx <= n; idx++) {
+          map.put(idx, new Node(idx));
+      }
+      
+      for (int idx = 0; idx < n; idx++) {
+          Node node = map.get(idx + 1);
+          Object neighborsObj = adjList.get(idx);
+          if (neighborsObj instanceof List) {
+              for (Object neighborVal : (List<?>) neighborsObj) {
+                  int neighborId = ((Number) neighborVal).intValue();
+                  node.neighbors.add(map.get(neighborId));
+              }
+          }
+      }
+      return map.get(1);
   }
 }
 `;

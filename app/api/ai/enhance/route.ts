@@ -212,6 +212,10 @@ class Driver {
             targetClass = (Class<?>) ((java.lang.reflect.ParameterizedType) targetType).getRawType();
         }
 
+        if (targetClass.getSimpleName().equals("ListNode")) return Main.buildList(o);
+        if (targetClass.getSimpleName().equals("TreeNode")) return Main.buildTree(o);
+        if (targetClass.getSimpleName().equals("Node")) return Main.buildGraph(o);
+
         if (targetClass == int.class || targetClass == Integer.class) return ((Number)o).intValue();
         if (targetClass == long.class || targetClass == Long.class) return ((Number)o).longValue();
         if (targetClass == double.class || targetClass == Double.class) return ((Number)o).doubleValue();
