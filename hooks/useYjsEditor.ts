@@ -3,6 +3,7 @@
 import { useEffect, useRef, useCallback } from "react";
 import * as Y from "yjs";
 import { YjsSupabaseProvider } from "@/lib/YjsSupabaseProvider";
+import { supabase } from "@/lib/supabase";
 
 /**
  * Yjs hook for CRDT-based code synchronization.
@@ -37,8 +38,43 @@ export function useYjsEditor(
 
     let provider: any = null;
     let destroyed = false;
+    let controlChannel: any = null;
 
     const initProvider = async () => {
+      // Set up control channel to coordinate WebRTC fallback desync
+      if (supabase) {
+        controlChannel = supabase.channel(`control-${roomName}`);
+        controlChannel.on("broadcast", { event: "force-fallback" }, () => {
+          if (destroyed) return;
+          console.log("[useYjsEditor] Received force-fallback broadcast. Swapping to Supabase...");
+          triggerSupabaseFallback();
+        });
+        controlChannel.subscribe();
+      }
+
+      const triggerSupabaseFallback = () => {
+        if (providerRef.current instanceof YjsSupabaseProvider) return;
+
+        console.log("[useYjsEditor] Swapping sync transport to Supabase Realtime...");
+        if (providerRef.current && typeof providerRef.current.destroy === "function") {
+          providerRef.current.destroy();
+        }
+
+        const supabaseProvider = new YjsSupabaseProvider(roomName, ydoc);
+        providerRef.current = supabaseProvider;
+
+        if (editorRef.current && (ydoc as any)._MonacoBindingClass) {
+          const MonacoBinding = (ydoc as any)._MonacoBindingClass;
+          if (bindingRef.current) bindingRef.current.destroy();
+          bindingRef.current = new MonacoBinding(
+            ydoc.getText("code"),
+            editorRef.current.getModel(),
+            new Set([editorRef.current]),
+            supabaseProvider.awareness
+          );
+        }
+      };
+
       const startWebrtcOrSupabase = async () => {
         try {
           console.log(`[useYjsEditor] Initializing P2P WebRTC sync for room: ${roomName}...`);
@@ -50,7 +86,15 @@ export function useYjsEditor(
               "wss://signaling.yjs.dev",
               "wss://y-webrtc-signaling-eu.herokuapp.com",
               "wss://y-webrtc-signaling-us.herokuapp.com"
-            ]
+            ],
+            peerOpts: {
+              config: {
+                iceServers: [
+                  { urls: "stun:stun.l.google.com:19302" },
+                  { urls: "stun:global.stun.twilio.com:3478" }
+                ]
+              }
+            }
           });
           providerRef.current = provider;
 
@@ -61,23 +105,15 @@ export function useYjsEditor(
                                     (providerRef.current.room?.webrtcConns?.size > 0);
 
             if (!webrtcConnected) {
-              console.log("[useYjsEditor] P2P WebRTC peer not found. Falling back to Supabase Realtime...");
-              if (providerRef.current && typeof providerRef.current.destroy === "function") {
-                providerRef.current.destroy();
+              console.log("[useYjsEditor] P2P WebRTC peer not found. Broadcasting force-fallback...");
+              if (controlChannel) {
+                controlChannel.send({
+                  type: "broadcast",
+                  event: "force-fallback",
+                  payload: {}
+                });
               }
-              const supabaseProvider = new YjsSupabaseProvider(roomName, ydoc);
-              providerRef.current = supabaseProvider;
-
-              if (editorRef.current && (ydoc as any)._MonacoBindingClass) {
-                const MonacoBinding = (ydoc as any)._MonacoBindingClass;
-                if (bindingRef.current) bindingRef.current.destroy();
-                bindingRef.current = new MonacoBinding(
-                  ydoc.getText("code"),
-                  editorRef.current.getModel(),
-                  new Set([editorRef.current]),
-                  supabaseProvider.awareness
-                );
-              }
+              triggerSupabaseFallback();
             }
           }, 4000);
 
@@ -120,6 +156,12 @@ export function useYjsEditor(
       bindingRef.current = null;
       if (providerRef.current && typeof providerRef.current.destroy === "function") {
         providerRef.current.destroy();
+      }
+      if (controlChannel) {
+        controlChannel.unsubscribe();
+        if (supabase) {
+          supabase.removeChannel(controlChannel);
+        }
       }
       ydoc.destroy();
       ydocRef.current = null;

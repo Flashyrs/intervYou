@@ -23,10 +23,11 @@ export default function VideoCall(props: {
   role: "interviewer" | "interviewee";
   autoStart?: boolean;
 }) {
+  const [useWebRtc, setUseWebRtc] = useState(false);
   const enableLiveKit = process.env.NEXT_PUBLIC_ENABLE_LIVEKIT === "true" && !!process.env.NEXT_PUBLIC_LIVEKIT_URL;
 
-  if (enableLiveKit) {
-    return <LiveKitVideoCall room={props.room} role={props.role} />;
+  if (enableLiveKit && !useWebRtc) {
+    return <LiveKitVideoCall room={props.room} role={props.role} onFallback={() => setUseWebRtc(true)} />;
   }
 
   return <WebRtcVideoCall {...props} />;

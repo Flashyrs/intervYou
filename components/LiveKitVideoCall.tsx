@@ -7,9 +7,11 @@ import "@livekit/components-styles";
 export default function LiveKitVideoCall({
   room,
   role,
+  onFallback,
 }: {
   room: string;
   role: "interviewer" | "interviewee";
+  onFallback: () => void;
 }) {
   const [token, setToken] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -32,7 +34,10 @@ export default function LiveKitVideoCall({
         setToken(data.token);
       } catch (err: any) {
         if (cancelled) return;
+        console.warn("[LiveKitVideoCall] Token generation failed. Falling back to WebRTC:", err.message);
         setError(err.message || "Failed to load LiveKit token");
+        // Trigger parent fallback immediately
+        onFallback();
       }
     }
 
@@ -40,7 +45,7 @@ export default function LiveKitVideoCall({
     return () => {
       cancelled = true;
     };
-  }, [room, role]);
+  }, [room, role, onFallback]);
 
   if (error) {
     return (
