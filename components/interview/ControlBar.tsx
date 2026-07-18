@@ -67,7 +67,6 @@ export function ControlBar({
             }
         };
 
-        // Initial update
         updateElapsed();
 
         if (timerState?.active) {
@@ -108,7 +107,6 @@ export function ControlBar({
         return `${h}:${m}:${s}`;
     };
 
-    // Auto-hide last editor message after 2 seconds
     useEffect(() => {
         if (lastEditor) {
             setShowEditorParams(true);
@@ -117,7 +115,6 @@ export function ControlBar({
         }
     }, [lastEditor]);
 
-    // Heartbeat check
     useEffect(() => {
         if (!sessionId) return;
 
@@ -125,16 +122,14 @@ export function ControlBar({
             try {
                 const res = await fetch(`/api/session/${sessionId}/heartbeat`, { method: "POST" });
                 if (res.status === 410) {
-                    // Session ended
                     push({ message: "This session has ended.", type: "error" });
                     router.push("/dashboard");
                 }
             } catch (e) {
                 console.error("Heartbeat failed", e);
             }
-        }, 60000); // Every 1 minute
+        }, 60000);
 
-        // Initial call
         fetch(`/api/session/${sessionId}/heartbeat`, { method: "POST" }).catch(() => { });
 
         return () => clearInterval(interval);
@@ -186,7 +181,6 @@ export function ControlBar({
                     </div>
                 </div>
 
-                {/* Last Editor Indicator */}
                 <div className={`text-xs text-gray-500 transition-opacity duration-300 ${showEditorParams ? 'opacity-100' : 'opacity-0'}`}>
                     {lastEditor && (
                         <span>Last edited by <span className="font-semibold capitalize">{lastEditor.role}</span></span>

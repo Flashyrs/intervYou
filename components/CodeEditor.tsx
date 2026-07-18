@@ -19,7 +19,6 @@ export function CodeEditor() {
   const providerRef = useRef<any>(null);
   const ydocRef = useRef<Y.Doc | null>(null);
 
-  // Load initial state
   useEffect(() => {
     if (!sessionId) return;
 
@@ -61,14 +60,12 @@ export function CodeEditor() {
 
         new MonacoBinding(type, editorRef.current.getModel(), new Set([editorRef.current]), provider.awareness);
 
-        // Populate initially if type is empty but we have downloaded state
         if (type.length === 0 && code) {
           type.insert(0, code);
         }
     }
   }
 
-  // Cleanup provider
   useEffect(() => {
     return () => {
       providerRef.current?.destroy();
@@ -76,7 +73,6 @@ export function CodeEditor() {
     };
   }, []);
 
-  // Save code changes to server (debounced)
   useEffect(() => {
     if (!sessionId || isLoading) return;
 
@@ -102,7 +98,6 @@ export function CodeEditor() {
     };
   }, [code, sessionId, isLoading]);
 
-  // Update hidden textarea for code execution
   useEffect(() => {
     const hidden = document.querySelector("textarea[name=__monaco_value]") as HTMLTextAreaElement | null;
     if (hidden) hidden.value = code;

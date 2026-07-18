@@ -13,7 +13,6 @@ export default function InterviewClient({ sessionId }: { sessionId: string }) {
       setIsRunning(true);
       setOutput("Running tests...");
 
-      // 1. Get user's code
       const source_code = (document.querySelector("textarea[name=__monaco_value]") as HTMLTextAreaElement)?.value || "";
 
       if (!source_code.trim()) {
@@ -21,7 +20,6 @@ export default function InterviewClient({ sessionId }: { sessionId: string }) {
         return;
       }
 
-      // 2. Fetch interview state (contains tests, driver, problem)
       const stateRes = await fetch(`/api/interview/state?sessionId=${sessionId}`);
       if (!stateRes.ok) {
         setOutput("❌ Error: Failed to load interview state");
@@ -32,7 +30,6 @@ export default function InterviewClient({ sessionId }: { sessionId: string }) {
       const sampleTests = state.sampleTests || "[]";
       const driver = state.driver || "";
 
-      // Parse tests
       let tests = [];
       try {
         tests = JSON.parse(sampleTests);
@@ -40,13 +37,11 @@ export default function InterviewClient({ sessionId }: { sessionId: string }) {
         console.error("Failed to parse tests:", e);
       }
 
-      // If no tests, generate some
       if (!tests || tests.length === 0) {
         setOutput("⚠️ No test cases found. Please use 'Enhance with AI' to generate tests first.");
         return;
       }
 
-      // 3. Build test harness (this wraps user code + driver + tests)
       const harnessRes = await fetch("/api/execute/harness", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -65,7 +60,6 @@ export default function InterviewClient({ sessionId }: { sessionId: string }) {
 
       const { harnessCode } = await harnessRes.json();
 
-      // 4. Execute the harness
       const execRes = await fetch("/api/execute", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -78,32 +72,27 @@ export default function InterviewClient({ sessionId }: { sessionId: string }) {
 
       const execData = await execRes.json();
 
-      // 5. Parse results and display
       if (execData.error) {
         setOutput(`❌ Error: ${execData.error}`);
         return;
       }
 
-      // Check for compilation errors
       if (execData.compile_output) {
         setOutput(`❌ Compilation Error:\n${execData.compile_output}`);
         return;
       }
 
-      // Check for runtime errors
       if (execData.stderr) {
         setOutput(`❌ Runtime Error:\n${execData.stderr}`);
         return;
       }
 
-      // Parse test results from stdout
       const stdout = execData.stdout || "";
       let results = [];
 
       try {
         results = JSON.parse(stdout);
       } catch (e) {
-        // Try to extract JSON from output
         const jsonMatch = stdout.match(/\[[\s\S]*\]/);
         if (jsonMatch) {
           try {
@@ -118,12 +107,10 @@ export default function InterviewClient({ sessionId }: { sessionId: string }) {
         }
       }
 
-      // Calculate pass/fail
       const passed = results.filter((r: any) => r.pass === true).length;
       const total = results.length;
       const failed = total - passed;
 
-      // Format output
       let formattedOutput = `\n`;
       formattedOutput += `════════════════════════════════════════\n`;
       formattedOutput += `📊 TEST RESULTS\n`;
@@ -136,7 +123,6 @@ export default function InterviewClient({ sessionId }: { sessionId: string }) {
         formattedOutput += `✅ TESTS PASSED: ${passed}/${total}\n\n`;
       }
 
-      // Show individual test results
       formattedOutput += `────────────────────────────────────────\n`;
       formattedOutput += `INDIVIDUAL TEST RESULTS:\n`;
       formattedOutput += `────────────────────────────────────────\n\n`;
