@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { submitToJudge0 } from "@/lib/judge0";
+import { executeCode } from "@/lib/codeExecutor";
 import { requireAuth } from "@/lib/utils";
 import { prisma } from "@/lib/db";
 
@@ -71,7 +71,7 @@ export async function POST(req: Request) {
     }
 
     
-    const result = await submitToJudge0({
+    const result = await executeCode({
       language_id,
       source_code,
       stdin: stdin ?? "",

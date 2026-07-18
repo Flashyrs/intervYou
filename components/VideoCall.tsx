@@ -5,16 +5,34 @@ import { applyAnswer, createAnswer, createOffer, setupPeerConnection } from "@/l
 import { broadcast, onSignal } from "@/lib/realtime";
 import { Maximize2, Mic, MicOff, Minimize2, Monitor, Settings, Users, Video, VideoOff, X } from "lucide-react";
 
+import dynamic from "next/dynamic";
 import { StreamVideo } from "./video/StreamVideo";
 import { VideoTile } from "./video/VideoTile";
 import { Controls } from "./video/Controls";
 import { ScreenPlaceholder } from "./video/ScreenPlaceholder";
 
+const LiveKitVideoCall = dynamic(() => import("./LiveKitVideoCall"), { ssr: false });
+
 function stopStream(stream: MediaStream | null) {
   stream?.getTracks().forEach((track) => track.stop());
 }
 
-export default function VideoCall({
+export default function VideoCall(props: {
+  room: string;
+  screenShareRoom?: string;
+  role: "interviewer" | "interviewee";
+  autoStart?: boolean;
+}) {
+  const enableLiveKit = process.env.NEXT_PUBLIC_ENABLE_LIVEKIT === "true" && !!process.env.NEXT_PUBLIC_LIVEKIT_URL;
+
+  if (enableLiveKit) {
+    return <LiveKitVideoCall room={props.room} role={props.role} />;
+  }
+
+  return <WebRtcVideoCall {...props} />;
+}
+
+function WebRtcVideoCall({
   room,
   screenShareRoom,
   role,

@@ -17,7 +17,7 @@ export function useYjsEditor(
   onRemoteUpdate: (code: string) => void,
 ) {
   const ydocRef = useRef<Y.Doc | null>(null);
-  const providerRef = useRef<YjsSupabaseProvider | null>(null);
+  const providerRef = useRef<any | null>(null);
   const bindingRef = useRef<any>(null);
   const editorRef = useRef<any>(null);
   const currentLanguageRef = useRef(language);
@@ -35,31 +35,63 @@ export function useYjsEditor(
     const ydoc = new Y.Doc();
     ydocRef.current = ydoc;
 
-    const provider = new YjsSupabaseProvider(roomName, ydoc);
-    providerRef.current = provider;
+    let provider: any = null;
+    let destroyed = false;
 
-    const ytext = ydoc.getText("code");
+    const initProvider = async () => {
+      const host = process.env.NEXT_PUBLIC_PARTYKIT_HOST;
+      const enablePartyKit = process.env.NEXT_PUBLIC_ENABLE_PARTYKIT === "true";
 
-    // Seed with initial code if the Y.Text is empty
-    if (ytext.length === 0 && initialCode && initialCode !== "// Start coding...\n") {
-      ytext.insert(0, initialCode);
-    }
-
-    // Listen for remote changes
-    const observer = () => {
-      if (isApplyingRemoteRef.current) return;
-      const newCode = ytext.toString();
-      if (newCode !== lastSyncedCodeRef.current) {
-        lastSyncedCodeRef.current = newCode;
-        onRemoteUpdate(newCode);
+      if (enablePartyKit && host) {
+        try {
+          console.log(`[useYjsEditor] Initializing PartyKit sync for room: ${roomName}...`);
+          const YPartyKitProvider = (await import("y-partykit/provider")).default;
+          if (destroyed) return;
+          provider = new YPartyKitProvider(host, roomName, ydoc);
+          providerRef.current = provider;
+        } catch (err) {
+          console.error("[useYjsEditor] Failed to load PartyKit, falling back to Supabase Realtime:", err);
+          if (destroyed) return;
+          provider = new YjsSupabaseProvider(roomName, ydoc);
+          providerRef.current = provider;
+        }
+      } else {
+        console.log(`[useYjsEditor] PartyKit not enabled or host missing. Initializing Supabase Realtime sync...`);
+        if (destroyed) return;
+        provider = new YjsSupabaseProvider(roomName, ydoc);
+        providerRef.current = provider;
       }
+
+      const ytext = ydoc.getText("code");
+
+      if (ytext.length === 0 && initialCode && initialCode !== "// Start coding...\n") {
+        ytext.insert(0, initialCode);
+      }
+
+      const observer = () => {
+        if (isApplyingRemoteRef.current) return;
+        const newCode = ytext.toString();
+        if (newCode !== lastSyncedCodeRef.current) {
+          lastSyncedCodeRef.current = newCode;
+          onRemoteUpdate(newCode);
+        }
+      };
+      ytext.observe(observer);
+      (ydoc as any)._observer = observer;
     };
-    ytext.observe(observer);
+
+    initProvider();
 
     return () => {
-      ytext.unobserve(observer);
+      destroyed = true;
+      const ytext = ydoc.getText("code");
+      if ((ydoc as any)._observer) {
+        ytext.unobserve((ydoc as any)._observer);
+      }
       bindingRef.current = null;
-      provider.destroy();
+      if (provider) {
+        provider.destroy();
+      }
       ydoc.destroy();
       ydocRef.current = null;
       providerRef.current = null;
