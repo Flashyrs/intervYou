@@ -42,6 +42,56 @@ export function useYjsEditor(
       const host = process.env.NEXT_PUBLIC_PARTYKIT_HOST;
       const enablePartyKit = process.env.NEXT_PUBLIC_ENABLE_PARTYKIT === "true";
 
+      const startWebrtcOrSupabase = async () => {
+        try {
+          console.log(`[useYjsEditor] Initializing P2P WebRTC sync for room: ${roomName}...`);
+          const { WebrtcProvider } = await import("y-webrtc");
+          if (destroyed) return;
+
+          provider = new WebrtcProvider(roomName, ydoc, {
+            signaling: [
+              "wss://signaling.yjs.dev",
+              "wss://y-webrtc-signaling-eu.herokuapp.com",
+              "wss://y-webrtc-signaling-us.herokuapp.com"
+            ]
+          });
+          providerRef.current = provider;
+
+          // Fallback Timer: if no peer connection exists after 4 seconds, migrate to Supabase
+          setTimeout(() => {
+            if (destroyed) return;
+            const webrtcConnected = providerRef.current && 
+                                    (providerRef.current.room?.webrtcConns?.size > 0);
+
+            if (!webrtcConnected) {
+              console.log("[useYjsEditor] P2P WebRTC peer not found. Falling back to Supabase Realtime...");
+              if (providerRef.current && typeof providerRef.current.destroy === "function") {
+                providerRef.current.destroy();
+              }
+              const supabaseProvider = new YjsSupabaseProvider(roomName, ydoc);
+              providerRef.current = supabaseProvider;
+
+              if (editorRef.current && (ydoc as any)._MonacoBindingClass) {
+                const MonacoBinding = (ydoc as any)._MonacoBindingClass;
+                if (bindingRef.current) bindingRef.current.destroy();
+                bindingRef.current = new MonacoBinding(
+                  ydoc.getText("code"),
+                  editorRef.current.getModel(),
+                  new Set([editorRef.current]),
+                  supabaseProvider.awareness
+                );
+              }
+            }
+          }, 4000);
+
+        } catch (err) {
+          console.error("[useYjsEditor] Failed to load WebRTC, falling back to Supabase Realtime:", err);
+          if (destroyed) return;
+          provider = new YjsSupabaseProvider(roomName, ydoc);
+          providerRef.current = provider;
+        }
+      };
+
       if (enablePartyKit && host) {
         try {
           console.log(`[useYjsEditor] Initializing PartyKit sync for room: ${roomName}...`);
@@ -50,16 +100,11 @@ export function useYjsEditor(
           provider = new YPartyKitProvider(host, roomName, ydoc);
           providerRef.current = provider;
         } catch (err) {
-          console.error("[useYjsEditor] Failed to load PartyKit, falling back to Supabase Realtime:", err);
-          if (destroyed) return;
-          provider = new YjsSupabaseProvider(roomName, ydoc);
-          providerRef.current = provider;
+          console.error("[useYjsEditor] Failed to load PartyKit, falling back to WebRTC:", err);
+          await startWebrtcOrSupabase();
         }
       } else {
-        console.log(`[useYjsEditor] PartyKit not enabled or host missing. Initializing Supabase Realtime sync...`);
-        if (destroyed) return;
-        provider = new YjsSupabaseProvider(roomName, ydoc);
-        providerRef.current = provider;
+        await startWebrtcOrSupabase();
       }
 
       const ytext = ydoc.getText("code");
@@ -89,8 +134,8 @@ export function useYjsEditor(
         ytext.unobserve((ydoc as any)._observer);
       }
       bindingRef.current = null;
-      if (provider) {
-        provider.destroy();
+      if (providerRef.current && typeof providerRef.current.destroy === "function") {
+        providerRef.current.destroy();
       }
       ydoc.destroy();
       ydocRef.current = null;
@@ -107,6 +152,9 @@ export function useYjsEditor(
 
       // Dynamically import y-monaco (it references browser APIs)
       const { MonacoBinding } = await import("y-monaco");
+      if (ydocRef.current) {
+        (ydocRef.current as any)._MonacoBindingClass = MonacoBinding;
+      }
 
       // Clean up previous binding
       if (bindingRef.current) {
