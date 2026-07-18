@@ -39,9 +39,6 @@ export function useYjsEditor(
     let destroyed = false;
 
     const initProvider = async () => {
-      const host = process.env.NEXT_PUBLIC_PARTYKIT_HOST;
-      const enablePartyKit = process.env.NEXT_PUBLIC_ENABLE_PARTYKIT === "true";
-
       const startWebrtcOrSupabase = async () => {
         try {
           console.log(`[useYjsEditor] Initializing P2P WebRTC sync for room: ${roomName}...`);
@@ -92,20 +89,7 @@ export function useYjsEditor(
         }
       };
 
-      if (enablePartyKit && host) {
-        try {
-          console.log(`[useYjsEditor] Initializing PartyKit sync for room: ${roomName}...`);
-          const YPartyKitProvider = (await import("y-partykit/provider")).default;
-          if (destroyed) return;
-          provider = new YPartyKitProvider(host, roomName, ydoc);
-          providerRef.current = provider;
-        } catch (err) {
-          console.error("[useYjsEditor] Failed to load PartyKit, falling back to WebRTC:", err);
-          await startWebrtcOrSupabase();
-        }
-      } else {
-        await startWebrtcOrSupabase();
-      }
+      await startWebrtcOrSupabase();
 
       const ytext = ydoc.getText("code");
 

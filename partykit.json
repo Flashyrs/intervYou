@@ -1,6 +1,0 @@
-{
-  "$schema": "https://www.partykit.io/schema.json",
-  "name": "intervyou-sync-server",
-  "main": "party/server.ts",
-  "compatibilityDate": "2023-11-16"
-}
