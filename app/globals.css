@@ -70,11 +70,19 @@ body,
 }
 
 /* Primary CTA Button (bg-black text-white) -> inverted in dark mode for premium look */
-.dark .bg-black {
+.dark button.bg-black,
+.dark a.bg-black,
+.dark input[type="button"].bg-black,
+.dark input[type="submit"].bg-black,
+.dark .btn-primary {
   background-color: #ffffff !important;
   color: #000000 !important;
 }
-.dark .bg-black.text-white {
+.dark button.bg-black.text-white,
+.dark a.bg-black.text-white,
+.dark input[type="button"].bg-black.text-white,
+.dark input[type="submit"].bg-black.text-white,
+.dark .btn-primary.text-white {
   background-color: #ffffff !important;
   color: #000000 !important;
 }

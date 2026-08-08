@@ -21,6 +21,9 @@ export default function LiveKitVideoCall({
 
     async function getToken() {
       try {
+        if (!process.env.NEXT_PUBLIC_LIVEKIT_URL) {
+          throw new Error("NEXT_PUBLIC_LIVEKIT_URL is not set. Cannot establish LiveKit connection.");
+        }
         const username = `${role}_${Math.floor(Math.random() * 1000)}`;
         const res = await fetch(`/api/livekit/token?room=${room}&username=${username}`);
         if (!res.ok) {

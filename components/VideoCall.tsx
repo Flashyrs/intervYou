@@ -24,9 +24,8 @@ export default function VideoCall(props: {
   autoStart?: boolean;
 }) {
   const [useWebRtc, setUseWebRtc] = useState(false);
-  const enableLiveKit = process.env.NEXT_PUBLIC_ENABLE_LIVEKIT === "true" && !!process.env.NEXT_PUBLIC_LIVEKIT_URL;
 
-  if (enableLiveKit && !useWebRtc) {
+  if (!useWebRtc) {
     return <LiveKitVideoCall room={props.room} role={props.role} onFallback={() => setUseWebRtc(true)} />;
   }
 
@@ -180,7 +179,10 @@ function WebRtcVideoCall({
       });
 
       const pc = new RTCPeerConnection({
-        iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
+        iceServers: [
+          { urls: "stun:stun.l.google.com:19302" },
+          { urls: "stun:global.stun.twilio.com:3478" }
+        ],
         iceCandidatePoolSize: 10,
       });
 
@@ -416,7 +418,10 @@ function WebRtcVideoCall({
         try {
           if (payload.type === "screen-share-offer" && payload.from !== roleRef.current) {
             const pc = new RTCPeerConnection({
-              iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
+              iceServers: [
+                { urls: "stun:stun.l.google.com:19302" },
+                { urls: "stun:global.stun.twilio.com:3478" }
+              ],
               iceCandidatePoolSize: 10,
             });
 

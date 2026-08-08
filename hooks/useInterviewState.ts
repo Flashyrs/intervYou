@@ -42,6 +42,7 @@ export function useInterviewState(sessionId: string, initialRole: Role) {
     const broadcastTimeout = useRef<any>(null);
     const cursorBroadcastTimeout = useRef<any>(null);
     const pendingCursorRef = useRef<any>(null);
+    const lastCursorBroadcastTime = useRef<number>(0);
     const pendingPersistRef = useRef<any>({});
     const lastUpdateRef = useRef<number>(0);
     const lastLocalEditRef = useRef<number>(0);
@@ -398,10 +399,12 @@ export function useInterviewState(sessionId: string, initialRole: Role) {
 
     const broadcastCursor = (position: { lineNumber: number, column: number }) => {
         pendingCursorRef.current = position;
+        const now = Date.now();
+        const throttleInterval = 100; // Capped at 10 messages per second
         
-        if (cursorBroadcastTimeout.current) clearTimeout(cursorBroadcastTimeout.current);
+        const timeSinceLastBroadcast = now - lastCursorBroadcastTime.current;
         
-        cursorBroadcastTimeout.current = setTimeout(() => {
+        const sendBroadcast = () => {
             if (channelRef.current && channelReadyRef.current) {
                 const pos = pendingCursorRef.current;
                 channelRef.current.send({
@@ -412,8 +415,18 @@ export function useInterviewState(sessionId: string, initialRole: Role) {
                         cursor: { ...pos, userId, timestamp: Date.now() }
                     }
                 }).catch(() => { });
+                lastCursorBroadcastTime.current = Date.now();
             }
-        }, 400);
+        };
+
+        if (cursorBroadcastTimeout.current) clearTimeout(cursorBroadcastTimeout.current);
+
+        if (timeSinceLastBroadcast >= throttleInterval) {
+            sendBroadcast();
+        } else {
+            const delay = throttleInterval - timeSinceLastBroadcast;
+            cursorBroadcastTimeout.current = setTimeout(sendBroadcast, delay);
+        }
     };
 
     const broadcast = (data: any) => {

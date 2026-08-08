@@ -14,6 +14,10 @@ export async function executeCode(body: any) {
   if (enablePiston && pistonLang) {
     try {
       console.log(`[CodeExecutor] Routing execution to Piston (${pistonLang})...`);
+      
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 6000);
+
       const response = await fetch(`${pistonUrl}/execute`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -27,10 +31,23 @@ export async function executeCode(body: any) {
           ],
           stdin: stdin || "",
         }),
+        signal: controller.signal
       });
+
+      clearTimeout(timeoutId);
 
       if (response.ok) {
         const data = await response.json();
+        
+        // Handle compilation errors or invalid payloads as failure to route to Judge0
+        if (!data || data.error || !data.run) {
+          throw new Error("Invalid response payload from Piston endpoint");
+        }
+        
+        if (data.compile && data.compile.code !== 0 && data.compile.stderr) {
+          throw new Error(`Piston compiler error: ${data.compile.stderr}`);
+        }
+
         return {
           stdout: data.run?.stdout || "",
           stderr: data.run?.stderr || "",
@@ -39,10 +56,10 @@ export async function executeCode(body: any) {
           memory: null,
         };
       } else {
-        console.warn(`[CodeExecutor] Piston execution failed with status: ${response.status}. Falling back to Judge0.`);
+        throw new Error(`Piston execution failed with status ${response.status}`);
       }
     } catch (e: any) {
-      console.warn(`[CodeExecutor] Piston failed: ${e.message}. Falling back to Judge0.`);
+      console.warn(`[CodeExecutor] Piston execution failed: ${e.message || e}. Falling back to Judge0.`);
     }
   }
 

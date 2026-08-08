@@ -249,8 +249,8 @@ export function MatchmakingProvider({ children }: { children: React.ReactNode })
       {!isDashboard && incoming.length > 0 && !isInterviewing && (
         <div className="fixed bottom-6 right-6 z-[100] flex flex-col gap-3 max-w-sm">
           {incoming.map((req, i) => (
-            <div key={i} className="bg-white border rounded-lg shadow-xl overflow-hidden animate-in slide-in-from-right-4 fade-in duration-300">
-               <div className="bg-black px-4 py-3 flex items-center justify-between border-b border-gray-200">
+            <div key={i} className="bg-white dark:bg-zinc-900 border dark:border-zinc-800 rounded-lg shadow-xl overflow-hidden animate-in slide-in-from-right-4 fade-in duration-300">
+               <div className="bg-black dark:bg-zinc-950 px-4 py-3 flex items-center justify-between border-b border-gray-200 dark:border-zinc-800">
                   <span className="text-white font-medium text-sm flex items-center gap-2">
                      <Users className="w-4 h-4" /> Incoming Code Match
                   </span>
@@ -259,19 +259,19 @@ export function MatchmakingProvider({ children }: { children: React.ReactNode })
                   </button>
                </div>
                <div className="p-4 flex flex-col gap-3">
-                  <p className="text-sm font-medium text-gray-800 line-clamp-1">
+                  <p className="text-sm font-medium text-gray-800 dark:text-gray-200 line-clamp-1">
                      {req.name || req.initiatorId} is searching for a partner!
                   </p>
                   <div className="flex gap-2">
                      <button
                         onClick={() => acceptRandom(req)}
-                        className="flex-1 bg-black hover:bg-gray-800 text-white text-xs font-semibold py-2 rounded flex items-center justify-center gap-2 transition"
+                        className="flex-1 bg-black text-white dark:bg-white dark:text-black hover:bg-gray-800 dark:hover:bg-zinc-200 text-xs font-semibold py-2 rounded flex items-center justify-center gap-2 transition"
                      >
                         <PhoneCall className="w-3.5 h-3.5" /> Accept Match
                      </button>
                      <button
                         onClick={() => declineRandom(req.tempId)}
-                        className="px-3 border border-gray-300 hover:bg-gray-50 text-gray-800 text-xs font-semibold py-2 rounded transition"
+                        className="px-3 border border-gray-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 hover:bg-gray-50 dark:hover:bg-zinc-800 text-gray-800 dark:text-gray-300 text-xs font-semibold py-2 rounded transition"
                      >
                         Cancel
                      </button>

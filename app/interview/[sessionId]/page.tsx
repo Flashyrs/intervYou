@@ -400,15 +400,15 @@ function InterviewRoom({ sessionId, initialRole }: { sessionId: string; initialR
               <>
                 {/* Frozen State Overlay */}
                 {isFrozen && role === 'interviewee' && (
-                  <div className="absolute inset-0 z-50 bg-white/60 backdrop-blur-md flex items-center justify-center">
-                    <div className="bg-white p-8 rounded-2xl shadow-xl border border-indigo-100 text-center max-w-sm transform transition-all duration-300">
+                  <div className="absolute inset-0 z-50 bg-white/60 dark:bg-black/60 backdrop-blur-md flex items-center justify-center">
+                    <div className="bg-white dark:bg-zinc-900 p-8 rounded-2xl shadow-xl border border-indigo-100 dark:border-zinc-800 text-center max-w-sm transform transition-all duration-300">
                       <div className="mb-5 flex justify-center">
-                        <div className="p-4 bg-indigo-50 rounded-full animate-bounce">
-                          <CheckCircle2 className="w-10 h-10 text-indigo-600" />
+                        <div className="p-4 bg-indigo-50 dark:bg-zinc-800 rounded-full animate-bounce">
+                          <CheckCircle2 className="w-10 h-10 text-indigo-600 dark:text-zinc-100" />
                         </div>
                       </div>
-                      <h3 className="text-xl font-bold text-gray-900 mb-2">Session Paused</h3>
-                      <p className="text-sm text-gray-500 leading-relaxed">
+                      <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">Session Paused</h3>
+                      <p className="text-sm text-gray-500 dark:text-gray-450 leading-relaxed">
                         The interviewer is explaining a concept. Please wait for them to resume the session before typing.
                       </p>
                     </div>
