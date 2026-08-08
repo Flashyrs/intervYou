@@ -22,6 +22,26 @@ export default function SubmissionsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>("");
   const [show, setShow] = useState<Submission | null>(null);
+  const [loadingDetailsId, setLoadingDetailsId] = useState<string | null>(null);
+
+  const handleView = async (sub: Submission) => {
+    setLoadingDetailsId(sub.id);
+    setError("");
+    try {
+      const res = await fetch(`/api/submissions?id=${sub.id}`);
+      if (res.ok) {
+        const fullSub = await res.json();
+        setShow(fullSub);
+      } else {
+        setError("Failed to load submission details");
+      }
+    } catch (e) {
+      console.error(e);
+      setError("Failed to load submission details");
+    } finally {
+      setLoadingDetailsId(null);
+    }
+  };
 
   useEffect(() => {
     (async () => {
@@ -79,7 +99,13 @@ export default function SubmissionsPage() {
                   </td>
                   <td className="p-2 border-b">{fmtDate(s.updatedAt)}</td>
                   <td className="p-2 border-b">
-                    <button className="px-3 py-1 text-sm border rounded" onClick={() => setShow(s)}>View</button>
+                    <button
+                      className="px-3 py-1 text-sm border rounded disabled:opacity-50"
+                      onClick={() => handleView(s)}
+                      disabled={loadingDetailsId === s.id}
+                    >
+                      {loadingDetailsId === s.id ? "Loading..." : "View"}
+                    </button>
                   </td>
                 </tr>
               ))}

@@ -41,14 +41,10 @@ export async function GET(req: Request) {
                 endedAt: true,
                 inviteeName: true,
                 inviteeEmail: true,
+                interviewerNotes: true,
                 participants: { select: { name: true, email: true } },
             }
         });
-
-        const notesBySessionId = await getInterviewerNotesForSessions(
-            userId,
-            sessions.map((s) => s.id)
-        );
 
         const now = new Date();
         const upcoming: any[] = [];
@@ -72,13 +68,8 @@ export async function GET(req: Request) {
             const sessionWithCorrectName = {
                 ...s,
                 inviteeName: displayInviteeName,
-                interviewerNotes: s.createdBy === userId ? (notesBySessionId[s.id] || null) : null,
+                interviewerNotes: s.createdBy === userId ? s.interviewerNotes : null,
             };
-
-            if (sessions.indexOf(s) >= 10 && (isEnded || past.length >= 10)) {
-                // Hard limit 10 for display if needed, but let's process 15 and just slice at end if we want strict 10
-                // For now, let's just categorize all 15 fetched
-            }
 
             if (isEnded) {
                 past.push(sessionWithCorrectName);

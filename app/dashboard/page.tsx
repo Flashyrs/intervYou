@@ -18,6 +18,8 @@ export default function DashboardPage() {
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [loadingSubmissions, setLoadingSubmissions] = useState(false);
   const [selectedSubmissionCode, setSelectedSubmissionCode] = useState<string | null>(null);
+  const [loadedCode, setLoadedCode] = useState<Record<string, string>>({});
+  const [loadingCodeIds, setLoadingCodeIds] = useState<Record<string, boolean>>({});
   const [viewingSessionId, setViewingSessionId] = useState<string | null>(null);
 
   // State for expanded history sorting
@@ -107,6 +109,29 @@ export default function DashboardPage() {
       console.error(e);
     } finally {
       setLoadingSessionSubmissions(false);
+    }
+  };
+
+  const handleToggleCode = async (subId: string) => {
+    if (selectedSubmissionCode === subId) {
+      setSelectedSubmissionCode(null);
+      return;
+    }
+    
+    setSelectedSubmissionCode(subId);
+    if (!loadedCode[subId]) {
+      setLoadingCodeIds(prev => ({ ...prev, [subId]: true }));
+      try {
+        const res = await fetch(`/api/submissions?id=${subId}`);
+        if (res.ok) {
+          const data = await res.json();
+          setLoadedCode(prev => ({ ...prev, [subId]: data.code }));
+        }
+      } catch (err) {
+        console.error("Failed to load submission code", err);
+      } finally {
+        setLoadingCodeIds(prev => ({ ...prev, [subId]: false }));
+      }
     }
   };
 
@@ -258,7 +283,7 @@ export default function DashboardPage() {
             </div>
 
             <button
-              onClick={() => setSelectedSubmissionCode(selectedSubmissionCode === sub.id ? null : sub.id)}
+              onClick={() => handleToggleCode(sub.id)}
               className="flex items-center gap-2 px-3 py-1.5 border hover:bg-gray-50 rounded-md text-sm font-medium transition"
             >
               <Eye className="w-4 h-4" />
@@ -294,7 +319,7 @@ export default function DashboardPage() {
             <div className="mt-4 border-t pt-4">
               <div className="text-xs font-medium text-gray-500 mb-2 uppercase tracking-wide">Submitted Code</div>
               <pre className="bg-gray-900 text-gray-100 p-4 rounded-lg overflow-x-auto text-sm font-mono leading-relaxed">
-                <code>{sub.code}</code>
+                <code>{loadingCodeIds[sub.id] ? "Loading code..." : (loadedCode[sub.id] || "No code found")}</code>
               </pre>
             </div>
           )}

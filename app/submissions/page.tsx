@@ -21,7 +21,32 @@ export default function SubmissionsPage() {
     const [submissions, setSubmissions] = useState<Submission[]>([]);
     const [loading, setLoading] = useState(true);
     const [selectedCode, setSelectedCode] = useState<string | null>(null);
+    const [loadedCode, setLoadedCode] = useState<Record<string, string>>({});
+    const [loadingCodeIds, setLoadingCodeIds] = useState<Record<string, boolean>>({});
     const router = useRouter();
+
+    const handleToggleCode = async (subId: string) => {
+        if (selectedCode === subId) {
+            setSelectedCode(null);
+            return;
+        }
+        
+        setSelectedCode(subId);
+        if (!loadedCode[subId]) {
+            setLoadingCodeIds(prev => ({ ...prev, [subId]: true }));
+            try {
+                const res = await fetch(`/api/submissions?id=${subId}`);
+                if (res.ok) {
+                    const data = await res.json();
+                    setLoadedCode(prev => ({ ...prev, [subId]: data.code }));
+                }
+            } catch (err) {
+                console.error("Failed to load submission code", err);
+            } finally {
+                setLoadingCodeIds(prev => ({ ...prev, [subId]: false }));
+            }
+        }
+    };
 
     useEffect(() => {
         fetchSubmissions();
@@ -148,7 +173,7 @@ export default function SubmissionsPage() {
                                             </div>
 
                                             <button
-                                                onClick={() => setSelectedCode(selectedCode === submission.id ? null : submission.id)}
+                                                onClick={() => handleToggleCode(submission.id)}
                                                 className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 rounded text-sm font-medium transition"
                                             >
                                                 <Eye className="w-4 h-4" />
@@ -186,7 +211,7 @@ export default function SubmissionsPage() {
                                             <div className="mt-4 border-t pt-4">
                                                 <div className="text-sm font-medium text-gray-700 mb-2">Submitted Code:</div>
                                                 <pre className="bg-gray-900 text-gray-100 p-4 rounded-lg overflow-x-auto text-sm">
-                                                    <code>{submission.code}</code>
+                                                    <code>{loadingCodeIds[submission.id] ? "Loading code..." : (loadedCode[submission.id] || "No code found")}</code>
                                                 </pre>
                                             </div>
                                         )}

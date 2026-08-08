@@ -13,7 +13,55 @@ export async function GET(req: Request) {
     const session = await requireAuth();
     const userId = (session.user as any)?.id as string;
     const { searchParams } = new URL(req.url);
+    const filterId = searchParams.get("id");
     const filterSessionId = searchParams.get("sessionId");
+
+    if (filterId) {
+      const submission = await prisma.submission.findUnique({
+        where: { id: filterId },
+        include: {
+          testResults: true,
+          session: {
+            select: {
+              id: true,
+              createdAt: true,
+              createdBy: true,
+              participants: {
+                select: { id: true, name: true, email: true }
+              }
+            }
+          },
+          user: {
+            select: { id: true, name: true, email: true }
+          }
+        }
+      });
+      if (!submission) return NextResponse.json({ error: "Submission not found" }, { status: 404 });
+
+      const isOwner = submission.userId === userId;
+      const isParticipant = submission.session.participants.some(p => p.id === userId);
+      if (!isOwner && !isParticipant) return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+
+      let interviewerNotes: string | null = null;
+      if (submission.session.createdBy === userId) {
+        const notesMap = await getInterviewerNotesForSessions(userId, [submission.sessionId]);
+        interviewerNotes = notesMap[submission.sessionId] || null;
+      }
+
+      const payload = {
+        ...submission,
+        results: JSON.stringify(submission.testResults.map((tr: any) => ({
+          pass: tr.passed,
+          got: tr.actualOutput,
+          exp: tr.expectedOutput,
+          error: tr.error,
+          time: tr.time,
+          memory: tr.memory,
+        }))),
+        interviewerNotes,
+      };
+      return NextResponse.json(payload, { status: 200 });
+    }
 
     let where: any = { userId };
 
@@ -37,8 +85,24 @@ export async function GET(req: Request) {
       where,
       orderBy: { updatedAt: "desc" },
       take: 50,
-      include: {
-        testResults: true,
+      select: {
+        id: true,
+        sessionId: true,
+        problemId: true,
+        userId: true,
+        language: true,
+        passed: true,
+        attempts: true,
+        time: true,
+        memory: true,
+        problemText: true,
+        createdAt: true,
+        updatedAt: true,
+        testResults: {
+          select: {
+            passed: true
+          }
+        },
         session: {
           select: {
             id: true,
@@ -61,14 +125,9 @@ export async function GET(req: Request) {
 
     const payload = rows.map((row: any) => ({
       ...row,
-      // Backwards compat: reconstruct a "results" JSON string from testResults for consuming clients
+      // Backwards compat: reconstruct a lightweight "results" JSON string
       results: JSON.stringify(row.testResults.map((tr: any) => ({
         pass: tr.passed,
-        got: tr.actualOutput,
-        exp: tr.expectedOutput,
-        error: tr.error,
-        time: tr.time,
-        memory: tr.memory,
       }))),
       interviewerNotes: row.session?.createdBy === userId ? (notesBySessionId[row.sessionId] || null) : null,
     }));
