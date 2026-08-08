@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireAuth } from "@/lib/utils";
 import { prisma } from "@/lib/db";
-import { getInterviewerNotesForSessions } from "@/lib/interviewStateStore";
 
 const EXEMPT_EMAILS = new Set([
   process.env.EXEMPT_EMAIL1 || "",
@@ -26,6 +25,7 @@ export async function GET(req: Request) {
               id: true,
               createdAt: true,
               createdBy: true,
+              interviewerNotes: true,
               participants: {
                 select: { id: true, name: true, email: true }
               }
@@ -42,11 +42,7 @@ export async function GET(req: Request) {
       const isParticipant = submission.session.participants.some(p => p.id === userId);
       if (!isOwner && !isParticipant) return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
 
-      let interviewerNotes: string | null = null;
-      if (submission.session.createdBy === userId) {
-        const notesMap = await getInterviewerNotesForSessions(userId, [submission.sessionId]);
-        interviewerNotes = notesMap[submission.sessionId] || null;
-      }
+      const interviewerNotes = submission.session.createdBy === userId ? (submission.session.interviewerNotes || null) : null;
 
       const payload = {
         ...submission,
@@ -108,6 +104,7 @@ export async function GET(req: Request) {
             id: true,
             createdAt: true,
             createdBy: true,
+            interviewerNotes: true,
             participants: {
               select: { id: true, name: true, email: true }
             }
@@ -118,10 +115,6 @@ export async function GET(req: Request) {
         }
       }
     });
-    const notesBySessionId = await getInterviewerNotesForSessions(
-      userId,
-      rows.map((row) => row.sessionId)
-    );
 
     const payload = rows.map((row: any) => ({
       ...row,
@@ -129,7 +122,7 @@ export async function GET(req: Request) {
       results: JSON.stringify(row.testResults.map((tr: any) => ({
         pass: tr.passed,
       }))),
-      interviewerNotes: row.session?.createdBy === userId ? (notesBySessionId[row.sessionId] || null) : null,
+      interviewerNotes: row.session?.createdBy === userId ? (row.session?.interviewerNotes || null) : null,
     }));
 
     return NextResponse.json(payload, { status: 200 });
