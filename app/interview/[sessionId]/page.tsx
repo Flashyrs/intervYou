@@ -282,18 +282,18 @@ function InterviewRoom({ sessionId, initialRole }: { sessionId: string; initialR
   }, [remoteCursors, sessionId]);
 
   return (
-    <div className="flex flex-col h-screen w-screen bg-[#f3f4f6] overflow-hidden selection:bg-indigo-100 selection:text-indigo-900 font-sans">
+    <div className={`flex flex-col h-screen w-screen transition-colors duration-200 overflow-hidden font-sans ${isDarkMode ? 'bg-zinc-950 text-zinc-150 selection:bg-zinc-800 selection:text-zinc-200' : 'bg-[#f3f4f6] selection:bg-indigo-100 selection:text-indigo-900'}`}>
       
       {showAuthModal && (
         <AuthModal onClose={() => setShowAuthModal(false)} />
       )}
 
       {/* Top Navigation / Global Header */}
-      <header className="shrink-0 h-[60px] bg-white border-b border-gray-200 px-4 flex items-center justify-between shadow-sm relative z-20">
+      <header className={`shrink-0 h-[60px] border-b px-4 flex items-center justify-between shadow-sm relative z-20 transition-colors duration-200 ${isDarkMode ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-gray-200'}`}>
         <div className="flex items-center gap-3">
           <div className="hidden sm:block">
-            <h1 className="text-sm font-bold text-gray-900 leading-tight">IntervYou</h1>
-            <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">{role}</p>
+            <h1 className={`text-sm font-bold leading-tight ${isDarkMode ? 'text-zinc-250' : 'text-gray-900'}`}>IntervYou</h1>
+            <p className={`text-[10px] font-semibold uppercase tracking-widest ${isDarkMode ? 'text-zinc-550' : 'text-gray-400'}`}>{role}</p>
           </div>
         </div>
 
@@ -323,9 +323,9 @@ function InterviewRoom({ sessionId, initialRole }: { sessionId: string; initialR
       <main className="flex-1 flex flex-col md:flex-row overflow-hidden p-2.5 gap-2.5">
         
         {/* Left Pane: Problem Definition & Tests (25%) */}
-        <aside className="w-full md:w-[25%] flex flex-col bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-          <div className="px-4 py-3 border-b border-gray-100 bg-gray-50/80">
-            <h2 className="text-[11px] font-bold text-gray-500 uppercase tracking-wider flex items-center gap-2">
+        <aside className={`w-full md:w-[25%] flex flex-col rounded-xl shadow-sm border overflow-hidden transition-colors duration-200 ${isDarkMode ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-gray-200'}`}>
+          <div className={`px-4 py-3 border-b ${isDarkMode ? 'border-zinc-800/80 bg-zinc-900/50' : 'border-gray-100 bg-gray-50/80'}`}>
+            <h2 className={`text-[11px] font-bold uppercase tracking-wider flex items-center gap-2 ${isDarkMode ? 'text-zinc-400' : 'text-gray-500'}`}>
               <span className="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
               Problem Details
             </h2>
@@ -355,15 +355,19 @@ function InterviewRoom({ sessionId, initialRole }: { sessionId: string; initialR
         </aside>
 
         {/* Center Pane: Solution Editor (50%) */}
-        <section className="w-full md:w-[50%] flex flex-col bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden relative group">
-          <div className="px-4 py-3 border-b border-gray-100 bg-gray-50/80 flex justify-between items-center">
+        <section className={`w-full md:w-[50%] flex flex-col rounded-xl shadow-sm border overflow-hidden relative group transition-colors duration-200 ${isDarkMode ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-gray-200'}`}>
+          <div className={`px-4 py-3 border-b flex justify-between items-center ${isDarkMode ? 'border-zinc-800 bg-zinc-900/50' : 'border-gray-100 bg-gray-50/80'}`}>
             <div className="flex items-center gap-2">
               <button
                 type="button"
                 className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition ${
                   workspaceMode === "editor"
-                    ? "bg-white text-gray-900 shadow-sm border border-gray-200"
-                    : "text-gray-500 hover:text-gray-700"
+                    ? isDarkMode
+                      ? "bg-zinc-800 text-zinc-100 shadow-sm border border-zinc-700"
+                      : "bg-white text-gray-900 shadow-sm border border-gray-200"
+                    : isDarkMode
+                      ? "text-zinc-400 hover:text-zinc-200"
+                      : "text-gray-500 hover:text-gray-700"
                 }`}
                 onClick={() => updateWorkspaceMode("editor")}
               >
@@ -374,8 +378,12 @@ function InterviewRoom({ sessionId, initialRole }: { sessionId: string; initialR
                 type="button"
                 className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition ${
                   workspaceMode === "whiteboard"
-                    ? "bg-white text-gray-900 shadow-sm border border-gray-200"
-                    : "text-gray-500 hover:text-gray-700"
+                    ? isDarkMode
+                      ? "bg-zinc-800 text-zinc-100 shadow-sm border border-zinc-700"
+                      : "bg-white text-gray-900 shadow-sm border border-gray-200"
+                    : isDarkMode
+                      ? "text-zinc-400 hover:text-zinc-200"
+                      : "text-gray-500 hover:text-gray-700"
                 }`}
                 onClick={() => updateWorkspaceMode("whiteboard")}
               >
@@ -384,7 +392,7 @@ function InterviewRoom({ sessionId, initialRole }: { sessionId: string; initialR
               </button>
             </div>
             <div className="flex items-center gap-2">
-              <h2 className="text-[11px] font-bold text-gray-500 uppercase tracking-wider flex items-center gap-2">
+              <h2 className={`text-[11px] font-bold uppercase tracking-wider flex items-center gap-2 ${isDarkMode ? 'text-zinc-400' : 'text-gray-500'}`}>
                 <span className={`w-1.5 h-1.5 rounded-full ${workspaceMode === "editor" ? "bg-emerald-500" : "bg-orange-500"}`}></span>
                 {workspaceMode === "editor" ? "Code Editor" : "Shared Whiteboard"}
               </h2>
@@ -408,7 +416,7 @@ function InterviewRoom({ sessionId, initialRole }: { sessionId: string; initialR
                         </div>
                       </div>
                       <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">Session Paused</h3>
-                      <p className="text-sm text-gray-500 dark:text-gray-450 leading-relaxed">
+                      <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed">
                         The interviewer is explaining a concept. Please wait for them to resume the session before typing.
                       </p>
                     </div>
@@ -472,9 +480,9 @@ function InterviewRoom({ sessionId, initialRole }: { sessionId: string; initialR
           </div>
 
           {/* Execution Output Panel */}
-          <div className="flex-1 bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden flex flex-col">
-            <div className="px-4 py-3 border-b border-gray-100 bg-gray-50/80 flex justify-between items-center">
-              <h2 className="text-[11px] font-bold text-gray-500 uppercase tracking-wider flex items-center gap-2">
+          <div className={`flex-1 rounded-xl shadow-sm border overflow-hidden flex flex-col transition-colors duration-200 ${isDarkMode ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-gray-200'}`}>
+            <div className={`px-4 py-3 border-b flex justify-between items-center ${isDarkMode ? 'border-zinc-800 bg-zinc-900/50' : 'border-gray-100 bg-gray-50/80'}`}>
+              <h2 className={`text-[11px] font-bold uppercase tracking-wider flex items-center gap-2 ${isDarkMode ? 'text-zinc-400' : 'text-gray-500'}`}>
                 <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
                 Console Output
               </h2>

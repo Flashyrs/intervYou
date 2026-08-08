@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { Role } from "@/lib/types";
 import { buildHarness, prettyResult } from "@/lib/interviewUtils";
 import { Sparkles, Play, Lock, FileText, Code2, Layers, AlertCircle, Plus, Trash2 } from "lucide-react";
+import { useTheme } from "@/components/ThemeProvider";
 
 interface TestPanelProps {
     sampleTests: string;
@@ -44,6 +45,7 @@ export function TestPanel({
     interviewerNotes,
     setInterviewerNotes
 }: TestPanelProps) {
+    const { isDarkMode } = useTheme();
     const [enhancing, setEnhancing] = useState(false);
     const [activeTab, setActiveTab] = useState<'problem' | 'tests' | 'notes'>('problem');
     const enhanceInFlightRef = useRef(false);
@@ -103,26 +105,38 @@ export function TestPanel({
     };
 
     return (
-        <div className="flex flex-col h-full bg-white select-none">
+        <div className={`flex flex-col h-full select-none transition-colors duration-200 ${isDarkMode ? 'bg-zinc-900 text-zinc-100' : 'bg-white'}`}>
             {/* Header / Tabs */}
-            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 shrink-0">
+            <div className={`flex items-center justify-between px-4 py-3 border-b shrink-0 ${isDarkMode ? 'border-zinc-800' : 'border-gray-100'}`}>
                 <div className="flex gap-4">
                     <button
                         onClick={() => setActiveTab('problem')}
-                        className={`text-sm font-medium transition-colors ${activeTab === 'problem' ? 'text-gray-900' : 'text-gray-400 hover:text-gray-600'}`}
+                        className={`text-sm font-medium transition-colors ${
+                            activeTab === 'problem' 
+                                ? isDarkMode ? 'text-zinc-100' : 'text-gray-900' 
+                                : isDarkMode ? 'text-zinc-500 hover:text-zinc-400' : 'text-gray-400 hover:text-gray-600'
+                        }`}
                     >
                         Problem
                     </button>
                     <button
                         onClick={() => setActiveTab('tests')}
-                        className={`text-sm font-medium transition-colors ${activeTab === 'tests' ? 'text-gray-900' : 'text-gray-400 hover:text-gray-600'}`}
+                        className={`text-sm font-medium transition-colors ${
+                            activeTab === 'tests' 
+                                ? isDarkMode ? 'text-zinc-100' : 'text-gray-900' 
+                                : isDarkMode ? 'text-zinc-500 hover:text-zinc-400' : 'text-gray-400 hover:text-gray-600'
+                        }`}
                     >
                         Test Cases
                     </button>
                     {role === "interviewer" && (
                         <button
                             onClick={() => setActiveTab('notes')}
-                            className={`text-sm font-medium transition-colors ${activeTab === 'notes' ? 'text-gray-900' : 'text-gray-400 hover:text-gray-600'}`}
+                            className={`text-sm font-medium transition-colors ${
+                                activeTab === 'notes' 
+                                    ? isDarkMode ? 'text-zinc-100' : 'text-gray-900' 
+                                    : isDarkMode ? 'text-zinc-500 hover:text-zinc-400' : 'text-gray-400 hover:text-gray-600'
+                            }`}
                         >
                             Notes
                         </button>
@@ -133,7 +147,11 @@ export function TestPanel({
                     <button
                         onClick={enhanceWithAI}
                         disabled={enhancing || !problemText}
-                        className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 text-indigo-600 rounded-md text-xs font-medium hover:bg-indigo-100 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition disabled:opacity-50 disabled:cursor-not-allowed ${
+                            isDarkMode 
+                                ? 'bg-indigo-950/45 text-indigo-400 hover:bg-indigo-950' 
+                                : 'bg-indigo-50 text-indigo-600 hover:bg-indigo-100'
+                        }`}
                     >
                         <Sparkles className="w-3 h-3" />
                         {enhancing ? "Enhancing..." : "Auto-Enhance"}
@@ -148,20 +166,20 @@ export function TestPanel({
                         {role === "interviewer" ? (
                             <div className="flex flex-col h-full space-y-4 animate-in fade-in duration-300">
                                 <input
-                                    className="w-full text-2xl font-bold placeholder-gray-300 border-none focus:ring-0 p-0 text-gray-900 bg-transparent"
+                                    className={`w-full text-2xl font-bold border-none focus:ring-0 p-0 bg-transparent ${isDarkMode ? 'text-zinc-100 placeholder-zinc-700' : 'text-gray-900 placeholder-gray-300'}`}
                                     placeholder="Problem Title"
                                     value={problemTitle || ""}
                                     onChange={(e) => setProblemTitle?.(e.target.value)}
                                 />
                                 <div className="relative group flex-1 min-h-0 flex flex-col">
                                     <textarea
-                                        className="w-full flex-1 resize-none border-none focus:ring-0 p-0 text-gray-600 text-base leading-relaxed bg-transparent placeholder-gray-300"
+                                        className={`w-full flex-1 resize-none border-none focus:ring-0 p-0 text-base leading-relaxed bg-transparent ${isDarkMode ? 'text-zinc-350 placeholder-zinc-700' : 'text-gray-600 placeholder-gray-300'}`}
                                         placeholder="Paste the problem description here..."
                                         value={problemText}
                                         onChange={(e) => setProblemText(e.target.value)}
                                     />
                                     {!problemText && (
-                                        <div className="absolute top-0 left-0 pointer-events-none text-gray-300">
+                                        <div className={`absolute top-0 left-0 pointer-events-none ${isDarkMode ? 'text-zinc-700' : 'text-gray-300'}`}>
                                             <p>Example:</p>
                                             <p className="mt-2">Given an array of integers...</p>
                                         </div>
@@ -170,8 +188,8 @@ export function TestPanel({
                             </div>
                         ) : (
                             <div className="prose prose-sm max-w-none">
-                                <h1 className="text-xl font-bold text-gray-900 mb-4">{problemTitle || "Problem"}</h1>
-                                <div className="whitespace-pre-wrap text-gray-700 leading-relaxed font-sans">
+                                <h1 className={`text-xl font-bold mb-4 ${isDarkMode ? 'text-zinc-100' : 'text-gray-900'}`}>{problemTitle || "Problem"}</h1>
+                                <div className={`whitespace-pre-wrap leading-relaxed font-sans ${isDarkMode ? 'text-zinc-300' : 'text-gray-700'}`}>
                                     {problemText || "Waiting for problem description..."}
                                 </div>
                             </div>
@@ -182,7 +200,7 @@ export function TestPanel({
                         {/* Sample Tests Section */}
                         <section>
                             <div className="flex items-center justify-between mb-3">
-                                <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-2">
+                                <h3 className={`text-xs font-semibold uppercase tracking-wider flex items-center gap-2 ${isDarkMode ? 'text-zinc-400' : 'text-gray-500'}`}>
                                     <Code2 className="w-3 h-3" />
                                     Sample Tests (Visible)
                                 </h3>
@@ -198,14 +216,14 @@ export function TestPanel({
 
                         {/* Private Tests Section (Interviewer Only) */}
                         {role === "interviewer" && (
-                            <section className="pt-4 border-t border-gray-100">
+                            <section className={`pt-4 border-t ${isDarkMode ? 'border-zinc-800' : 'border-gray-105'}`}>
                                 <div className="flex items-center justify-between mb-3">
-                                    <h3 className="text-xs font-semibold text-indigo-600 uppercase tracking-wider flex items-center gap-2">
+                                    <h3 className={`text-xs font-semibold uppercase tracking-wider flex items-center gap-2 ${isDarkMode ? 'text-indigo-400' : 'text-indigo-600'}`}>
                                         <Lock className="w-3 h-3" />
                                         Private Tests (Hidden)
                                     </h3>
                                 </div>
-                                <div className="bg-indigo-50/50 rounded-lg p-1">
+                                <div className={`rounded-lg p-1 ${isDarkMode ? 'bg-zinc-950/20' : 'bg-indigo-50/50'}`}>
                                     <TestCaseEditor
                                         json={privateTests}
                                         onChange={setPrivateTests}
@@ -218,13 +236,17 @@ export function TestPanel({
                     <div className="h-full overflow-y-auto p-6 animate-in fade-in duration-300">
                         <div className="space-y-3 h-full flex flex-col">
                             <div>
-                                <h3 className="text-sm font-semibold text-gray-900">Private Interviewer Notes</h3>
-                                <p className="text-xs text-gray-500 mt-1">
+                                <h3 className={`text-sm font-semibold ${isDarkMode ? 'text-zinc-200' : 'text-gray-900'}`}>Private Interviewer Notes</h3>
+                                <p className={`text-xs mt-1 ${isDarkMode ? 'text-zinc-500' : 'text-gray-500'}`}>
                                     Saved privately for grading, feedback, and decision history. These notes are never shown to the interviewee.
                                 </p>
                             </div>
                             <textarea
-                                className="flex-1 min-h-[320px] w-full resize-none rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-700 outline-none transition focus:border-indigo-300 focus:bg-white focus:ring-2 focus:ring-indigo-100"
+                                className={`flex-1 min-h-[320px] w-full resize-none rounded-lg border px-4 py-3 text-sm outline-none transition ${
+                                    isDarkMode 
+                                        ? 'bg-zinc-950 border-zinc-800 text-zinc-300 focus:border-zinc-700 focus:ring-zinc-800' 
+                                        : 'bg-gray-50 border-gray-200 text-gray-700 focus:border-indigo-300 focus:bg-white focus:ring-2 focus:ring-indigo-100'
+                                }`}
                                 placeholder="Capture observations, communication signals, approach, tradeoffs, and follow-up grading notes..."
                                 value={interviewerNotes}
                                 onChange={(e) => setInterviewerNotes(e.target.value)}
@@ -238,32 +260,33 @@ export function TestPanel({
 }
 
 function TestsRenderer({ json, editable, onChange }: { json: string, editable: boolean, onChange: (v: string) => void }) {
+    const { isDarkMode } = useTheme();
     try {
         const tests = JSON.parse(json || "[]");
         if (!Array.isArray(tests) || tests.length === 0) {
-            return <div className="text-sm text-gray-400 italic text-center py-4 bg-gray-50 rounded-lg border border-dashed border-gray-200">No test cases defined</div>;
+            return <div className={`text-sm italic text-center py-4 rounded-lg border border-dashed ${isDarkMode ? 'bg-zinc-950 border-zinc-800 text-zinc-500' : 'bg-gray-50 border-gray-200 text-gray-400'}`}>No test cases defined</div>;
         }
 
         return (
             <div className="space-y-3">
                 {tests.map((t: any, i: number) => (
-                    <div key={i} className="group relative bg-gray-50 rounded-md p-3 border border-gray-100 hover:border-gray-200 transition-colors">
+                    <div key={i} className={`group relative rounded-md p-3 border transition-colors ${isDarkMode ? 'bg-zinc-950 border-zinc-800/80 hover:border-zinc-700' : 'bg-gray-50 border-gray-100 hover:border-gray-200'}`}>
                         <div className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm font-mono">
-                            <span className="text-gray-400 text-xs uppercase tracking-wide py-0.5">Input</span>
-                            <div className="text-gray-800 break-all">{JSON.stringify(t.input)}</div>
+                            <span className={`text-xs uppercase tracking-wide py-0.5 ${isDarkMode ? 'text-zinc-550' : 'text-gray-400'}`}>Input</span>
+                            <div className={`break-all ${isDarkMode ? 'text-zinc-300' : 'text-gray-800'}`}>{JSON.stringify(t.input)}</div>
 
-                            <span className="text-gray-400 text-xs uppercase tracking-wide py-0.5">Expect</span>
-                            <div className="text-gray-800 break-all">{JSON.stringify(t.output)}</div>
+                            <span className={`text-xs uppercase tracking-wide py-0.5 ${isDarkMode ? 'text-zinc-550' : 'text-gray-400'}`}>Expect</span>
+                            <div className={`break-all ${isDarkMode ? 'text-zinc-300' : 'text-gray-800'}`}>{JSON.stringify(t.output)}</div>
                         </div>
                     </div>
                 ))}
                 {editable && (
                     <details className="mt-2">
-                        <summary className="text-xs text-gray-400 hover:text-gray-600 cursor-pointer list-none flex items-center gap-1">
+                        <summary className={`text-xs cursor-pointer list-none flex items-center gap-1 ${isDarkMode ? 'text-zinc-500 hover:text-zinc-400' : 'text-gray-400 hover:text-gray-600'}`}>
                             <Code2 className="w-3 h-3" /> Edit Raw JSON
                         </summary>
                         <textarea
-                            className="w-full mt-2 h-32 font-mono text-xs border rounded-md p-2 bg-gray-900 text-gray-100"
+                            className={`w-full mt-2 h-32 font-mono text-xs border rounded-md p-2 outline-none ${isDarkMode ? 'bg-zinc-950 border-zinc-800 text-zinc-200' : 'bg-gray-900 text-gray-100'}`}
                             value={json}
                             onChange={e => onChange(e.target.value)}
                         />
@@ -272,11 +295,12 @@ function TestsRenderer({ json, editable, onChange }: { json: string, editable: b
             </div>
         );
     } catch {
-        return <div className="text-red-500 text-sm bg-red-50 p-2 rounded">Invalid JSON Format</div>;
+        return <div className={`text-sm p-2 rounded ${isDarkMode ? 'bg-red-950/20 text-red-400 border border-red-900/30' : 'bg-red-50 text-red-500'}`}>Invalid JSON Format</div>;
     }
 }
 
 function TestCaseEditor({ json, onChange }: { json: string; onChange: (v: string) => void }) {
+    const { isDarkMode } = useTheme();
     const [cases, setCases] = useState<any[]>([]);
     const [error, setError] = useState("");
 
@@ -314,14 +338,14 @@ function TestCaseEditor({ json, onChange }: { json: string; onChange: (v: string
         onChange(JSON.stringify(newCases, null, 2));
     };
 
-    if (error) return <div className="text-red-500 text-xs">{error}</div>;
+    if (error) return <div className={`text-xs ${isDarkMode ? 'text-red-400' : 'text-red-500'}`}>{error}</div>;
 
     return (
         <div className="space-y-3">
             {cases.map((c, i) => (
-                <div key={i} className="bg-white rounded border border-indigo-100 p-3 shadow-sm">
+                <div key={i} className={`rounded border p-3 shadow-sm ${isDarkMode ? 'bg-zinc-900 border-zinc-800 text-zinc-300' : 'bg-white border-indigo-100'}`}>
                     <div className="flex items-center justify-between mb-2">
-                        <span className="text-xs font-bold text-indigo-900/50 uppercase tracking-wider">Test Case {i + 1}</span>
+                        <span className={`text-xs font-bold uppercase tracking-wider ${isDarkMode ? 'text-zinc-500' : 'text-indigo-900/50'}`}>Test Case {i + 1}</span>
                         <button onClick={() => removeCase(i)} className="text-gray-400 hover:text-red-500 transition-colors">
                             <Trash2 className="w-3 h-3" />
                         </button>
@@ -329,7 +353,11 @@ function TestCaseEditor({ json, onChange }: { json: string; onChange: (v: string
                     <div className="space-y-2">
                         <div>
                             <input
-                                className="w-full bg-gray-50 border-transparent focus:bg-white focus:border-indigo-200 rounded px-2 py-1 text-xs font-mono transition-all"
+                                className={`w-full border-transparent rounded px-2 py-1 text-xs font-mono transition-all ${
+                                    isDarkMode 
+                                        ? 'bg-zinc-950 text-zinc-200 focus:bg-zinc-950 focus:border-zinc-700 focus:ring-0' 
+                                        : 'bg-gray-50 border-transparent focus:bg-white focus:border-indigo-200 focus:ring-0'
+                                }`}
                                 placeholder="Input (JSON)"
                                 value={typeof c.input === 'string' ? c.input : JSON.stringify(c.input)}
                                 onChange={(e) => updateCase(i, 'input', e.target.value)}
@@ -337,7 +365,11 @@ function TestCaseEditor({ json, onChange }: { json: string; onChange: (v: string
                         </div>
                         <div>
                             <input
-                                className="w-full bg-gray-50 border-transparent focus:bg-white focus:border-indigo-200 rounded px-2 py-1 text-xs font-mono transition-all"
+                                className={`w-full border-transparent rounded px-2 py-1 text-xs font-mono transition-all ${
+                                    isDarkMode 
+                                        ? 'bg-zinc-950 text-zinc-200 focus:bg-zinc-950 focus:border-zinc-700 focus:ring-0' 
+                                        : 'bg-gray-50 border-transparent focus:bg-white focus:border-indigo-200 focus:ring-0'
+                                }`}
                                 placeholder="Expected Output (JSON)"
                                 value={typeof c.output === 'string' ? c.output : JSON.stringify(c.output)}
                                 onChange={(e) => updateCase(i, 'output', e.target.value)}
@@ -348,7 +380,11 @@ function TestCaseEditor({ json, onChange }: { json: string; onChange: (v: string
             ))}
             <button
                 onClick={addCase}
-                className="w-full py-2 flex items-center justify-center gap-2 text-xs font-medium text-indigo-600 border border-dashed border-indigo-200 rounded-md hover:bg-indigo-50 hover:border-indigo-300 transition-all"
+                className={`w-full py-2 flex items-center justify-center gap-2 text-xs font-medium border border-dashed rounded-md transition-all ${
+                    isDarkMode 
+                        ? 'text-indigo-400 border-zinc-800 hover:bg-zinc-900/50 hover:border-zinc-700' 
+                        : 'text-indigo-600 border-indigo-200 hover:bg-indigo-50 hover:border-indigo-300'
+                }`}
             >
                 <Plus className="w-3 h-3" />
                 Add Hidden Case

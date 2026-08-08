@@ -309,9 +309,9 @@ export default function DashboardPage() {
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white dark:bg-zinc-900 border dark:border-zinc-800 rounded-lg p-6 max-w-md w-full shadow-xl max-h-[80vh] overflow-y-auto space-y-4 text-gray-900 dark:text-gray-150">
             <h2 className="text-xl font-semibold mb-2 text-gray-900 dark:text-white">Random Interview Requests</h2>
-            <p className="text-gray-500 dark:text-gray-450 mb-4 text-sm">Multiple users are looking for an interviewer. Accepting one will automatically decline the rest.</p>
+            <p className="text-gray-500 dark:text-gray-400 mb-4 text-sm">Multiple users are looking for an interviewer. Accepting one will automatically decline the rest.</p>
             {incoming.map((invite) => (
-              <div key={invite.tempId} className="border border-gray-200 dark:border-zinc-700 rounded-lg p-4 bg-gray-50 dark:bg-zinc-805 shadow-sm">
+              <div key={invite.tempId} className="border border-gray-200 dark:border-zinc-700 rounded-lg p-4 bg-gray-50 dark:bg-zinc-800 shadow-sm">
                 <p className="text-gray-800 dark:text-gray-200 font-medium mb-3">
                   {invite.name || "A user"} <span className="font-normal text-gray-500 dark:text-gray-400">is looking for an interviewer.</span>
                 </p>
@@ -323,7 +323,7 @@ export default function DashboardPage() {
                     Accept
                   </button>
                   <button
-                    className="flex-1 px-4 py-2 border border-gray-300 dark:border-zinc-700 rounded bg-white dark:bg-zinc-900 hover:bg-gray-50 dark:hover:bg-zinc-800 transition text-sm font-medium text-gray-700 dark:text-gray-305"
+                    className="flex-1 px-4 py-2 border border-gray-300 dark:border-zinc-700 rounded bg-white dark:bg-zinc-900 hover:bg-gray-50 dark:hover:bg-zinc-800 transition text-sm font-medium text-gray-700 dark:text-gray-300"
                     onClick={() => declineRandom(invite.tempId)}
                   >
                     Decline

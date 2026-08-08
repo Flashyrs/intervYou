@@ -194,6 +194,12 @@ export function MatchmakingProvider({ children }: { children: React.ReactNode })
 
   const acceptRandom = async (invite: any) => {
     if (!invite.tempId || acceptingRef.current.has(invite.tempId)) return;
+    
+    if (!channelRef.current) {
+      push({ message: "Matchmaking channel is not connected. Please try again.", type: "error" });
+      return;
+    }
+    
     acceptingRef.current.add(invite.tempId);
 
     try {
@@ -213,18 +219,13 @@ export function MatchmakingProvider({ children }: { children: React.ReactNode })
       }
 
       const sessionId = data.sessionId;
-      if (!lobbyReady) {
-        push({ message: "Matchmaking channel is reconnecting. Please try accepting again.", type: "error" });
-        return;
-      }
       
-      channelRef.current?.send({
+      channelRef.current.send({
         type: "broadcast",
         event: "lobby",
         payload: { type: "random-accept", from: "interviewer", tempId: invite.tempId, sessionId },
-      }).catch(() => {
-        push({ message: "Failed to confirm match", type: "error" });
-        return;
+      }).catch((err: any) => {
+        console.error("Failed to broadcast accept match confirmation:", err);
       });
       
       setIncoming([]); // Clear all

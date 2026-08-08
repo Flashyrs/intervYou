@@ -168,7 +168,11 @@ export function ControlBar({
                     <select
                         value={language}
                         onChange={(e) => setLanguage(e.target.value)}
-                        className="pl-9 pr-8 py-1.5 bg-gray-50 border border-gray-200 text-gray-700 text-sm rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none appearance-none cursor-pointer hover:bg-gray-100 transition min-w-[140px]"
+                        className={`pl-9 pr-8 py-1.5 text-sm rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none appearance-none cursor-pointer transition min-w-[140px] ${
+                            isDarkMode 
+                                ? 'bg-zinc-950 border border-zinc-800 text-zinc-300 hover:bg-zinc-900' 
+                                : 'bg-gray-50 border border-gray-200 text-gray-700 hover:bg-gray-100'
+                        }`}
                     >
                         {allowedLangs.map((l) => (
                             <option key={l.id} value={l.id}>
@@ -181,7 +185,7 @@ export function ControlBar({
                     </div>
                 </div>
 
-                <div className={`text-xs text-gray-500 transition-opacity duration-300 ${showEditorParams ? 'opacity-100' : 'opacity-0'}`}>
+                <div className={`text-xs transition-opacity duration-300 ${isDarkMode ? 'text-zinc-500' : 'text-gray-500'} ${showEditorParams ? 'opacity-100' : 'opacity-0'}`}>
                     {lastEditor && (
                         <span>Last edited by <span className="font-semibold capitalize">{lastEditor.role}</span></span>
                     )}
@@ -194,8 +198,12 @@ export function ControlBar({
                     <button
                         onClick={onToggleFreeze}
                         className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition border whitespace-nowrap shrink-0 ${isFrozen
-                            ? "bg-blue-100 text-blue-700 border-blue-200 hover:bg-blue-200"
-                            : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50"
+                            ? isDarkMode
+                                ? "bg-blue-950/50 text-blue-400 border-blue-900/50 hover:bg-blue-950"
+                                : "bg-blue-100 text-blue-700 border-blue-200 hover:bg-blue-200"
+                            : isDarkMode
+                                ? "bg-zinc-950 text-zinc-300 border-zinc-800 hover:bg-zinc-900"
+                                : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50"
                             }`}
                         title="Pause session for explanation"
                     >
@@ -207,7 +215,11 @@ export function ControlBar({
                 {role === "interviewer" && onNextQuestion && (
                     <button
                         onClick={handleNextQuestion}
-                        className="flex items-center gap-2 px-3 py-1.5 bg-white text-indigo-600 border border-indigo-200 rounded-md text-sm font-medium hover:bg-indigo-50 transition"
+                        className={`flex items-center gap-2 px-3 py-1.5 border rounded-md text-sm font-medium transition ${
+                            isDarkMode
+                                ? "bg-zinc-950 text-indigo-400 border-zinc-800 hover:bg-zinc-900"
+                                : "bg-white text-indigo-600 border-indigo-200 hover:bg-indigo-50"
+                        }`}
                         title="Clear session variables for a new problem"
                     >
                         <RotateCcw className="w-4 h-4 fill-current" />
@@ -218,7 +230,11 @@ export function ControlBar({
                 {role === "interviewer" && (
                     <button
                         onClick={endInterview}
-                        className="flex items-center gap-2 px-3 py-1.5 bg-white text-red-600 border border-red-200 rounded-md text-sm font-medium hover:bg-red-50 transition"
+                        className={`flex items-center gap-2 px-3 py-1.5 border rounded-md text-sm font-medium transition ${
+                            isDarkMode
+                                ? "bg-zinc-950 text-red-400 border-zinc-800 hover:bg-zinc-900"
+                                : "bg-white text-red-600 border-red-200 hover:bg-red-50"
+                        }`}
                         title="End interview for everyone"
                     >
                         <Square className="w-4 h-4 fill-current" />
@@ -227,7 +243,11 @@ export function ControlBar({
                 )}
 
                 <button
-                    className="flex items-center gap-2 px-4 py-1.5 bg-gray-100 text-gray-700 rounded-md text-sm font-medium hover:bg-gray-200 transition border border-gray-200 whitespace-nowrap shrink-0"
+                    className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-sm font-medium transition border whitespace-nowrap shrink-0 ${
+                        isDarkMode
+                            ? "bg-zinc-950 text-zinc-300 border-zinc-800 hover:bg-zinc-900"
+                            : "bg-gray-100 text-gray-700 border-gray-200 hover:bg-gray-200"
+                    }`}
                     onClick={onRun}
                 >
                     <Play className="w-4 h-4 fill-current" />
@@ -247,25 +267,29 @@ export function ControlBar({
 
                 <button
                     onClick={() => router.push('/dashboard')}
-                    className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-md transition"
+                    className={`p-2 rounded-md transition ${isDarkMode ? 'text-zinc-400 hover:text-red-400 hover:bg-red-950/20' : 'text-gray-500 hover:text-red-600 hover:bg-red-50'}`}
                     title="Leave Room"
                 >
                     <LogOut className="w-4 h-4" />
                 </button>
                 
                 {/* Synced Timer Display */}
-                <div className="flex items-center bg-gray-50 border border-gray-200 rounded-md shadow-sm ml-2 overflow-hidden h-8">
-                    <div className="flex items-center gap-1.5 px-3 py-1.5 text-gray-600 text-sm font-medium min-w-[70px] justify-center">
+                <div className={`flex items-center rounded-md shadow-sm ml-2 overflow-hidden h-8 border ${isDarkMode ? 'bg-zinc-950 border-zinc-800' : 'bg-gray-50 border-gray-200'}`}>
+                    <div className={`flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium min-w-[70px] justify-center ${isDarkMode ? 'text-zinc-300' : 'text-gray-600'}`}>
                         <Clock className={`w-3.5 h-3.5 ${timerState?.active ? 'text-indigo-500 animate-pulse' : 'text-gray-400'}`} />
                         <span className="tabular-nums tracking-tight">{formatTime(elapsed)}</span>
                     </div>
                     {role === 'interviewer' && (
                         <button
                             onClick={handleTimerToggle}
-                            className={`flex items-center justify-center px-2.5 h-full border-l border-gray-200 transition ${
+                            className={`flex items-center justify-center px-2.5 h-full border-l transition ${
                                 timerState?.active 
-                                    ? 'bg-amber-50 text-amber-600 hover:bg-amber-100' 
-                                    : 'bg-indigo-50 text-indigo-600 hover:bg-indigo-100'
+                                    ? isDarkMode
+                                        ? 'bg-amber-950/50 border-zinc-800 text-amber-400 hover:bg-amber-950'
+                                        : 'bg-amber-50 border-gray-200 text-amber-600 hover:bg-amber-100' 
+                                    : isDarkMode
+                                        ? 'bg-indigo-950/50 border-zinc-800 text-indigo-400 hover:bg-indigo-950'
+                                        : 'bg-indigo-50 border-gray-200 text-indigo-600 hover:bg-indigo-100'
                             }`}
                             title={timerState?.active ? "Pause Timer" : "Start Timer"}
                         >
@@ -278,7 +302,7 @@ export function ControlBar({
                 {onToggleDarkMode && (
                     <button
                         onClick={onToggleDarkMode}
-                        className="p-2 text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-gray-800 rounded-md transition"
+                        className={`p-2 rounded-md transition ${isDarkMode ? 'text-zinc-400 hover:text-indigo-400 hover:bg-zinc-800' : 'text-gray-500 hover:text-indigo-600 hover:bg-indigo-50'}`}
                         title={isDarkMode ? "Switch to Day Mode" : "Switch to Night Mode"}
                     >
                         {isDarkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}

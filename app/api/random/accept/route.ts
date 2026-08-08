@@ -31,7 +31,10 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'One or both users not found' }, { status: 400 });
     }
 
-    if (!EXEMPT_EMAILS.has(email)) {
+    const isExempt = EXEMPT_EMAILS.has(email) || 
+                     email === process.env.EXEMPT_EMAIL1 || 
+                     email === process.env.EXEMPT_EMAIL2;
+    if (process.env.NODE_ENV !== 'development' && !isExempt) {
       const since = new Date();
       since.setHours(0, 0, 0, 0);
       const todayCount = await prisma.interviewSession.count({

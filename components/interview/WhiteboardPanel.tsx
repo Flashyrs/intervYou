@@ -5,6 +5,7 @@ import dynamic from "next/dynamic";
 import { Eraser, Loader2, RefreshCw } from "lucide-react";
 import { broadcastWhiteboard, onWhiteboardSignal } from "@/lib/whiteboardRealtime";
 import { getWhiteboardChannel } from "@/lib/sessionChannels";
+import { useTheme } from "@/components/ThemeProvider";
 
 const Excalidraw = dynamic(
   () => import("@excalidraw/excalidraw").then((mod) => mod.Excalidraw),
@@ -36,6 +37,7 @@ export function WhiteboardPanel({
   sessionId: string;
   role: "interviewer" | "interviewee";
 }) {
+  const { isDarkMode } = useTheme();
   const apiRef = useRef<any>(null);
   const channelRef = useRef<any>(null);
   const broadcastTimeoutRef = useRef<any>(null);
@@ -69,7 +71,7 @@ export function WhiteboardPanel({
 
       if (payload.type === "whiteboard-clear" && apiRef.current) {
         suppressBroadcastRef.current = true;
-        latestSceneRef.current = { elements: [], appState: { viewBackgroundColor: "#ffffff" } };
+        latestSceneRef.current = { elements: [], appState: { viewBackgroundColor: isDarkMode ? "#121212" : "#ffffff" } };
         apiRef.current.resetScene();
         setRemoteVersion((prev) => prev + 1);
         setTimeout(() => {
@@ -87,7 +89,7 @@ export function WhiteboardPanel({
       channelRef.current?.unsubscribe();
       channelRef.current = null;
     };
-  }, [room]);
+  }, [room, isDarkMode]);
 
   const queueBroadcast = (scene: WhiteboardScene, type: "whiteboard-init" | "whiteboard-update" = "whiteboard-update") => {
     latestSceneRef.current = cloneScene(scene);
@@ -104,7 +106,7 @@ export function WhiteboardPanel({
 
   const handleClear = () => {
     apiRef.current?.resetScene();
-    latestSceneRef.current = { elements: [], appState: { viewBackgroundColor: "#ffffff" } };
+    latestSceneRef.current = { elements: [], appState: { viewBackgroundColor: isDarkMode ? "#121212" : "#ffffff" } };
     if (channelRef.current) {
       broadcastWhiteboard(channelRef.current, {
         type: "whiteboard-clear",
@@ -114,21 +116,25 @@ export function WhiteboardPanel({
   };
 
   return (
-    <div className="h-full flex flex-col bg-white">
-      <div className="px-4 py-3 border-b border-gray-100 bg-gray-50/80 flex items-center justify-between">
+    <div className={`h-full flex flex-col transition-colors duration-200 ${isDarkMode ? 'bg-[#121212] text-zinc-100' : 'bg-white'}`}>
+      <div className={`px-4 py-3 border-b flex items-center justify-between ${isDarkMode ? 'border-zinc-800 bg-zinc-900/50' : 'border-gray-100 bg-gray-50/80'}`}>
         <div>
-          <h3 className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Whiteboard</h3>
-          <p className="text-[11px] text-gray-400 mt-1">
+          <h3 className={`text-[11px] font-bold uppercase tracking-wider ${isDarkMode ? 'text-zinc-400' : 'text-gray-500'}`}>Whiteboard</h3>
+          <p className={`text-[11px] mt-1 ${isDarkMode ? 'text-zinc-500' : 'text-gray-400'}`}>
             Shared drawing space on its own realtime channel.
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-[10px] text-gray-400 uppercase tracking-wider">
+          <span className={`text-[10px] uppercase tracking-wider ${isDarkMode ? 'text-zinc-500' : 'text-gray-400'}`}>
             {ready ? "Live" : "Connecting"}
           </span>
           <button
             type="button"
-            className="inline-flex items-center gap-1 rounded-md border border-gray-200 px-2.5 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-100 transition"
+            className={`inline-flex items-center gap-1 rounded-md border px-2.5 py-1.5 text-xs font-medium transition ${
+                isDarkMode 
+                    ? 'bg-zinc-950 border-zinc-800 text-zinc-300 hover:bg-zinc-900' 
+                    : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-100'
+            }`}
             onClick={() => {
               const current = latestSceneRef.current;
               if (current) queueBroadcast(current, "whiteboard-init");
@@ -140,7 +146,11 @@ export function WhiteboardPanel({
           {role === "interviewee" && (
             <button
               type="button"
-              className="inline-flex items-center gap-1 rounded-md border border-gray-200 px-2.5 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-100 transition"
+              className={`inline-flex items-center gap-1 rounded-md border px-2.5 py-1.5 text-xs font-medium transition ${
+                  isDarkMode 
+                      ? 'bg-zinc-950 border-zinc-800 text-zinc-300 hover:bg-zinc-900' 
+                      : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-100'
+              }`}
               onClick={handleClear}
             >
               <Eraser className="w-3.5 h-3.5" />
@@ -152,6 +162,7 @@ export function WhiteboardPanel({
 
       <div className="flex-1 min-h-[360px]">
         <Excalidraw
+          theme={isDarkMode ? "dark" : "light"}
           excalidrawAPI={(api) => {
             apiRef.current = api;
             if (latestSceneRef.current) {
@@ -163,7 +174,7 @@ export function WhiteboardPanel({
           }}
           initialData={{
             appState: {
-              viewBackgroundColor: "#ffffff",
+              viewBackgroundColor: isDarkMode ? "#121212" : "#ffffff",
             },
           }}
           onChange={(elements, appState) => {
