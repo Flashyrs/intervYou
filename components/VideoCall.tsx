@@ -502,7 +502,7 @@ function WebRtcVideoCall({
                 await pc.addIceCandidate(candidate).catch(e => console.warn("Screen ICE error", e));
               }
             }
-          } else if (payload.type === "screen-share-ice-candidate") {
+          } else if (payload.type === "screen-share-ice-candidate" && payload.from !== roleRef.current) {
             const candidate = new RTCIceCandidate(payload.candidate);
             const targetPc = screenSharePcRef.current;
             if (targetPc?.remoteDescription?.type) {

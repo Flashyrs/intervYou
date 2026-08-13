@@ -355,7 +355,7 @@ function InterviewRoom({ sessionId, initialRole }: { sessionId: string; initialR
         </aside>
 
         {/* Center Pane: Solution Editor (50%) */}
-        <section className={`w-full md:w-[50%] flex flex-col rounded-xl shadow-sm border overflow-hidden relative group transition-colors duration-200 ${isDarkMode ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-gray-200'}`}>
+        <section className={`w-full md:w-[50%] flex flex-col rounded-xl shadow-sm border overflow-hidden relative group resize-y min-h-[400px] transition-colors duration-200 ${isDarkMode ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-gray-200'}`}>
           <div className={`px-4 py-3 border-b flex justify-between items-center ${isDarkMode ? 'border-zinc-800 bg-zinc-900/50' : 'border-gray-100 bg-gray-50/80'}`}>
             <div className="flex items-center gap-2">
               <button
@@ -403,59 +403,63 @@ function InterviewRoom({ sessionId, initialRole }: { sessionId: string; initialR
               </div>
             </div>
           </div>
-          <div className="flex-1 relative">
-            {workspaceMode === "editor" ? (
-              <>
-                {/* Frozen State Overlay */}
-                {isFrozen && role === 'interviewee' && (
-                  <div className="absolute inset-0 z-50 bg-white/60 dark:bg-black/60 backdrop-blur-md flex items-center justify-center">
-                    <div className="bg-white dark:bg-zinc-900 p-8 rounded-2xl shadow-xl border border-indigo-100 dark:border-zinc-800 text-center max-w-sm transform transition-all duration-300">
-                      <div className="mb-5 flex justify-center">
-                        <div className="p-4 bg-indigo-50 dark:bg-zinc-800 rounded-full animate-bounce">
-                          <CheckCircle2 className="w-10 h-10 text-indigo-600 dark:text-zinc-100" />
-                        </div>
+          <div className="flex-1 relative min-h-0">
+            <div className={`h-full ${workspaceMode === "editor" ? "block" : "hidden"}`}>
+              {/* Frozen State Overlay */}
+              {isFrozen && role === 'interviewee' && (
+                <div className="absolute inset-0 z-50 bg-white/60 dark:bg-black/60 backdrop-blur-md flex items-center justify-center">
+                  <div className="bg-white dark:bg-zinc-900 p-8 rounded-2xl shadow-xl border border-indigo-100 dark:border-zinc-800 text-center max-w-sm transform transition-all duration-300">
+                    <div className="mb-5 flex justify-center">
+                      <div className="p-4 bg-indigo-50 dark:bg-zinc-800 rounded-full animate-bounce">
+                        <CheckCircle2 className="w-10 h-10 text-indigo-600 dark:text-zinc-100" />
                       </div>
-                      <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">Session Paused</h3>
-                      <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed">
-                        The interviewer is explaining a concept. Please wait for them to resume the session before typing.
-                      </p>
                     </div>
+                    <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">Session Paused</h3>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed">
+                      The interviewer is explaining a concept. Please wait for them to resume the session before typing.
+                    </p>
                   </div>
-                )}
+                </div>
+              )}
 
-                <MonacoEditor
-                  key={`${language}-${sessionId}`}
-                  height="100%"
-                  defaultLanguage="javascript"
-                  language={language}
-                  defaultValue={code}
-                  theme={isDarkMode ? "vs-dark" : "light"}
-                  onChange={(v: string | undefined) => updateCode(v || "")}
-                  onMount={(editor: any, monaco: any) => {
-                    editor.onDidChangeCursorPosition((e: any) => {
-                      broadcastCursor({ lineNumber: e.position.lineNumber, column: e.position.column });
-                    });
-                    (window as any)[`__editor_${sessionId}`] = editor;
-                    (window as any)[`__monaco_${sessionId}`] = monaco;
-                    // Bind Yjs CRDT to this editor for P2P real-time sync
-                    bindEditor(editor, monaco);
-                  }}
-                  options={{
-                    minimap: { enabled: false },
-                    scrollBeyondLastLine: false,
-                    readOnly: isFrozen && role === 'interviewee',
-                    fontSize: 14,
-                    fontFamily: "'JetBrains Mono', 'Fira Code', Consolas, monospace",
-                    lineHeight: 1.6,
-                    padding: { top: 16, bottom: 16 },
-                    roundedSelection: true,
-                    cursorBlinking: "smooth",
-                  }}
-                />
-              </>
-            ) : (
+              <MonacoEditor
+                key={`${language}-${sessionId}`}
+                height="100%"
+                defaultLanguage="javascript"
+                language={language}
+                defaultValue={code}
+                theme={isDarkMode ? "vs-dark" : "light"}
+                onChange={(v: string | undefined) => {
+                  const editor = (window as any)[`__editor_${sessionId}`];
+                  const isLocal = editor && editor.hasTextFocus();
+                  updateCode(v || "", isLocal);
+                }}
+                onMount={(editor: any, monaco: any) => {
+                  editor.onDidChangeCursorPosition((e: any) => {
+                    broadcastCursor({ lineNumber: e.position.lineNumber, column: e.position.column });
+                  });
+                  (window as any)[`__editor_${sessionId}`] = editor;
+                  (window as any)[`__monaco_${sessionId}`] = monaco;
+                  // Bind Yjs CRDT to this editor for P2P real-time sync
+                  bindEditor(editor, monaco);
+                }}
+                options={{
+                  minimap: { enabled: false },
+                  scrollBeyondLastLine: false,
+                  readOnly: isFrozen && role === 'interviewee',
+                  fontSize: 14,
+                  fontFamily: "'JetBrains Mono', 'Fira Code', Consolas, monospace",
+                  lineHeight: 1.6,
+                  padding: { top: 16, bottom: 16 },
+                  roundedSelection: true,
+                  cursorBlinking: "smooth",
+                }}
+              />
+            </div>
+
+            <div className={`h-full ${workspaceMode === "whiteboard" ? "block" : "hidden"}`}>
               <WhiteboardPanel sessionId={sessionId} role={role} />
-            )}
+            </div>
           </div>
         </section>
 

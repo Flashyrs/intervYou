@@ -44,6 +44,8 @@ export function WhiteboardPanel({
   const suppressBroadcastRef = useRef(false);
   const latestSceneRef = useRef<WhiteboardScene | null>(null);
   const clientIdRef = useRef(`wb-${Math.random().toString(36).slice(2, 10)}`);
+  const lastPointerSendRef = useRef<number>(0);
+  const collaboratorsRef = useRef<Map<string, any>>(new Map());
   const [ready, setReady] = useState(false);
   const [remoteVersion, setRemoteVersion] = useState(0);
 
@@ -78,6 +80,37 @@ export function WhiteboardPanel({
           suppressBroadcastRef.current = false;
         }, 0);
       }
+
+      if (payload.type === "whiteboard-pointer" && apiRef.current) {
+        const { from, pointer, button, role: senderRole } = payload as any;
+        const name = senderRole === "interviewer" ? "Interviewer" : "Interviewee";
+
+        collaboratorsRef.current.set(from, {
+          pointer,
+          button,
+          username: name,
+          color: senderRole === "interviewer"
+            ? { background: "#ec4899", stroke: "#db2777" }
+            : { background: "#3b82f6", stroke: "#2563eb" }
+        });
+
+        apiRef.current.updateScene({
+          collaborators: new Map(collaboratorsRef.current),
+        });
+
+        // Clean up cursor after 5 seconds of inactivity
+        if ((apiRef.current as any)[`__timeout_${from}`]) {
+          clearTimeout((apiRef.current as any)[`__timeout_${from}`]);
+        }
+        (apiRef.current as any)[`__timeout_${from}`] = setTimeout(() => {
+          collaboratorsRef.current.delete(from);
+          if (apiRef.current) {
+            apiRef.current.updateScene({
+              collaborators: new Map(collaboratorsRef.current),
+            });
+          }
+        }, 5000);
+      }
     });
 
     channelRef.current = channel;
@@ -88,8 +121,39 @@ export function WhiteboardPanel({
       if (broadcastTimeoutRef.current) clearTimeout(broadcastTimeoutRef.current);
       channelRef.current?.unsubscribe();
       channelRef.current = null;
+      // Prune collaborator timeouts on unmount
+      if (apiRef.current) {
+        collaboratorsRef.current.forEach((_, from) => {
+          if ((apiRef.current as any)[`__timeout_${from}`]) {
+            clearTimeout((apiRef.current as any)[`__timeout_${from}`]);
+          }
+        });
+      }
     };
   }, [room, isDarkMode]);
+
+  const handlePointerUpdate = (payload: any) => {
+    if (!channelRef.current) return;
+    const now = Date.now();
+    // Throttle pointer updates to every 80ms
+    if (now - lastPointerSendRef.current < 80) return;
+    lastPointerSendRef.current = now;
+
+    const { pointer, button } = payload;
+    if (!pointer) return;
+
+    broadcastWhiteboard(channelRef.current, {
+      type: "whiteboard-pointer",
+      from: clientIdRef.current,
+      role,
+      pointer: { 
+        x: pointer.x, 
+        y: pointer.y,
+        tool: pointer.tool // "laser", etc.
+      },
+      button
+    } as any);
+  };
 
   const queueBroadcast = (scene: WhiteboardScene, type: "whiteboard-init" | "whiteboard-update" = "whiteboard-update") => {
     latestSceneRef.current = cloneScene(scene);
@@ -172,6 +236,7 @@ export function WhiteboardPanel({
               });
             }
           }}
+          onPointerUpdate={handlePointerUpdate}
           initialData={{
             appState: {
               viewBackgroundColor: isDarkMode ? "#121212" : "#ffffff",

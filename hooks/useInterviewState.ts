@@ -554,12 +554,14 @@ export function useInterviewState(sessionId: string, initialRole: Role) {
         });
     };
 
-    const updateCode = (newCode: string) => {
+    const updateCode = (newCode: string, isLocal = false) => {
         lastLocalEditRef.current = Date.now();
         setCodeMap(prev => {
             const next = { ...prev, [language]: newCode };
-            // Yjs handles real-time sync; we only persist to Redis for recovery.
-            persist({ codeMap: { [language]: newCode } });
+            if (isLocal) {
+                // Yjs handles real-time sync; we only persist to Redis for recovery.
+                persist({ codeMap: { [language]: newCode } });
+            }
             return next;
         });
     };
