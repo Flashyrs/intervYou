@@ -383,6 +383,11 @@ export async function updateInterviewState({
   let timeSinceLastWrite = Infinity;
   if (lastWriteRaw) {
     timeSinceLastWrite = now - parseInt(lastWriteRaw, 10);
+  } else {
+    try {
+      await redis.set(lastWriteKey, now.toString(), "EX", STATE_TTL_SECONDS);
+    } catch {}
+    timeSinceLastWrite = 0;
   }
 
   const shouldWriteToDb = hasCriticalChange || timeSinceLastWrite >= 10000;
