@@ -97,27 +97,52 @@ export async function POST(req: Request) {
         if (!text) {
             return NextResponse.json({ error: "Empty response from AI" }, { status: 500 });
         }
-        let cleanJson = text.trim();
-        if (cleanJson.includes("```")) {
-            cleanJson = cleanJson.replace(/```json/g, "").replace(/```/g, "").trim();
-        }
-
         let aiResult;
         try {
-            aiResult = JSON.parse(cleanJson);
-        } catch (e) {
-            // Fallback: try to extract substring between first { and last }
-            const start = cleanJson.indexOf('{');
-            const end = cleanJson.lastIndexOf('}');
-            if (start !== -1 && end !== -1) {
-                try {
-                    aiResult = JSON.parse(cleanJson.substring(start, end + 1));
-                } catch (e2) {
-                    throw new Error("Failed to parse AI response: " + cleanJson);
-                }
-            } else {
-                throw new Error("Invalid AI response format: " + cleanJson);
+            // 1. Initial cleanup
+            let clean = text.trim();
+            if (clean.includes("```")) {
+                clean = clean.replace(/```json/g, "").replace(/```/g, "").trim();
             }
+
+            // 2. Try standard parse first
+            try {
+                aiResult = JSON.parse(clean);
+            } catch (firstErr) {
+                // If standard parse fails, attempt robust sanitization
+                const start = clean.indexOf('{');
+                const end = clean.lastIndexOf('}');
+                if (start !== -1 && end !== -1) {
+                    clean = clean.substring(start, end + 1);
+                }
+
+                // Remove trailing commas (e.g. [1, 2, ] or {"a": 1, })
+                clean = clean.replace(/,(\s*[\]}])/g, "$1");
+
+                // Escape unescaped control characters (newlines/tabs) inside string literals
+                let sanitized = "";
+                let inString = false;
+                let escaped = false;
+                for (let i = 0; i < clean.length; i++) {
+                    const char = clean[i];
+                    if (char === '"' && !escaped) {
+                        inString = !inString;
+                    }
+                    if (inString && (char === '\n' || char === '\r')) {
+                        sanitized += '\\n';
+                    } else if (inString && char === '\t') {
+                        sanitized += '\\t';
+                    } else {
+                        sanitized += char;
+                    }
+                    escaped = char === '\\' ? !escaped : false;
+                }
+
+                aiResult = JSON.parse(sanitized);
+            }
+        } catch (e: any) {
+            console.error("AI parse failed. Original response:", text);
+            throw new Error("Failed to parse AI response: " + e.message + ". Raw: " + text.substring(0, 300));
         }
         
         const funcInfo = aiResult.functionInfo || {
