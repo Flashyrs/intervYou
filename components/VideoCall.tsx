@@ -173,6 +173,16 @@ function WebRtcVideoCall({
     }
 
     try {
+      if (screenSharePcRef.current) {
+        screenSharePcRef.current.close();
+        screenSharePcRef.current = null;
+      }
+      if (localScreenStreamRef.current) {
+        stopStream(localScreenStreamRef.current);
+        localScreenStreamRef.current = null;
+        setLocalScreenStream(null);
+      }
+
       const displayStream = await navigator.mediaDevices.getDisplayMedia({
         video: true,
         audio: true,
@@ -417,6 +427,17 @@ function WebRtcVideoCall({
 
         try {
           if (payload.type === "screen-share-offer" && payload.from !== roleRef.current) {
+            if (screenSharePcRef.current) {
+              screenSharePcRef.current.close();
+              screenSharePcRef.current = null;
+            }
+            if (remoteScreenStreamRef.current) {
+              stopStream(remoteScreenStreamRef.current);
+              remoteScreenStreamRef.current = null;
+              setRemoteScreenStream(null);
+            }
+            pendingIceCandidates.length = 0;
+
             const pc = new RTCPeerConnection({
               iceServers: [
                 { urls: "stun:stun.l.google.com:19302" },
