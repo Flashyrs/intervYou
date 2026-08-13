@@ -208,29 +208,64 @@ async function safeWriteRedisState(sessionId: string, state: StoredInterviewStat
   }
 }
 
+
 export async function getInterviewState(sessionId: string, userId: string) {
-  const session = await fetchSessionContext(sessionId);
-  if (!session) throw new Error("Session not found");
-  const durableState = await readDurableSessionState(sessionId);
+  const contextKey = `session:${sessionId}:context`;
+  const stateKey = `session:${sessionId}:state`;
+  const notesKey = `session:${sessionId}:notes`;
 
-  let state = await safeReadRedisState(sessionId);
+  let contextRaw: string | null = null;
+  let stateRaw: string | null = null;
+  let notesRaw: string | null = null;
 
-  if (!state && durableState.stateSnapshot) {
-    state = durableState.stateSnapshot;
-    await safeWriteRedisState(sessionId, state);
+  try {
+    const results = await redis.mget(contextKey, stateKey, notesKey);
+    contextRaw = results[0];
+    stateRaw = results[1];
+    notesRaw = results[2];
+  } catch (err) {
+    console.warn("Redis mget failed in getInterviewState:", err);
   }
 
+  let session = contextRaw ? JSON.parse(contextRaw) : null;
+  if (!session) {
+    session = await fetchSessionContext(sessionId);
+    if (!session) throw new Error("Session not found");
+    try {
+      await redis.set(contextKey, JSON.stringify(session), "EX", STATE_TTL_SECONDS);
+    } catch {}
+  }
+
+  let state = stateRaw ? JSON.parse(stateRaw) : null;
   const isInterviewer = session.createdBy === userId;
+  let interviewerNotes = isInterviewer ? notesRaw : null;
+
+  if (!state || (isInterviewer && interviewerNotes === null)) {
+    const durableState = await readDurableSessionState(sessionId);
+    if (!state && durableState.stateSnapshot) {
+      state = durableState.stateSnapshot;
+      try {
+        await redis.set(stateKey, JSON.stringify(state), "EX", STATE_TTL_SECONDS);
+      } catch {}
+    }
+    if (isInterviewer && interviewerNotes === null) {
+      interviewerNotes = durableState.interviewerNotes || "";
+      try {
+        await redis.set(notesKey, interviewerNotes, "EX", STATE_TTL_SECONDS);
+      } catch {}
+    }
+  }
+
   return {
     session,
     state: state || {
       __meta: {
-        version: durableState.liveStateVersion || 0,
+        version: 0,
         fieldVersions: {},
         updatedAt: new Date().toISOString(),
       },
     },
-    response: toResponseState(state || {}, isInterviewer ? durableState.interviewerNotes : undefined),
+    response: toResponseState(state || {}, isInterviewer ? interviewerNotes : undefined),
     isInterviewer,
   };
 }
@@ -241,16 +276,48 @@ export async function updateInterviewState({
   patch,
   baseVersion,
 }: UpdateStateArgs) {
-  const session = await fetchSessionContext(sessionId);
-  if (!session) throw new Error("Session not found");
-  const durableState = await readDurableSessionState(sessionId);
+  const contextKey = `session:${sessionId}:context`;
+  const stateKey = `session:${sessionId}:state`;
+  const notesKey = `session:${sessionId}:notes`;
+  const lastWriteKey = `session:${sessionId}:lastDbWriteTime`;
 
-  const current =
-    (await safeReadRedisState(sessionId)) ||
-    (durableState.stateSnapshot || {});
+  let contextRaw: string | null = null;
+  let stateRaw: string | null = null;
+  let notesRaw: string | null = null;
+  let lastWriteRaw: string | null = null;
+
+  try {
+    const results = await redis.mget(contextKey, stateKey, notesKey, lastWriteKey);
+    contextRaw = results[0];
+    stateRaw = results[1];
+    notesRaw = results[2];
+    lastWriteRaw = results[3];
+  } catch (err) {
+    console.warn("Redis mget failed in updateInterviewState:", err);
+  }
+
+  let session = contextRaw ? JSON.parse(contextRaw) : null;
+  if (!session) {
+    session = await fetchSessionContext(sessionId);
+    if (!session) throw new Error("Session not found");
+    try {
+      await redis.set(contextKey, JSON.stringify(session), "EX", STATE_TTL_SECONDS);
+    } catch {}
+  }
+
+  let current = stateRaw ? JSON.parse(stateRaw) : null;
+  let dbLiveStateVersion = 0;
+  let dbInterviewerNotes: string | null = null;
+
+  if (!current) {
+    const durableState = await readDurableSessionState(sessionId);
+    dbLiveStateVersion = durableState.liveStateVersion;
+    dbInterviewerNotes = durableState.interviewerNotes;
+    current = durableState.stateSnapshot || {};
+  }
 
   const currentMeta = current.__meta || {
-    version: durableState.liveStateVersion || 0,
+    version: dbLiveStateVersion,
     fieldVersions: {},
     updatedAt: new Date().toISOString(),
   };
@@ -262,10 +329,15 @@ export async function updateInterviewState({
       : undefined;
 
   const isInterviewer = session.createdBy === userId;
-  const interviewerNotes =
-    typeof patch.interviewerNotes === "string" && isInterviewer
-      ? patch.interviewerNotes
-      : durableState.interviewerNotes;
+  
+  let interviewerNotes: string | null = null;
+  if (typeof patch.interviewerNotes === "string" && isInterviewer) {
+    interviewerNotes = patch.interviewerNotes;
+  } else {
+    interviewerNotes = isInterviewer 
+      ? (notesRaw || "") 
+      : (dbInterviewerNotes || null);
+  }
 
   const sharedPatch = { ...patch };
   delete sharedPatch.interviewerNotes;
@@ -294,16 +366,54 @@ export async function updateInterviewState({
     __meta: nextMeta,
   };
 
-  await safeWriteRedisState(sessionId, nextState);
+  // Redis-backed write-behind throttling to protect the DB from write starvation
+  const IMMEDIATE_WRITE_KEYS = [
+    "problemId",
+    "problemTitle",
+    "isFrozen",
+    "workspaceMode",
+    "timerState"
+  ];
 
-  const { __meta, ...snapshot } = nextState;
-  await writeDurableSessionState({
-    sessionId,
-    liveStateVersion: nextVersion,
-    stateSnapshot: nextState,
-    problemPack: buildProblemPack(snapshot),
-    interviewerNotes: interviewerNotes ?? null,
-  });
+  const hasCriticalChange =
+    Object.keys(patch).some((key) => IMMEDIATE_WRITE_KEYS.includes(key)) ||
+    (typeof patch.interviewerNotes === "string" && patch.interviewerNotes !== interviewerNotes);
+
+  const now = Date.now();
+  let timeSinceLastWrite = Infinity;
+  if (lastWriteRaw) {
+    timeSinceLastWrite = now - parseInt(lastWriteRaw, 10);
+  }
+
+  const shouldWriteToDb = hasCriticalChange || timeSinceLastWrite >= 10000;
+
+  // Pipeline Redis writes to execute in a single roundtrip
+  try {
+    const pipeline = redis.pipeline();
+    pipeline.set(stateKey, JSON.stringify(nextState), "EX", STATE_TTL_SECONDS);
+    if (typeof patch.interviewerNotes === "string" && isInterviewer) {
+      pipeline.set(notesKey, interviewerNotes, "EX", STATE_TTL_SECONDS);
+    }
+    if (shouldWriteToDb) {
+      pipeline.set(lastWriteKey, now.toString(), "EX", STATE_TTL_SECONDS);
+    }
+    await pipeline.exec();
+  } catch (err) {
+    console.warn("Redis pipeline exec failed:", err);
+  }
+
+  if (shouldWriteToDb) {
+    const { __meta, ...snapshot } = nextState;
+    await writeDurableSessionState({
+      sessionId,
+      liveStateVersion: nextVersion,
+      stateSnapshot: nextState,
+      problemPack: buildProblemPack(snapshot),
+      interviewerNotes: interviewerNotes ?? null,
+    });
+  } else if (process.env.NODE_ENV === "development") {
+    console.log(`[write-behind] Throttled DB update for session: ${sessionId}`);
+  }
 
   return {
     ok: true as const,
@@ -314,7 +424,6 @@ export async function updateInterviewState({
 
 export async function persistFinalInterviewState(sessionId: string) {
   const state = await safeReadRedisState(sessionId);
-
   await writeDurableSessionState({
     sessionId,
     finalState: state,
@@ -360,23 +469,67 @@ export async function getInterviewerNotesForSessions(
 }
 
 export async function getInterviewerNotes(sessionId: string, userId: string) {
-  const session = await fetchSessionContext(sessionId);
-  if (!session) throw new Error("Session not found");
+  const contextKey = `session:${sessionId}:context`;
+  const notesKey = `session:${sessionId}:notes`;
+
+  let contextRaw: string | null = null;
+  let notesRaw: string | null = null;
+
+  try {
+    const results = await redis.mget(contextKey, notesKey);
+    contextRaw = results[0];
+    notesRaw = results[1];
+  } catch {}
+
+  let session = contextRaw ? JSON.parse(contextRaw) : null;
+  if (!session) {
+    session = await fetchSessionContext(sessionId);
+    if (!session) throw new Error("Session not found");
+    try {
+      await redis.set(contextKey, JSON.stringify(session), "EX", STATE_TTL_SECONDS);
+    } catch {}
+  }
+
   if (session.createdBy !== userId) throw new Error("Forbidden");
 
+  if (notesRaw !== null) return notesRaw;
+
   const durableState = await readDurableSessionState(sessionId);
-  return durableState.interviewerNotes || "";
+  const notes = durableState.interviewerNotes || "";
+  try {
+    await redis.set(notesKey, notes, "EX", STATE_TTL_SECONDS);
+  } catch {}
+  return notes;
 }
 
 export async function updateInterviewerNotes(sessionId: string, userId: string, notes: string) {
-  const session = await fetchSessionContext(sessionId);
-  if (!session) throw new Error("Session not found");
+  const contextKey = `session:${sessionId}:context`;
+  const notesKey = `session:${sessionId}:notes`;
+
+  let contextRaw: string | null = null;
+  try {
+    contextRaw = await redis.get(contextKey);
+  } catch {}
+
+  let session = contextRaw ? JSON.parse(contextRaw) : null;
+  if (!session) {
+    session = await fetchSessionContext(sessionId);
+    if (!session) throw new Error("Session not found");
+    try {
+      await redis.set(contextKey, JSON.stringify(session), "EX", STATE_TTL_SECONDS);
+    } catch {}
+  }
+
   if (session.createdBy !== userId) throw new Error("Forbidden");
 
   await writeDurableSessionState({
     sessionId,
     interviewerNotes: notes,
   });
+
+  try {
+    await redis.set(notesKey, notes, "EX", STATE_TTL_SECONDS);
+  } catch {}
 
   return notes;
 }

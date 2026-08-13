@@ -5,6 +5,7 @@ import { Footer } from '@/components/Footer';
 import Providers from './providers';
 import { ToastProvider } from '@/components/Toast';
 import { MatchmakingProvider } from '@/components/MatchmakingProvider';
+import { Analytics } from '@vercel/analytics/react';
 
 export const metadata = {
   title: 'IntervYou',
@@ -41,7 +42,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           </MatchmakingProvider>
           </ToastProvider>
         </Providers>
+        <Analytics />
       </body>
     </html>
   );
 }
+
