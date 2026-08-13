@@ -23,7 +23,7 @@ export default function VideoCall(props: {
   role: "interviewer" | "interviewee";
   autoStart?: boolean;
 }) {
-  const [useWebRtc, setUseWebRtc] = useState(false);
+  const [useWebRtc, setUseWebRtc] = useState(true);
 
   if (!useWebRtc) {
     return <LiveKitVideoCall room={props.room} role={props.role} onFallback={() => setUseWebRtc(true)} />;
@@ -58,7 +58,7 @@ function WebRtcVideoCall({
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
   const [localScreenStream, setLocalScreenStream] = useState<MediaStream | null>(null);
   const [remoteScreenStream, setRemoteScreenStream] = useState<MediaStream | null>(null);
-  
+
   // Perfect Negotiation states for main call
   const makingOfferRef = useRef(false);
   const ignoreOfferRef = useRef(false);
@@ -123,11 +123,11 @@ function WebRtcVideoCall({
         offerToReceiveVideo: true,
         iceRestart,
       });
-      
+
       // Safety check: if signalingState is not stable/have-local-offer, we might be in glare
       if (pcRef.current.signalingState !== "stable" && !iceRestart) {
-         // If we are polite, we should have yielded. If impolite, we keep our offer.
-         // But setLocalDescription will fail if not stable.
+        // If we are polite, we should have yielded. If impolite, we keep our offer.
+        // But setLocalDescription will fail if not stable.
       }
 
       await pcRef.current.setLocalDescription(offer);
@@ -215,7 +215,7 @@ function WebRtcVideoCall({
       };
 
       displayStream.getVideoTracks()[0]?.addEventListener("ended", () => {
-        stopScreenShare().catch(() => {});
+        stopScreenShare().catch(() => { });
       });
 
       const offer = await createOffer(pc);
@@ -321,7 +321,7 @@ function WebRtcVideoCall({
                 await pc.setRemoteDescription(new RTCSessionDescription(payload.sdp));
                 const answer = await pc.createAnswer();
                 await pc.setLocalDescription(answer);
-                
+
                 if (channelRef.current) {
                   broadcast(channelRef.current, {
                     type: "call-answer",
@@ -348,9 +348,9 @@ function WebRtcVideoCall({
                   }
                 }
               } else if (payload.type === "call-ping" && payload.from !== roleRef.current) {
-                 if (pc.connectionState !== "connected" && pc.connectionState !== "connecting") {
-                    startCall(true).catch(console.error);
-                 }
+                if (pc.connectionState !== "connected" && pc.connectionState !== "connecting") {
+                  startCall(true).catch(console.error);
+                }
               } else if (payload.type === "ice-candidate" && payload.from !== roleRef.current) {
                 const candidate = new RTCIceCandidate(payload.candidate);
                 try {
@@ -371,11 +371,11 @@ function WebRtcVideoCall({
             if (!mounted) return;
             setCallChannelReady(status === "SUBSCRIBED");
             if (status === "SUBSCRIBED" && channelRef.current) {
-               broadcast(channelRef.current, {
-                 type: "call-ping",
-                 from: roleRef.current,
-                 sessionId: room,
-               });
+              broadcast(channelRef.current, {
+                type: "call-ping",
+                from: roleRef.current,
+                sessionId: room,
+              });
             }
             if (status === "SUBSCRIBED" && roleRef.current === "interviewee" && autoStart && !hasAutoStartedRef.current) {
               hasAutoStartedRef.current = true;
@@ -451,8 +451,8 @@ function WebRtcVideoCall({
             ignoreScreenOfferRef.current = !isPolite && offerCollision;
 
             if (ignoreScreenOfferRef.current) {
-               console.log("[ScreenShare] Ignoring offer (glare)");
-               return;
+              console.log("[ScreenShare] Ignoring offer (glare)");
+              return;
             }
 
             const incomingRemoteScreen = new MediaStream();
@@ -478,25 +478,25 @@ function WebRtcVideoCall({
                 });
               }
             };
-            
+
             pc.oniceconnectionstatechange = () => {
               if (!mounted) return;
               if (pc.iceConnectionState === "failed" || pc.iceConnectionState === "disconnected") {
-                 // The sharer handles restarts, but the viewer can ping the sharer to trigger one
-                 if (screenShareChannelRef.current) {
-                    broadcast(screenShareChannelRef.current, {
-                      type: "screen-share-ping",
-                      from: roleRef.current,
-                      sessionId: screenShareRoom,
-                    });
-                 }
+                // The sharer handles restarts, but the viewer can ping the sharer to trigger one
+                if (screenShareChannelRef.current) {
+                  broadcast(screenShareChannelRef.current, {
+                    type: "screen-share-ping",
+                    from: roleRef.current,
+                    sessionId: screenShareRoom,
+                  });
+                }
               }
             };
 
             await pc.setRemoteDescription(new RTCSessionDescription(payload.sdp));
             const answer = await pc.createAnswer();
             await pc.setLocalDescription(answer);
-            
+
             if (screenShareChannelRef.current) {
               broadcast(screenShareChannelRef.current, {
                 type: "screen-share-answer",
@@ -537,19 +537,19 @@ function WebRtcVideoCall({
             screenSharePcRef.current?.close();
             screenSharePcRef.current = null;
           } else if (payload.type === "screen-share-ping" && payload.from !== roleRef.current) {
-             if (screenShareActive && screenSharePcRef.current && screenShareChannelRef.current) {
-                screenSharePcRef.current.createOffer({ iceRestart: true })
-                  .then(async (offer) => {
-                     await screenSharePcRef.current!.setLocalDescription(offer);
-                     broadcast(screenShareChannelRef.current!, {
-                        type: "screen-share-offer",
-                        from: roleRef.current,
-                        sessionId: screenShareRoom,
-                        sdp: { type: offer.type, sdp: offer.sdp },
-                     });
-                  })
-                  .catch(console.error);
-             }
+            if (screenShareActive && screenSharePcRef.current && screenShareChannelRef.current) {
+              screenSharePcRef.current.createOffer({ iceRestart: true })
+                .then(async (offer) => {
+                  await screenSharePcRef.current!.setLocalDescription(offer);
+                  broadcast(screenShareChannelRef.current!, {
+                    type: "screen-share-offer",
+                    from: roleRef.current,
+                    sessionId: screenShareRoom,
+                    sdp: { type: offer.type, sdp: offer.sdp },
+                  });
+                })
+                .catch(console.error);
+            }
           }
         } catch (e) {
           console.error("Screen share signaling error", e);
@@ -631,10 +631,10 @@ function WebRtcVideoCall({
 
   const toggleScreenShare = () => {
     if (screenShareActive) {
-      stopScreenShare().catch(() => {});
+      stopScreenShare().catch(() => { });
       return;
     }
-    startScreenShare().catch(() => {});
+    startScreenShare().catch(() => { });
   };
 
   const localPlaceholder = (
@@ -814,9 +814,8 @@ function WebRtcVideoCall({
 
           {sidebarMode !== "hidden" && (
             <div
-              className={`flex shrink-0 flex-col border-t border-white/10 bg-black/60 backdrop-blur transition-all duration-300 md:h-full md:border-l md:border-t-0 ${
-                sidebarMode === "full" ? "h-[34%] w-full md:w-[24rem]" : "h-[34%] w-full md:w-24"
-              }`}
+              className={`flex shrink-0 flex-col border-t border-white/10 bg-black/60 backdrop-blur transition-all duration-300 md:h-full md:border-l md:border-t-0 ${sidebarMode === "full" ? "h-[34%] w-full md:w-[24rem]" : "h-[34%] w-full md:w-24"
+                }`}
             >
               <div className="hidden h-14 items-center justify-between border-b border-white/10 px-4 md:flex">
                 {sidebarMode === "full" ? <span className="text-sm font-semibold tracking-wide text-white">Participants</span> : null}
@@ -839,11 +838,10 @@ function WebRtcVideoCall({
               )}
 
               <div
-                className={`mt-auto shrink-0 border-white/10 ${
-                  sidebarMode === "compact"
-                    ? "flex flex-row items-center justify-center gap-4 p-3 md:flex-col"
-                    : "flex flex-wrap justify-center gap-2 border-t p-4"
-                }`}
+                className={`mt-auto shrink-0 border-white/10 ${sidebarMode === "compact"
+                  ? "flex flex-row items-center justify-center gap-4 p-3 md:flex-col"
+                  : "flex flex-wrap justify-center gap-2 border-t p-4"
+                  }`}
               >
                 <Controls
                   micOn={micOn}

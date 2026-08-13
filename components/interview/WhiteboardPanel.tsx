@@ -61,9 +61,15 @@ export function WhiteboardPanel({
         if (!payload.scene || !apiRef.current) return;
         suppressBroadcastRef.current = true;
         latestSceneRef.current = cloneScene(payload.scene);
+
+        // Strip out viewport navigation state (scroll and zoom) to allow independent viewports
+        const cleanAppState = {
+          viewBackgroundColor: payload.scene.appState?.viewBackgroundColor,
+        };
+
         apiRef.current.updateScene({
           elements: payload.scene.elements || [],
-          appState: payload.scene.appState || {},
+          appState: cleanAppState,
         });
         setRemoteVersion((prev) => prev + 1);
         setTimeout(() => {
@@ -116,6 +122,8 @@ export function WhiteboardPanel({
     channelRef.current = channel;
     setReady(true);
 
+    const currentCollaborators = collaboratorsRef.current;
+
     return () => {
       mounted = false;
       if (broadcastTimeoutRef.current) clearTimeout(broadcastTimeoutRef.current);
@@ -123,7 +131,7 @@ export function WhiteboardPanel({
       channelRef.current = null;
       // Prune collaborator timeouts on unmount
       if (apiRef.current) {
-        collaboratorsRef.current.forEach((_, from) => {
+        currentCollaborators.forEach((_, from) => {
           if ((apiRef.current as any)[`__timeout_${from}`]) {
             clearTimeout((apiRef.current as any)[`__timeout_${from}`]);
           }
@@ -249,9 +257,7 @@ export function WhiteboardPanel({
               elements: elements.map((element: any) => ({ ...element })),
               appState: {
                 viewBackgroundColor: appState.viewBackgroundColor,
-                scrollX: appState.scrollX,
-                scrollY: appState.scrollY,
-                zoom: appState.zoom,
+                // Exclude viewport navigation state to allow independent zoom/scroll
               },
             };
             queueBroadcast(scene);
