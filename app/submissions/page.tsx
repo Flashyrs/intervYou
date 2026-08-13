@@ -35,7 +35,7 @@ export default function SubmissionsPage() {
         if (!loadedCode[subId]) {
             setLoadingCodeIds(prev => ({ ...prev, [subId]: true }));
             try {
-                const res = await fetch(`/api/submissions?id=${subId}`);
+                const res = await fetch(`/api/submissions?id=${subId}`, { cache: "no-store" });
                 if (res.ok) {
                     const data = await res.json();
                     setLoadedCode(prev => ({ ...prev, [subId]: data.code }));
@@ -54,7 +54,7 @@ export default function SubmissionsPage() {
 
     const fetchSubmissions = async () => {
         try {
-            const res = await fetch("/api/submissions");
+            const res = await fetch("/api/submissions", { cache: "no-store" });
             if (res.ok) {
                 const data = await res.json();
                 setSubmissions(data);

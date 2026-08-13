@@ -28,7 +28,7 @@ export default function SubmissionsPage() {
     setLoadingDetailsId(sub.id);
     setError("");
     try {
-      const res = await fetch(`/api/submissions?id=${sub.id}`);
+      const res = await fetch(`/api/submissions?id=${sub.id}`, { cache: "no-store" });
       if (res.ok) {
         const fullSub = await res.json();
         setShow(fullSub);

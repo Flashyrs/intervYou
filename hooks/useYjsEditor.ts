@@ -129,9 +129,16 @@ export function useYjsEditor(
 
       const ytext = ydoc.getText("code");
 
-      if (ytext.length === 0 && initialCode && initialCode !== "// Start coding...\n") {
-        ytext.insert(0, initialCode);
-      }
+      // Wait 1 second for peer/network synchronization to complete before inserting initial fallback code
+      setTimeout(() => {
+        if (destroyed) return;
+        const currentYtext = ydoc.getText("code");
+        if (currentYtext.length === 0 && initialCode && initialCode !== "// Start coding...\n") {
+          ydoc.transact(() => {
+            currentYtext.insert(0, initialCode);
+          });
+        }
+      }, 1000);
 
       const observer = () => {
         if (isApplyingRemoteRef.current) return;

@@ -53,7 +53,7 @@ export default function DashboardPage() {
         ? `/api/submissions?sessionId=${viewingSessionId}`
         : `/api/submissions`;
 
-      fetch(endpoint)
+      fetch(endpoint, { cache: "no-store" })
         .then(res => res.json())
         .then(data => {
           if (Array.isArray(data)) setSubmissions(data);

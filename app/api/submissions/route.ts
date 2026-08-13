@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { requireAuth } from "@/lib/utils";
 import { prisma } from "@/lib/db";
 
+export const dynamic = "force-dynamic";
+
 const EXEMPT_EMAILS = new Set([
   process.env.EXEMPT_EMAIL1 || "",
   process.env.EXEMPT_EMAIL2 || "",
