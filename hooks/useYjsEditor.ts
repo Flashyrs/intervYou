@@ -168,6 +168,9 @@ export function useYjsEditor(
       if ((ydoc as any)._observer) {
         ytext.unobserve((ydoc as any)._observer);
       }
+      if (bindingRef.current && typeof bindingRef.current.destroy === "function") {
+        bindingRef.current.destroy();
+      }
       bindingRef.current = null;
       if (providerRef.current && typeof providerRef.current.destroy === "function") {
         providerRef.current.destroy();
