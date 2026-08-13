@@ -11,4 +11,4 @@ export const redis =
       maxRetriesPerRequest: 3,
   });
 
-if (process.env.NODE_ENV !== 'production') globalForRedis.redis = redis;
+globalForRedis.redis = redis;
