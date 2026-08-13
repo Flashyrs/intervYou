@@ -237,3 +237,14 @@ body,
 .dark .shadow-xl {
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.8), 0 2px 4px -1px rgba(0, 0, 0, 0.6) !important;
 }
+
+/* Excalidraw Collaborator Cursor Resizing */
+.excalidraw .collaborator-cursor svg {
+  width: 12px !important;
+  height: 12px !important;
+}
+.excalidraw .collaborator-cursor__label {
+  font-size: 9px !important;
+  padding: 1px 3px !important;
+  line-height: 1 !important;
+}

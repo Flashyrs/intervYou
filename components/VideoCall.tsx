@@ -73,6 +73,7 @@ function WebRtcVideoCall({
   const [micOn, setMicOn] = useState(true);
   const [camOn, setCamOn] = useState(true);
   const [screenShareActive, setScreenShareActive] = useState(false);
+  const screenShareActiveRef = useRef(false);
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
   const [videoDeviceId, setVideoDeviceId] = useState("");
   const [audioDeviceId, setAudioDeviceId] = useState("");
@@ -160,6 +161,7 @@ function WebRtcVideoCall({
     screenSharePcRef.current?.close();
     screenSharePcRef.current = null;
     setScreenShareActive(false);
+    screenShareActiveRef.current = false;
 
     if (screenShareChannelRef.current) {
       broadcast(screenShareChannelRef.current, {
@@ -208,6 +210,7 @@ function WebRtcVideoCall({
       localScreenStreamRef.current = displayStream;
       setLocalScreenStream(displayStream);
       setScreenShareActive(true);
+      screenShareActiveRef.current = true;
 
       displayStream.getTracks().forEach((track) => pc.addTrack(track, displayStream));
 
@@ -545,7 +548,7 @@ function WebRtcVideoCall({
             screenSharePcRef.current?.close();
             screenSharePcRef.current = null;
           } else if (payload.type === "screen-share-ping" && payload.from !== roleRef.current) {
-            if (screenShareActive && screenSharePcRef.current && screenShareChannelRef.current) {
+            if (screenShareActiveRef.current && screenSharePcRef.current && screenShareChannelRef.current) {
               screenSharePcRef.current.createOffer({ iceRestart: true })
                 .then(async (offer) => {
                   await screenSharePcRef.current!.setLocalDescription(offer);
@@ -580,10 +583,11 @@ function WebRtcVideoCall({
 
     return () => {
       mounted = false;
+      ch?.unsubscribe();
       remoteScreenStreamRef.current = null;
       setRemoteScreenStream(null);
     };
-  }, [screenShareRoom, isPolite, screenShareActive]);
+  }, [screenShareRoom, isPolite]);
 
   const switchDevices = async () => {
     if (!pcRef.current) return;
@@ -727,12 +731,24 @@ function WebRtcVideoCall({
                 <div className="h-full w-full min-h-0">{focusView === "local" ? localTile : remoteTile}</div>
               </div>
             ) : hasAnyScreenShare ? (
-              <div className="grid h-full min-h-0 grid-rows-[minmax(0,1fr)_180px] gap-2 md:grid-rows-[minmax(0,1fr)_32%]">
-                <div className="min-h-0">{screenTile}</div>
-                <div className="grid min-h-0 grid-cols-2 gap-2">
-                  {localTile}
-                  {remoteTile}
-                </div>
+              <div className="relative h-full w-full min-h-0">
+                <button
+                  type="button"
+                  onClick={() => setCompactSlide(prev => prev === "cameras" ? "screen" : "cameras")}
+                  className="absolute right-1 top-1/2 -translate-y-1/2 z-30 rounded-full bg-black/60 hover:bg-black/80 p-1 text-white border border-white/10 shadow-lg transition"
+                  title={compactSlide === "cameras" ? "Show shared screen" : "Show participant videos"}
+                >
+                  <ChevronRight className={`h-4 w-4 transform transition-transform duration-200 ${compactSlide === "screen" ? "rotate-180" : ""}`} />
+                </button>
+
+                {compactSlide === "screen" ? (
+                  <div className="h-full w-full min-h-0">{screenTile}</div>
+                ) : (
+                  <div className="grid h-full min-h-0 grid-cols-2 gap-2 pr-6">
+                    {localTile}
+                    {remoteTile}
+                  </div>
+                )}
               </div>
             ) : (
               <div className="grid h-full min-h-0 grid-cols-2 gap-2">
