@@ -95,7 +95,9 @@ function WebRtcVideoCall({
   const [compactSlide, setCompactSlide] = useState<"cameras" | "screen">("cameras");
 
   useEffect(() => {
-    if (!hasAnyScreenShare) {
+    if (hasAnyScreenShare) {
+      setCompactSlide("screen");
+    } else {
       setCompactSlide("cameras");
     }
   }, [hasAnyScreenShare]);
@@ -742,7 +744,7 @@ function WebRtcVideoCall({
                 </button>
 
                 {compactSlide === "screen" ? (
-                  <div className="h-full w-full min-h-0">{screenTile}</div>
+                  <div className="h-full w-full min-h-0 pr-6">{screenTile}</div>
                 ) : (
                   <div className="grid h-full min-h-0 grid-cols-2 gap-2 pr-6">
                     {localTile}

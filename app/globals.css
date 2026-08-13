@@ -240,11 +240,11 @@ body,
 
 /* Excalidraw Collaborator Cursor Resizing */
 .excalidraw .collaborator-cursor svg {
-  width: 12px !important;
-  height: 12px !important;
+  width: 9px !important;
+  height: 9px !important;
 }
 .excalidraw .collaborator-cursor__label {
-  font-size: 9px !important;
-  padding: 1px 3px !important;
+  font-size: 7px !important;
+  padding: 1px 2px !important;
   line-height: 1 !important;
 }
