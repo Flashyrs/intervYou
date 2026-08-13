@@ -392,7 +392,7 @@ export async function updateInterviewState({
     const pipeline = redis.pipeline();
     pipeline.set(stateKey, JSON.stringify(nextState), "EX", STATE_TTL_SECONDS);
     if (typeof patch.interviewerNotes === "string" && isInterviewer) {
-      pipeline.set(notesKey, interviewerNotes, "EX", STATE_TTL_SECONDS);
+      pipeline.set(notesKey, patch.interviewerNotes, "EX", STATE_TTL_SECONDS);
     }
     if (shouldWriteToDb) {
       pipeline.set(lastWriteKey, now.toString(), "EX", STATE_TTL_SECONDS);
