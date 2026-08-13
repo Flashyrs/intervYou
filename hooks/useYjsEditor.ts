@@ -76,17 +76,25 @@ export function useYjsEditor(
       };
 
       const startWebrtcOrSupabase = async () => {
+        const signalingUrlsStr = process.env.NEXT_PUBLIC_WEBRTC_SIGNALING_URLS;
+        const signalingUrls = signalingUrlsStr
+          ? signalingUrlsStr.split(",").map(url => url.trim()).filter(Boolean)
+          : [];
+
+        if (signalingUrls.length === 0) {
+          console.log(`[useYjsEditor] No WebRTC signaling servers configured. Using Supabase Realtime primary sync.`);
+          provider = new YjsSupabaseProvider(roomName, ydoc);
+          providerRef.current = provider;
+          return;
+        }
+
         try {
           console.log(`[useYjsEditor] Initializing P2P WebRTC sync for room: ${roomName}...`);
           const { WebrtcProvider } = await import("y-webrtc");
           if (destroyed) return;
 
           provider = new WebrtcProvider(roomName, ydoc, {
-            signaling: [
-              "wss://signaling.yjs.dev",
-              "wss://y-webrtc-signaling-eu.herokuapp.com",
-              "wss://y-webrtc-signaling-us.herokuapp.com"
-            ],
+            signaling: signalingUrls,
             peerOpts: {
               config: {
                 iceServers: [

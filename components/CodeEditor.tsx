@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import * as Y from "yjs";
 import { WebrtcProvider } from "y-webrtc";
 import { MonacoBinding } from "y-monaco";
+import { YjsSupabaseProvider } from "@/lib/YjsSupabaseProvider";
 
 const MonacoEditor: any = dynamic(() => import("@monaco-editor/react"), { ssr: false });
 
@@ -50,10 +51,20 @@ export function CodeEditor() {
         const ydoc = new Y.Doc();
         ydocRef.current = ydoc;
 
-        // WebrtcProvider creates a peer-to-peer connection avoiding 10msg/sec supabase limit
-        const provider = new WebrtcProvider(`intervyou-${sessionId}`, ydoc, {
-            signaling: ['wss://signaling.yjs.dev', 'wss://y-webrtc-signaling-eu.herokuapp.com'] 
-        });
+        const signalingUrlsStr = process.env.NEXT_PUBLIC_WEBRTC_SIGNALING_URLS;
+        const signalingUrls = signalingUrlsStr
+          ? signalingUrlsStr.split(",").map(url => url.trim()).filter(Boolean)
+          : [];
+
+        let provider;
+        if (signalingUrls.length > 0) {
+          // WebrtcProvider creates a peer-to-peer connection avoiding 10msg/sec supabase limit
+          provider = new WebrtcProvider(`intervyou-${sessionId}`, ydoc, {
+              signaling: signalingUrls
+          });
+        } else {
+          provider = new YjsSupabaseProvider(`intervyou-${sessionId}`, ydoc);
+        }
         providerRef.current = provider;
 
         const type = ydoc.getText("monaco");
