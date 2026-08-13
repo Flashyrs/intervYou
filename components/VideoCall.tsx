@@ -856,33 +856,16 @@ function WebRtcVideoCall({
 
               {(sidebarMode === "full" || sidebarMode === "compact") && (
                 <div className="flex flex-1 items-center justify-center overflow-hidden p-2 relative group/sidebar">
-                  {sidebarMode === "compact" && hasAnyScreenShare && (
-                    <button
-                      type="button"
-                      onClick={() => setCompactSlide(prev => prev === "cameras" ? "screen" : "cameras")}
-                      className="absolute right-1 top-1/2 -translate-y-1/2 z-30 rounded-full bg-black/60 hover:bg-black/80 p-1 text-white border border-white/10 shadow-lg transition"
-                      title={compactSlide === "cameras" ? "Show shared screen" : "Show participant videos"}
-                    >
-                      <ChevronRight className={`h-4 w-4 transform transition-transform duration-200 ${compactSlide === "screen" ? "rotate-180" : ""}`} />
-                    </button>
-                  )}
-
-                  {sidebarMode === "compact" && compactSlide === "screen" ? (
-                    <div className="w-full h-full aspect-[4/3] max-w-[260px] md:max-w-[80px] flex-1">
-                      {screenTile}
-                    </div>
-                  ) : (
-                    <div
-                      className={`flex w-full gap-2 ${
-                        sidebarMode === "full"
-                          ? "max-w-[260px] flex-row md:flex-col"
-                          : "max-w-[260px] flex-row md:flex-col md:max-w-[80px]"
-                      }`}
-                    >
-                      <div className="aspect-[4/3] flex-1">{localTile}</div>
-                      <div className="aspect-[4/3] flex-1">{remoteTile}</div>
-                    </div>
-                  )}
+                  <div
+                    className={`flex w-full gap-2 ${
+                      sidebarMode === "full"
+                        ? "max-w-[260px] flex-row md:flex-col"
+                        : "max-w-[260px] flex-row md:flex-col md:max-w-[80px]"
+                    }`}
+                  >
+                    <div className="aspect-[4/3] flex-1">{localTile}</div>
+                    <div className="aspect-[4/3] flex-1">{remoteTile}</div>
+                  </div>
                 </div>
               )}
 
