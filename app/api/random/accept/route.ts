@@ -17,8 +17,16 @@ export async function POST(req: Request) {
     if (!tempId) return NextResponse.json({ error: 'tempId required' }, { status: 400 });
     if (!initiatorId) return NextResponse.json({ error: 'initiatorId required' }, { status: 400 });
 
+    if (!userId) {
+      return NextResponse.json({ error: 'Unauthorized: Missing user ID in session' }, { status: 401 });
+    }
+
+    if (userId === initiatorId) {
+      return NextResponse.json({ error: 'You cannot accept your own matchmaking invite' }, { status: 400 });
+    }
+
     const key = `random_match_claim:${tempId}`;
-    const claimed = await redis.set(key, userId!, "EX", 3600, "NX");
+    const claimed = await redis.set(key, userId, "EX", 3600, "NX");
     if (!claimed) {
         return NextResponse.json({ error: 'Interview claim already accepted by another user' }, { status: 409 });
     }
@@ -41,16 +49,17 @@ export async function POST(req: Request) {
         where: { createdAt: { gte: since }, createdBy: userId },
       });
       if (todayCount >= 1) {
+        await redis.del(key); // Unlock if limit reached
         return NextResponse.json({ error: 'daily interview limit reached' }, { status: 429 });
       }
     }
 
     const created = await prisma.interviewSession.create({
       data: {
-        createdBy: userId!, 
+        createdBy: userId, 
         participants: {
           connect: [
-            { id: userId! }, 
+            { id: userId }, 
             { id: initiatorId }, 
           ],
         },
@@ -59,6 +68,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ sessionId: created.id }, { status: 200 });
   } catch (e: any) {
+    console.error("Error in /api/random/accept:", e);
     return NextResponse.json({ error: e?.message || 'failed' }, { status: 500 });
   }
 }
