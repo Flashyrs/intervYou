@@ -3,7 +3,7 @@
 import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import { applyAnswer, createAnswer, createOffer, setupPeerConnection } from "@/lib/webrtc";
 import { broadcast, onSignal } from "@/lib/realtime";
-import { Maximize2, Mic, MicOff, Minimize2, Monitor, Settings, Users, Video, VideoOff, X } from "lucide-react";
+import { ChevronRight, Maximize2, Mic, MicOff, Minimize2, Monitor, Settings, Users, Video, VideoOff, X } from "lucide-react";
 
 import dynamic from "next/dynamic";
 import { StreamVideo } from "./video/StreamVideo";
@@ -90,6 +90,14 @@ function WebRtcVideoCall({
 
   const activeScreenStream = localScreenStream || remoteScreenStream;
   const hasAnyScreenShare = !!activeScreenStream;
+
+  const [compactSlide, setCompactSlide] = useState<"cameras" | "screen">("cameras");
+
+  useEffect(() => {
+    if (!hasAnyScreenShare) {
+      setCompactSlide("cameras");
+    }
+  }, [hasAnyScreenShare]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -828,12 +836,35 @@ function WebRtcVideoCall({
                 </button>
               </div>
 
-              {sidebarMode === "full" && (
-                <div className="flex flex-1 items-center justify-center overflow-auto p-2">
-                  <div className="flex w-full max-w-[260px] flex-row gap-2 md:flex-col">
-                    <div className="aspect-[4/3] flex-1">{localTile}</div>
-                    <div className="aspect-[4/3] flex-1">{remoteTile}</div>
-                  </div>
+              {(sidebarMode === "full" || sidebarMode === "compact") && (
+                <div className="flex flex-1 items-center justify-center overflow-hidden p-2 relative group/sidebar">
+                  {sidebarMode === "compact" && hasAnyScreenShare && (
+                    <button
+                      type="button"
+                      onClick={() => setCompactSlide(prev => prev === "cameras" ? "screen" : "cameras")}
+                      className="absolute right-1 top-1/2 -translate-y-1/2 z-30 rounded-full bg-black/60 hover:bg-black/80 p-1 text-white border border-white/10 shadow-lg transition"
+                      title={compactSlide === "cameras" ? "Show shared screen" : "Show participant videos"}
+                    >
+                      <ChevronRight className={`h-4 w-4 transform transition-transform duration-200 ${compactSlide === "screen" ? "rotate-180" : ""}`} />
+                    </button>
+                  )}
+
+                  {sidebarMode === "compact" && compactSlide === "screen" ? (
+                    <div className="w-full h-full aspect-[4/3] max-w-[260px] md:max-w-[80px] flex-1">
+                      {screenTile}
+                    </div>
+                  ) : (
+                    <div
+                      className={`flex w-full gap-2 ${
+                        sidebarMode === "full"
+                          ? "max-w-[260px] flex-row md:flex-col"
+                          : "max-w-[260px] flex-row md:flex-col md:max-w-[80px]"
+                      }`}
+                    >
+                      <div className="aspect-[4/3] flex-1">{localTile}</div>
+                      <div className="aspect-[4/3] flex-1">{remoteTile}</div>
+                    </div>
+                  )}
                 </div>
               )}
 
