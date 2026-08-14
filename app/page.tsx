@@ -1,10 +1,52 @@
+"use client";
+
 import Link from "next/link";
-import { Sparkles, Users, Code2, Zap, ArrowRight, CheckCircle2 } from "lucide-react";
+import { Sparkles, Users, Code2, ArrowRight, RotateCcw } from "lucide-react";
+import { useState } from "react";
+import { useToast } from "@/components/Toast";
 
 export default function HomePage() {
+  const [supportName, setSupportName] = useState("");
+  const [supportEmail, setSupportEmail] = useState("");
+  const [supportMessage, setSupportMessage] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const { push } = useToast();
+
+  const handleSupportSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmitting(true);
+
+    try {
+      const res = await fetch("/api/support", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: supportName,
+          email: supportEmail,
+          message: supportMessage,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        push({ message: data.message || "Thank you! Support ticket submitted.", type: "success" });
+        setSupportName("");
+        setSupportEmail("");
+        setSupportMessage("");
+      } else {
+        push({ message: data.error || "Failed to submit issue report.", type: "error" });
+      }
+    } catch (err: any) {
+      push({ message: err?.message || "An unexpected error occurred.", type: "error" });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-white">
-      {/* Simple Hero (Preserved as requested) */}
+      {/* Simple Hero */}
       <section className="py-24 md:py-32 flex flex-col items-center justify-center text-center px-4">
         <h1 className="text-5xl md:text-6xl font-extrabold tracking-tight text-gray-900 mb-6">
           IntervYou
@@ -90,6 +132,76 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* P2P Focus & Support Section */}
+      <section className="py-24 bg-gray-50 border-t border-gray-100">
+        <div className="max-w-4xl mx-auto px-4">
+          <div className="bg-white rounded-3xl border border-gray-100 p-8 md:p-12 shadow-xl">
+            <div className="max-w-2xl mx-auto text-center mb-10">
+              <h2 className="text-3xl font-extrabold text-gray-900 tracking-tight sm:text-4xl mb-4">
+                P2P Network Support & Feedback
+              </h2>
+              <p className="text-gray-600 leading-relaxed text-sm md:text-base">
+                IntervYou utilizes secure, direct <strong>Peer-to-Peer (P2P) WebRTC connection routing</strong> to deliver zero-latency typing sync and direct face-to-face video calling.
+              </p>
+              <div className="mt-4 p-4 bg-amber-50 border border-amber-100 rounded-xl text-left text-xs md:text-sm text-amber-800 leading-relaxed">
+                <strong>Symmetric NAT / Firewall Warning (Scenario 1):</strong> Direct peer connections can sometimes fail to traverse strict VPNs, corporate firewalls, or school/university networks. If enough users report traversal issues, we will enable server-side LiveKit media relays. Please report your network setup details using the form below.
+              </div>
+            </div>
+
+            <form onSubmit={handleSupportSubmit} className="space-y-6 max-w-xl mx-auto">
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 mb-2">
+                  Name
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={supportName}
+                  onChange={(e) => setSupportName(e.target.value)}
+                  placeholder="Your Name"
+                  className="w-full rounded-xl border border-gray-200 bg-gray-50/50 px-4 py-3 text-sm text-gray-900 focus:border-black focus:bg-white focus:outline-none transition-colors"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 mb-2">
+                  Email Address
+                </label>
+                <input
+                  type="email"
+                  required
+                  value={supportEmail}
+                  onChange={(e) => setSupportEmail(e.target.value)}
+                  placeholder="name@example.com"
+                  className="w-full rounded-xl border border-gray-200 bg-gray-50/50 px-4 py-3 text-sm text-gray-900 focus:border-black focus:bg-white focus:outline-none transition-colors"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 mb-2">
+                  Issue Description & Network Setup
+                </label>
+                <textarea
+                  required
+                  rows={4}
+                  value={supportMessage}
+                  onChange={(e) => setSupportMessage(e.target.value)}
+                  placeholder="Describe your issue. (e.g. video connection stuck on connecting behind university VPN)"
+                  className="w-full rounded-xl border border-gray-200 bg-gray-50/50 px-4 py-3 text-sm text-gray-900 focus:border-black focus:bg-white focus:outline-none transition-colors resize-none"
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={submitting}
+                className="w-full bg-black text-white hover:bg-gray-800 disabled:bg-gray-400 font-semibold py-3 px-6 rounded-xl transition-colors flex items-center justify-center gap-2 text-sm shadow-md"
+              >
+                {submitting ? "Submitting..." : "Submit Issue Report"}
+              </button>
+            </form>
+          </div>
+        </div>
+      </section>
     </div>
   );
 }

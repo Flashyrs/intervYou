@@ -212,3 +212,46 @@ export async function sendSessionArchivedEmail(
     }
   }
 }
+
+/**
+ * Send support/issue reports to roshanshuklayt@gmail.com
+ */
+export async function sendSupportEmail(name: string, fromEmail: string, message: string) {
+  const user = process.env.EMAIL;
+  const pass = process.env.APP_PASSWORD;
+  if (!user || !pass) {
+    console.log(`EMAIL/APP_PASSWORD not set. Support request from ${fromEmail}: ${message}`);
+    return;
+  }
+
+  const transporter = nodemailer.createTransport({
+    host: process.env.SMTP_HOST || "smtp.gmail.com",
+    port: Number(process.env.SMTP_PORT || 465),
+    secure: true,
+    auth: { user, pass },
+  });
+
+  const subject = `IntervYou P2P Issue Report from ${name}`;
+  const html = `
+  <div style="font-family: Arial, sans-serif; color: #111; max-width: 600px; margin: 0 auto; border: 1px solid #eee; padding: 20px; border-radius: 8px;">
+    <h2 style="border-bottom: 1px solid #eee; padding-bottom: 10px;">New P2P Connection Issue Report</h2>
+    <p><strong>Name:</strong> ${name}</p>
+    <p><strong>Reply-To Email:</strong> ${fromEmail}</p>
+    <p><strong>Message/Details:</strong></p>
+    <div style="background: #f9f9f9; padding: 15px; border-radius: 6px; border-left: 4px solid #f59e0b; margin-top: 10px; white-space: pre-wrap;">${message}</div>
+    <p style="font-size: 11px; color: #666; margin-top: 20px; border-top: 1px solid #eee; padding-top: 10px;">
+      This email was generated automatically by the IntervYou Support Form.
+    </p>
+  </div>`;
+
+  const info = await transporter.sendMail({
+    from: user,
+    to: "roshanshuklayt@gmail.com",
+    replyTo: fromEmail,
+    subject,
+    text: `Support Request from ${name} (${fromEmail}): ${message}`,
+    html,
+  });
+
+  return info;
+}
