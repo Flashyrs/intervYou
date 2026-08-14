@@ -4,6 +4,7 @@ import { type ReactNode, useCallback, useEffect, useRef, useState } from "react"
 import { applyAnswer, createAnswer, createOffer, setupPeerConnection } from "@/lib/webrtc";
 import { broadcast, onSignal } from "@/lib/realtime";
 import { ChevronRight, Maximize2, Mic, MicOff, Minimize2, Monitor, Settings, Users, Video, VideoOff, X } from "lucide-react";
+import { useToast } from "@/components/Toast";
 
 import dynamic from "next/dynamic";
 import { StreamVideo } from "./video/StreamVideo";
@@ -43,6 +44,7 @@ function WebRtcVideoCall({
   role: "interviewer" | "interviewee";
   autoStart?: boolean;
 }) {
+  const { push } = useToast();
   const roleRef = useRef(role);
   const hasAutoStartedRef = useRef(false);
   const pcRef = useRef<RTCPeerConnection | null>(null);
@@ -281,11 +283,14 @@ function WebRtcVideoCall({
 
         pc.oniceconnectionstatechange = () => {
           if (!mounted) return;
-          console.log(`[ICE] ${pc.iceConnectionState}`);
           if (pc.iceConnectionState === "failed" || pc.iceConnectionState === "disconnected") {
             // Auto-reconnect on drop
             console.log("ICE failed/disconnected, attempting restart...");
             startCall(true).catch(console.error);
+            push({
+              message: "Media connection drop detected. Attempting to reconnect...",
+              type: "error"
+            });
           }
         };
 
@@ -298,6 +303,10 @@ function WebRtcVideoCall({
           } else if (pc.connectionState === "failed") {
             setActive(false);
             setError("Connection failed. Attempting to resume...");
+            push({
+              message: "Video connection lost. If it doesn't resume, please reload the page.",
+              type: "error"
+            });
           }
         };
 

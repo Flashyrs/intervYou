@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { buildHarness, mergeTests } from "@/lib/interviewUtils";
-import { ExecutionMetrics } from "@/lib/types";
 import { useToast } from "@/components/Toast";
 
 interface UseCodeExecutionProps {
@@ -35,17 +34,19 @@ export function useCodeExecution({
     const onRun = async () => {
         try {
             const testsAll = mergeTests(sampleTests, privateTests);
-
             const harness = buildHarness(language, code, driver, testsAll);
+
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 7500);
 
             const res = await fetch("/api/execute", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ language, source_code: harness, sessionId, problemId: "run" }),
+                signal: controller.signal
             });
+            clearTimeout(timeoutId);
             const out = await res.json();
-
-
 
             const executionTime = out?.time ? parseFloat(out.time) * 1000 : undefined;
             const memoryUsed = out?.memory ? parseInt(out.memory) : undefined;
@@ -55,7 +56,6 @@ export function useCodeExecution({
             const stderr = out?.stderr;
             const stdout = out?.stdout || "";
             const delimiter = "___JSON_RESULT___";
-
 
             if (stdout.includes(delimiter)) {
                 let jsonStr = stdout;
@@ -67,7 +67,6 @@ export function useCodeExecution({
 
                 if (compileErr || stderr) {
                     let cleanedErrors = (compileErr || "") + (stderr || "");
-                    // Filter noisy Java warnings
                     if (language === 'java') {
                         cleanedErrors = cleanedErrors
                             .split('\n')
@@ -106,10 +105,8 @@ export function useCodeExecution({
                 return { caseResults: [], runOutput: "No output", metrics: { time: executionTime, memory: memoryUsed } };
             }
 
-
             console.warn("⚠️ Stdout without delimiter:", stdout);
             
-            // Try fallback json parse in case judge0 returns pure json due to error or custom output
             try {
                 const parsed = JSON.parse(stdout);
                 if (Array.isArray(parsed)) {
@@ -118,7 +115,7 @@ export function useCodeExecution({
                     return { caseResults: parsed, runOutput: compileErr || "Executed successfully", metrics: { time: executionTime, memory: memoryUsed } };
                 }
             } catch (e) {
-                // Ignore fallback parse error
+                // Ignore
             }
 
             setRunOutput(stdout);
@@ -126,16 +123,19 @@ export function useCodeExecution({
             return { caseResults: [], runOutput: stdout, metrics: { time: executionTime, memory: memoryUsed } };
         } catch (e: any) {
             console.error("❌ Run error:", e);
-            push({ message: `Execution failed: ${e.message}`, type: "error" });
-            setRunOutput("Run error: " + e.message);
-            return { caseResults: [], runOutput: "Run error: " + e.message, metrics: {} };
+            const isAbort = e.name === "AbortError";
+            const errMsg = isAbort 
+              ? "Execution Timeout: Please check for infinite loops or extremely slow operations."
+              : e.message;
+            push({ message: `Execution failed: ${errMsg}`, type: "error" });
+            setRunOutput("Run error: " + errMsg);
+            return { caseResults: [], runOutput: "Run error: " + errMsg, metrics: {} };
         }
     };
 
     const onSubmitFinal = async () => {
         setSubmitting(true);
         try {
-            // Auto-run tests first
             const executionData = await onRun();
             const finalCaseResults = executionData?.caseResults || [];
 
@@ -144,9 +144,6 @@ export function useCodeExecution({
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ sessionId, code }),
             });
-
-            // Broadcast results explicitly just in case onRun didn't propagate fast enough
-            // (onRun already broadcasts via page.tsx but we want to be sure submission record has generic data)
 
             const resultsStr = JSON.stringify(finalCaseResults);
 

@@ -28,6 +28,25 @@ export function useInterviewState(sessionId: string, initialRole: Role) {
     const [role, setRole] = useState<Role>(initialRole);
     const [showAuthModal, setShowAuthModal] = useState(false);
     const [remoteCursors, setRemoteCursors] = useState<Record<string, any>>({});
+
+    useEffect(() => {
+        const interval = setInterval(() => {
+            const now = Date.now();
+            let changed = false;
+            setRemoteCursors(prev => {
+                const next = { ...prev };
+                for (const [clientId, cursor] of Object.entries(prev)) {
+                    if (now - (cursor as any).timestamp > 10000) {
+                        delete next[clientId];
+                        changed = true;
+                    }
+                }
+                return changed ? next : prev;
+            });
+        }, 5000);
+
+        return () => clearInterval(interval);
+    }, []);
     const [lastEditor, setLastEditor] = useState<{ name: string, role: string, timestamp: number } | null>(null);
     const [isFrozen, setIsFrozen] = useState(false);
     const [timerState, setTimerState] = useState<{ active: boolean, startTimestamp: number | null, accumulated: number }>({ active: false, startTimestamp: null, accumulated: 0 });
@@ -343,7 +362,10 @@ export function useInterviewState(sessionId: string, initialRole: Role) {
 
             // 4. Cursor Update
             if (cursor && senderClientId) {
-                setRemoteCursors(prev => ({ ...prev, [senderClientId]: cursor }));
+                setRemoteCursors(prev => ({
+                    ...prev,
+                    [senderClientId]: { ...cursor, timestamp: Date.now() }
+                }));
             }
 
             // 5. Freeze State Update
