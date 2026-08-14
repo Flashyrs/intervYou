@@ -190,7 +190,9 @@ function InterviewRoom({ sessionId, initialRole }: { sessionId: string; initialR
     persistInterviewerNotes,
     endSession,
     resetSessionForNextQuestion,
-    performanceMetrics
+    performanceMetrics,
+    editorSyncFallback,
+    updateEditorSyncFallback
   } = useInterviewState(sessionId, initialRole);
 
   const { isDarkMode, toggleTheme: toggleDarkMode } = useTheme();
@@ -204,7 +206,8 @@ function InterviewRoom({ sessionId, initialRole }: { sessionId: string; initialR
     // When remote peer sends code via Yjs, update local state for execution/persistence
     useCallback((remoteCode: string) => {
       updateCode(remoteCode);
-    }, [updateCode])
+    }, [updateCode]),
+    editorSyncFallback
   );
 
   const handleSetCodeMapFull = useCallback((map: Record<string, string>) => {
@@ -397,7 +400,7 @@ function InterviewRoom({ sessionId, initialRole }: { sessionId: string; initialR
                 <button
                   type="button"
                   onClick={() => {
-                    forceSync();
+                    updateEditorSyncFallback(true);
                     push({ message: "Swapped editor sync to Supabase fallback!", type: "success" });
                   }}
                   className={`inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-semibold border transition shadow-sm ${

@@ -372,7 +372,8 @@ export async function updateInterviewState({
     "problemTitle",
     "isFrozen",
     "workspaceMode",
-    "timerState"
+    "timerState",
+    "editorSyncFallback"
   ];
 
   const hasCriticalChange =

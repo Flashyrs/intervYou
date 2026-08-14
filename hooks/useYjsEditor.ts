@@ -16,6 +16,7 @@ export function useYjsEditor(
   language: string,
   initialCode: string,
   onRemoteUpdate: (code: string) => void,
+  editorSyncFallback: boolean,
 ) {
   const ydocRef = useRef<Y.Doc | null>(null);
   const providerRef = useRef<any | null>(null);
@@ -87,8 +88,8 @@ export function useYjsEditor(
           ? signalingUrlsStr.split(",").map(url => url.trim()).filter(Boolean)
           : [];
 
-        if (signalingUrls.length === 0) {
-          console.log(`[useYjsEditor] No WebRTC signaling servers configured. Using Supabase Realtime primary sync.`);
+        if (signalingUrls.length === 0 || editorSyncFallback) {
+          console.log(`[useYjsEditor] Suppressing WebRTC. Using Supabase Realtime primary sync.`);
           provider = new YjsSupabaseProvider(roomName, ydoc);
           providerRef.current = provider;
           return;
@@ -185,6 +186,13 @@ export function useYjsEditor(
     }
     triggerSupabaseFallbackRef.current?.();
   }, []);
+
+  useEffect(() => {
+    if (editorSyncFallback) {
+      console.log("[useYjsEditor] Persistent state fallback trigger received. Swapping to Supabase...");
+      triggerSupabaseFallbackRef.current?.();
+    }
+  }, [editorSyncFallback]);
 
   // Bind Monaco editor to Yjs
   const bindEditor = useCallback(

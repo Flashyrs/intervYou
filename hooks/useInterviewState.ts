@@ -34,6 +34,7 @@ export function useInterviewState(sessionId: string, initialRole: Role) {
     const [stateVersion, setStateVersion] = useState(0);
     const [interviewerNotes, setInterviewerNotes] = useState("");
     const [notesLoaded, setNotesLoaded] = useState(false);
+    const [editorSyncFallback, setEditorSyncFallback] = useState(false);
 
     const channelRef = useRef<any>(null);
     const saveTimeout = useRef<any>(null);
@@ -85,6 +86,7 @@ export function useInterviewState(sessionId: string, initialRole: Role) {
         if (stateData.timerState) setTimerState(stateData.timerState);
         if (stateData.lastOutput !== undefined) setExecutionResult(stateData.lastOutput);
         if (stateData.isFrozen !== undefined) setIsFrozen(stateData.isFrozen);
+        if (stateData.editorSyncFallback !== undefined) setEditorSyncFallback(stateData.editorSyncFallback);
     };
 
     const reloadAuthoritativeState = async () => {
@@ -275,7 +277,7 @@ export function useInterviewState(sessionId: string, initialRole: Role) {
         channelReadyRef.current = false;
 
         channel.on("broadcast", { event: "state" }, (payload: any) => {
-            const { clientId: senderClientId, language: newLang, codeMap: newCodeMap, driverMap: newDriverMap, problemText: newProb, problemTitle: newTitle, problemId: newProblemId, sampleTests: newTests, workspaceMode: newWorkspaceMode, cursor, version } = payload?.payload || {};
+            const { clientId: senderClientId, language: newLang, codeMap: newCodeMap, driverMap: newDriverMap, problemText: newProb, problemTitle: newTitle, problemId: newProblemId, sampleTests: newTests, workspaceMode: newWorkspaceMode, cursor, version, editorSyncFallback: newFallback } = payload?.payload || {};
 
             // Echo cancellation: only skip if it's from THIS exact client
             if (senderClientId && senderClientId === clientIdRef.current) {
@@ -352,6 +354,11 @@ export function useInterviewState(sessionId: string, initialRole: Role) {
             // 6. Timer Update
             if (payload?.payload?.timerState !== undefined) {
                 setTimerState(payload.payload.timerState);
+            }
+
+            // 6b. Sync Fallback Update
+            if (newFallback !== undefined) {
+                setEditorSyncFallback(newFallback);
             }
 
             if (typeof version === "number" && version > stateVersionRef.current) {
@@ -601,6 +608,12 @@ export function useInterviewState(sessionId: string, initialRole: Role) {
         persist({ workspaceMode: mode });
     };
 
+    const updateEditorSyncFallback = (fallback: boolean) => {
+        setEditorSyncFallback(fallback);
+        broadcast({ editorSyncFallback: fallback });
+        persist({ editorSyncFallback: fallback });
+    };
+
     const updateDriver = (text: string) => {
         setDriverMap(prev => {
             const next = { ...prev, [language]: text };
@@ -714,6 +727,8 @@ export function useInterviewState(sessionId: string, initialRole: Role) {
         updateTimerState,
         lastEditor,
         stateVersion,
+        editorSyncFallback,
+        updateEditorSyncFallback,
         persistInterviewerNotes,
         resetSessionForNextQuestion,
         endSession,
