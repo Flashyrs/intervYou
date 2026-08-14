@@ -73,6 +73,12 @@ export function buildHarness(language: string, userCode: string, driver: string,
       return buildJava(userCode, driver, tests);
     case 'cpp':
       return buildCpp(userCode, driver, tests);
+    case 'python':
+      return buildPython(userCode, driver, tests);
+    case 'go':
+      return buildGo(userCode, driver, tests);
+    case 'c':
+      return buildC(userCode, driver, tests);
     default:
       return userCode;
   }
@@ -836,6 +842,98 @@ int main() {
     cout << "[{\\"error\\":\\"Unknown runtime error\\"}]" << endl;
   }
   return 0;
+}
+`;
+}
+
+function buildPython(userCode: string, driver: string, tests: any[]) {
+  const testStr = safeJSON(tests);
+  const drv = driver || "";
+
+  return `${userCode}
+
+${drv}
+
+import json
+tests_data = json.loads('''${testStr}''')
+results = []
+
+try:
+    if 'run_tests' in globals() or 'run_tests' in locals():
+        results = run_tests(tests_data)
+    else:
+        func_to_call = None
+        for name in ['solve', 'twoSum', 'threeSum']:
+            if name in globals() or name in locals():
+                func_to_call = globals().get(name) or locals().get(name)
+                break
+        if func_to_call:
+            for t in tests_data:
+                args = t["input"]
+                if not isinstance(args, list):
+                    args = [args]
+                got = func_to_call(*args)
+                results.append({
+                    "got": got,
+                    "exp": t["output"],
+                    "pass": got == t["output"]
+                })
+        else:
+            results.append({"error": "No solve() or run_tests() found"})
+except Exception as e:
+    results.append({"error": str(e)})
+
+print("___JSON_RESULT___")
+print(json.dumps(results))
+`;
+}
+
+function buildGo(userCode: string, driver: string, tests: any[]) {
+  const testStr = safeJSON(tests);
+  const drv = driver || `
+func runTests(tests []map[string]interface{}) []map[string]interface{} {
+    return []map[string]interface{}{}
+}
+`;
+
+  return `${userCode}
+
+${drv}
+
+import (
+	"encoding/json"
+	"fmt"
+)
+
+func main() {
+	testsJSON := \`${testStr}\`
+	var tests []map[string]interface{}
+	json.Unmarshal([]byte(testsJSON), &tests)
+	
+	results := runTests(tests)
+	
+	outBytes, _ := json.Marshal(results)
+	fmt.Println("___JSON_RESULT___")
+	fmt.Println(string(outBytes))
+}
+`;
+}
+
+function buildC(userCode: string, driver: string, tests: any[]) {
+  const drv = driver || `
+void run_tests() {
+    printf("[]");
+}
+`;
+
+  return `${userCode}
+
+${drv}
+
+int main() {
+    printf("___JSON_RESULT___\\n");
+    run_tests();
+    return 0;
 }
 `;
 }

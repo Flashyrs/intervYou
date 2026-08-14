@@ -14,6 +14,9 @@ export function useInterviewState(sessionId: string, initialRole: Role) {
     const [language, setLanguage] = useState("javascript");
     const [codeMap, setCodeMap] = useState<Record<string, string>>({
         javascript: "// Start coding...\n",
+        python: "# Start coding...\n",
+        go: "// Start coding...\n",
+        c: "// Start coding...\n",
         java: "// Start coding...\n",
         cpp: "// Start coding...\n"
     });
@@ -669,6 +672,9 @@ export function useInterviewState(sessionId: string, initialRole: Role) {
             privateTests: "",
             codeMap: {
                 javascript: "// Start coding new problem...\n",
+                python: "# Start coding new problem...\n",
+                go: "// Start coding new problem...\n",
+                c: "// Start coding new problem...\n",
                 java: "// Start coding new problem...\n",
                 cpp: "// Start coding new problem...\n"
             },

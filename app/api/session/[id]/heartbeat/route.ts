@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { persistFinalInterviewState } from "@/lib/interviewStateStore";
+import { requireAuth } from "@/lib/utils";
 
 export async function POST(req: Request, { params }: { params: { id: string } }) {
     try {
+        await requireAuth();
         const { id } = params;
 
         const session = await prisma.interviewSession.findUnique({

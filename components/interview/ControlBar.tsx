@@ -25,6 +25,9 @@ interface ControlBarProps {
 
 const allowedLangs = [
     { id: "javascript", name: "JavaScript" },
+    { id: "python", name: "Python" },
+    { id: "go", name: "Go" },
+    { id: "c", name: "C" },
     { id: "java", name: "Java" },
     { id: "cpp", name: "C++" },
 ];

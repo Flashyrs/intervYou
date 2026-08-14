@@ -7,6 +7,9 @@ export async function executeCode(body: any) {
   if (language_id === 63) pistonLang = "javascript";
   else if (language_id === 62) pistonLang = "java";
   else if (language_id === 54) pistonLang = "cpp";
+  else if (language_id === 71) pistonLang = "python";
+  else if (language_id === 60) pistonLang = "go";
+  else if (language_id === 50) pistonLang = "c";
 
   const enablePiston = process.env.ENABLE_PISTON === "true";
   const pistonUrl = process.env.PISTON_URL || "https://emkc.org/api/v2/piston";

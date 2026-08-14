@@ -7,6 +7,9 @@ const ALLOWED_LANGS: Record<string, number> = {
   javascript: 63,
   java: 62,
   cpp: 54,
+  python: 71,
+  go: 60,
+  c: 50,
 };
 
 const EXEMPT_EMAILS = new Set(

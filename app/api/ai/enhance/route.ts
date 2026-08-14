@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
+import { requireAuth } from "@/lib/utils";
 
 export async function POST(req: Request) {
     try {
+        await requireAuth();
         const { problemText } = await req.json();
 
         if (!problemText || problemText.trim().length < 10) {
@@ -27,6 +29,9 @@ export async function POST(req: Request) {
     ],
     "functionInfo": {
       "javascript": {"name": "actualFunctionName", "params": ["actualParam1", "actualParam2"]},
+      "python": {"name": "actualFunctionName", "params": ["actualParam1", "actualParam2"]},
+      "go": {"name": "actualFunctionName", "returnType": "[]int", "params": [{"name": "nums", "type": "[]int"}, {"name": "target", "type": "int"}]},
+      "c": {"name": "actualFunctionName", "returnType": "int", "params": [{"name": "nums", "type": "int*"}, {"name": "numsSize", "type": "int"}, {"name": "target", "type": "int"}]},
       "java": {"name": "actualFunctionName", "returnType": "int[]", "params": [{"name": "nums", "type": "int[]"}, {"name": "target", "type": "int"}]},
       "cpp": {"name": "actualFunctionName", "returnType": "vector<int>", "params": [{"name": "nums", "type": "vector<int>&"}, {"name": "target", "type": "int"}]}
     }
@@ -99,27 +104,21 @@ export async function POST(req: Request) {
         }
         let aiResult;
         try {
-            // 1. Initial cleanup
             let clean = text.trim();
             if (clean.includes("```")) {
                 clean = clean.replace(/```json/g, "").replace(/```/g, "").trim();
             }
 
-            // 2. Try standard parse first
             try {
                 aiResult = JSON.parse(clean);
             } catch (firstErr) {
-                // If standard parse fails, attempt robust sanitization
                 const start = clean.indexOf('{');
                 const end = clean.lastIndexOf('}');
                 if (start !== -1 && end !== -1) {
                     clean = clean.substring(start, end + 1);
                 }
-
-                // Remove trailing commas (e.g. [1, 2, ] or {"a": 1, })
                 clean = clean.replace(/,(\s*[\]}])/g, "$1");
 
-                // Escape unescaped control characters (newlines/tabs) inside string literals
                 let sanitized = "";
                 let inString = false;
                 let escaped = false;
@@ -147,17 +146,44 @@ export async function POST(req: Request) {
         
         const funcInfo = aiResult.functionInfo || {
             javascript: { name: "solve", params: ["input"] },
+            python: { name: "solve", params: ["input"] },
+            go: { name: "solve", returnType: "int", params: [{ name: "input", type: "int" }] },
+            c: { name: "solve", returnType: "int", params: [{ name: "input", type: "int" }] },
             java: { name: "solve", returnType: "int", params: [{ name: "input", type: "int[]" }] },
             cpp: { name: "solve", returnType: "int", params: [{ name: "input", type: "vector<int>" }] }
         };
 
         const skeletons = {
             javascript: `function ${funcInfo.javascript?.name || "solve"}(${(funcInfo.javascript?.params || []).join(", ")}) {\n  // TODO: Implement solution\n  return null;\n}`,
+            python: `def ${funcInfo.python?.name || "solve"}(${(funcInfo.python?.params || []).join(", ")}):\n    # TODO: Implement solution\n    return None`,
+            go: `package main\n\nfunc ${funcInfo.go?.name || "solve"}(${(funcInfo.go?.params || []).map((p: any) => `${p.name || 'arg'} ${p.type || 'int'}`).join(", ")}) ${funcInfo.go?.returnType || "int"} {\n    // TODO: Implement solution\n    return 0\n}`,
+            c: `${funcInfo.c?.returnType || "int"} ${funcInfo.c?.name || "solve"}(${(funcInfo.c?.params || []).map((p: any) => `${p.type || 'int'} ${p.name || 'arg'}`).join(", ")}) {\n    // TODO: Implement solution\n    return 0;\n}`,
             java: `import java.util.*;\n\nclass Solution {\n  public ${funcInfo.java?.returnType || "void"} ${funcInfo.java?.name || "solve"}(${(funcInfo.java?.params || []).map((p: any) => `${p.type || 'Object'} ${p.name || 'arg'}`).join(", ")}) {\n    // TODO: Implement solution\n    return 0;\n  }\n}`,
             cpp: `#include <vector>\n#include <string>\n#include <algorithm>\n#include <map>\n#include <set>\nusing namespace std;\n\nclass Solution {\npublic:\n  ${funcInfo.cpp?.returnType || "void"} ${funcInfo.cpp?.name || "solve"}(${(funcInfo.cpp?.params || []).map((p: any) => `${p.type || 'int'} ${p.name || 'arg'}`).join(", ")}) {\n    // TODO: Implement solution\n    return 0;\n  }\n};`
         };
 
         const jsFunc = funcInfo.javascript?.name || "solve";
+        
+        // Generate static C test runs dynamically
+        const cTestCalls = (aiResult.testCases || []).map((t: any, idx: number) => {
+            const argsStr = (t.input || []).map((val: any) => {
+                if (Array.isArray(val)) {
+                    return `(int[]){${val.join(", ")}}`;
+                }
+                if (typeof val === 'string') {
+                    return `"${val}"`;
+                }
+                return String(val);
+            }).join(", ");
+            
+            return `    {
+        int got = ${funcInfo.c?.name || "solve"}(${argsStr});
+        int exp = ${t.output};
+        printf("{\\"got\\": %d, \\"exp\\": %d, \\"pass\\": %s}%s\\n", 
+            got, exp, got == exp ? "true" : "false", ${idx < (aiResult.testCases || []).length - 1 ? '","' : '""'});
+    }`;
+        }).join("\n");
+
         const drivers = {
             javascript: `function runTests(tests) {
   const results = [];
@@ -170,6 +196,53 @@ export async function POST(req: Request) {
     }
   }
   return results;
+}`,
+            python: `def run_tests(tests):
+    results = []
+    for t in tests:
+        try:
+            args = t["input"]
+            if not isinstance(args, list):
+                args = [args]
+            got = ${funcInfo.python?.name || "solve"}(*args)
+            results.append({
+                "got": got,
+                "exp": t["output"],
+                "pass": got == t["output"]
+            })
+        except Exception as e:
+            results.append({
+                "pass": False,
+                "error": str(e)
+            })
+    return results`,
+            go: `func runTests(tests []map[string]interface{}) []map[string]interface{} {
+    results := make([]map[string]interface{}, 0)
+    for _, t := range tests {
+        res := make(map[string]interface{})
+        res["exp"] = t["output"]
+        
+        inputBytes, _ := json.Marshal(t["input"])
+        var args []json.RawMessage
+        json.Unmarshal(inputBytes, &args)
+
+        ${(funcInfo.go?.params || []).map((p: any, i: number) => {
+            return `var arg${i} ${p.type || "int"}
+        json.Unmarshal(args[${i}], &arg${i})`;
+        }).join("\n        ")}
+
+        got := ${funcInfo.go?.name || "solve"}(${(funcInfo.go?.params || []).map((_: any, i: number) => `arg${i}`).join(", ")})
+        res["got"] = got
+        res["pass"] = fmt.Sprintf("%v", got) == fmt.Sprintf("%v", t["output"])
+        
+        results = append(results, res)
+    }
+    return results
+}`,
+            c: `void run_tests() {
+    printf("[\\n");
+${cTestCalls}
+    printf("]\\n");
 }`,
             java: `import java.util.*;
 import java.lang.reflect.Method;
