@@ -10,6 +10,7 @@ export default function HomePage() {
   const [supportEmail, setSupportEmail] = useState("");
   const [supportMessage, setSupportMessage] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [showSupportForm, setShowSupportForm] = useState(false);
   const { push } = useToast();
 
   const handleSupportSubmit = async (e: React.FormEvent) => {
@@ -136,69 +137,83 @@ export default function HomePage() {
       <section className="py-24 bg-gray-50 border-t border-gray-100">
         <div className="max-w-4xl mx-auto px-4">
           <div className="bg-white rounded-3xl border border-gray-100 p-8 md:p-12 shadow-xl">
-            <div className="max-w-2xl mx-auto text-center mb-10">
+            <div className="max-w-2xl mx-auto text-center">
               <h2 className="text-3xl font-extrabold text-gray-900 tracking-tight sm:text-4xl mb-4">
                 P2P Network Support & Feedback
               </h2>
-              <p className="text-gray-600 leading-relaxed text-sm md:text-base">
+              <p className="text-gray-600 leading-relaxed text-sm md:text-base mb-6">
                 IntervYou utilizes secure, direct <strong>Peer-to-Peer (P2P) WebRTC connection routing</strong> to deliver zero-latency typing sync and direct face-to-face video calling.
               </p>
-              <div className="mt-4 p-4 bg-amber-50 border border-amber-100 rounded-xl text-left text-xs md:text-sm text-amber-800 leading-relaxed">
-                <strong>Symmetric NAT / Firewall Warning (Scenario 1):</strong> Direct peer connections can sometimes fail to traverse strict VPNs, corporate firewalls, or school/university networks. If enough users report traversal issues, we will enable server-side LiveKit media relays. Please report your network setup details using the form below.
-              </div>
+              <button
+                type="button"
+                onClick={() => setShowSupportForm((prev) => !prev)}
+                className="inline-flex items-center gap-2 px-5 py-2.5 bg-black text-white hover:bg-gray-800 rounded-xl text-xs font-bold uppercase tracking-wider transition-colors shadow-sm"
+              >
+                {showSupportForm ? "Hide Contact Form" : "Report Connection Issue"}
+              </button>
             </div>
 
-            <form onSubmit={handleSupportSubmit} className="space-y-6 max-w-xl mx-auto">
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 mb-2">
-                  Name
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={supportName}
-                  onChange={(e) => setSupportName(e.target.value)}
-                  placeholder="Your Name"
-                  className="w-full rounded-xl border border-gray-200 bg-gray-50/50 px-4 py-3 text-sm text-gray-900 focus:border-black focus:bg-white focus:outline-none transition-colors"
-                />
-              </div>
+            {showSupportForm && (
+              <div className="mt-10 border-t border-gray-100 pt-10 animate-in fade-in slide-in-from-top-4 duration-300">
+                <div className="max-w-2xl mx-auto mb-8">
+                  <div className="p-4 bg-amber-50 border border-amber-100 rounded-xl text-left text-xs md:text-sm text-amber-800 leading-relaxed">
+                    <strong>Symmetric NAT / Firewall Warning (Scenario 1):</strong> Direct peer connections can sometimes fail to traverse strict VPNs, corporate firewalls, or school/university networks. If enough users report traversal issues, we will enable server-side LiveKit media relays. Please report your network setup details using the form below.
+                  </div>
+                </div>
 
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 mb-2">
-                  Email Address
-                </label>
-                <input
-                  type="email"
-                  required
-                  value={supportEmail}
-                  onChange={(e) => setSupportEmail(e.target.value)}
-                  placeholder="name@example.com"
-                  className="w-full rounded-xl border border-gray-200 bg-gray-50/50 px-4 py-3 text-sm text-gray-900 focus:border-black focus:bg-white focus:outline-none transition-colors"
-                />
-              </div>
+                <form onSubmit={handleSupportSubmit} className="space-y-6 max-w-xl mx-auto">
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 mb-2">
+                      Name
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={supportName}
+                      onChange={(e) => setSupportName(e.target.value)}
+                      placeholder="Your Name"
+                      className="w-full rounded-xl border border-gray-200 bg-gray-50/50 px-4 py-3 text-sm text-gray-900 focus:border-black focus:bg-white focus:outline-none transition-colors"
+                    />
+                  </div>
 
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 mb-2">
-                  Issue Description & Network Setup
-                </label>
-                <textarea
-                  required
-                  rows={4}
-                  value={supportMessage}
-                  onChange={(e) => setSupportMessage(e.target.value)}
-                  placeholder="Describe your issue. (e.g. video connection stuck on connecting behind university VPN)"
-                  className="w-full rounded-xl border border-gray-200 bg-gray-50/50 px-4 py-3 text-sm text-gray-900 focus:border-black focus:bg-white focus:outline-none transition-colors resize-none"
-                />
-              </div>
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 mb-2">
+                      Email Address
+                    </label>
+                    <input
+                      type="email"
+                      required
+                      value={supportEmail}
+                      onChange={(e) => setSupportEmail(e.target.value)}
+                      placeholder="name@example.com"
+                      className="w-full rounded-xl border border-gray-200 bg-gray-50/50 px-4 py-3 text-sm text-gray-900 focus:border-black focus:bg-white focus:outline-none transition-colors"
+                    />
+                  </div>
 
-              <button
-                type="submit"
-                disabled={submitting}
-                className="w-full bg-black text-white hover:bg-gray-800 disabled:bg-gray-400 font-semibold py-3 px-6 rounded-xl transition-colors flex items-center justify-center gap-2 text-sm shadow-md"
-              >
-                {submitting ? "Submitting..." : "Submit Issue Report"}
-              </button>
-            </form>
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 mb-2">
+                      Issue Description & Network Setup
+                    </label>
+                    <textarea
+                      required
+                      rows={4}
+                      value={supportMessage}
+                      onChange={(e) => setSupportMessage(e.target.value)}
+                      placeholder="Describe your issue. (e.g. video connection stuck on connecting behind university VPN)"
+                      className="w-full rounded-xl border border-gray-200 bg-gray-50/50 px-4 py-3 text-sm text-gray-900 focus:border-black focus:bg-white focus:outline-none transition-colors resize-none"
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={submitting}
+                    className="w-full bg-black text-white hover:bg-gray-800 disabled:bg-gray-400 font-semibold py-3 px-6 rounded-xl transition-colors flex items-center justify-center gap-2 text-sm shadow-md"
+                  >
+                    {submitting ? "Submitting..." : "Submit Issue Report"}
+                  </button>
+                </form>
+              </div>
+            )}
           </div>
         </div>
       </section>
