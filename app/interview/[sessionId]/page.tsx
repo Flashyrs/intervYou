@@ -287,6 +287,34 @@ function InterviewRoom({ sessionId, initialRole }: { sessionId: string; initialR
     }
   }, [remoteCursors, sessionId]);
 
+  useEffect(() => {
+    const editor = (window as any)[`__editor_${sessionId}`];
+    const monaco = (window as any)[`__monaco_${sessionId}`];
+    if (!editor || !monaco) return;
+
+    const oldErrorDecorations = (editor as any).__oldErrorDecorations || [];
+    let newDecorations: any[] = [];
+
+    if (runOutput) {
+      // Matches Main.extension:lineNumber or Main.extension line lineNumber
+      const match = runOutput.match(/Main\.(cpp|java|js|py|go|rs|cs)[:\s](\d+)/i);
+      if (match && match[2]) {
+        const errorLine = parseInt(match[2], 10);
+        newDecorations.push({
+          range: new monaco.Range(errorLine, 1, errorLine, 1),
+          options: {
+            isWholeLine: true,
+            className: 'bg-red-500/10 border-l-4 border-red-500',
+            glyphMarginClassName: 'bg-red-500 rounded-full cursor-pointer',
+            hoverMessage: { value: 'Compilation Error: Check code execution logs.' }
+          }
+        });
+      }
+    }
+
+    (editor as any).__oldErrorDecorations = editor.deltaDecorations(oldErrorDecorations, newDecorations);
+  }, [runOutput, sessionId]);
+
   return (
     <div className={`flex flex-col h-screen w-screen transition-colors duration-200 overflow-hidden font-sans ${isDarkMode ? 'bg-zinc-950 text-zinc-150 selection:bg-zinc-800 selection:text-zinc-200' : 'bg-[#f3f4f6] selection:bg-indigo-100 selection:text-indigo-900'}`}>
       
@@ -488,6 +516,7 @@ function InterviewRoom({ sessionId, initialRole }: { sessionId: string; initialR
                   padding: { top: 16, bottom: 16 },
                   roundedSelection: true,
                   cursorBlinking: "smooth",
+                  glyphMargin: true,
                 }}
               />
             </div>
