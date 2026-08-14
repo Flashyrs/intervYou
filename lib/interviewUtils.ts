@@ -825,6 +825,24 @@ function buildCpp(userCode: string, driver: string, tests: any[]) {
 
 using namespace std;
 
+// Data Structure Definitions for LeetCode Compatibility
+struct ListNode {
+    int val;
+    ListNode *next;
+    ListNode() : val(0), next(nullptr) {}
+    ListNode(int x) : val(x), next(nullptr) {}
+    ListNode(int x, ListNode *next) : val(x), next(next) {}
+};
+
+struct TreeNode {
+    int val;
+    TreeNode *left;
+    TreeNode *right;
+    TreeNode() : val(0), left(nullptr), right(nullptr) {}
+    TreeNode(int x) : val(x), left(nullptr), right(nullptr) {}
+    TreeNode(int x, TreeNode *left, TreeNode *right) : val(x), left(left), right(right) {}
+};
+
 ${includesStr}
 
 // User Solution
@@ -850,7 +868,19 @@ function buildPython(userCode: string, driver: string, tests: any[]) {
   const testStr = safeJSON(tests);
   const drv = driver || "";
 
-  return `${userCode}
+  return `# Data Structure Definitions for LeetCode Compatibility
+class ListNode:
+    def __init__(self, val=0, next=None):
+        self.val = val
+        self.next = next
+
+class TreeNode:
+    def __init__(self, val=0, left=None, right=None):
+        self.val = val
+        self.left = left
+        self.right = right
+
+${userCode}
 
 ${drv}
 
@@ -896,14 +926,28 @@ func runTests(tests []map[string]interface{}) []map[string]interface{} {
 }
 `;
 
-  return `${userCode}
-
-${drv}
+  return `package main
 
 import (
 	"encoding/json"
 	"fmt"
 )
+
+// Data Structure Definitions for LeetCode Compatibility
+type ListNode struct {
+    Val  int
+    Next *ListNode
+}
+
+type TreeNode struct {
+    Val   int
+    Left  *TreeNode
+    Right *TreeNode
+}
+
+${userCode}
+
+${drv}
 
 func main() {
 	testsJSON := \`${testStr}\`
@@ -926,7 +970,23 @@ void run_tests() {
 }
 `;
 
-  return `${userCode}
+  return `#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+// Data Structure Definitions for LeetCode Compatibility
+struct ListNode {
+    int val;
+    struct ListNode *next;
+};
+
+struct TreeNode {
+    int val;
+    struct TreeNode *left;
+    struct TreeNode *right;
+};
+
+${userCode}
 
 ${drv}
 
