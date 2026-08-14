@@ -459,6 +459,17 @@ function InterviewRoom({ sessionId, initialRole }: { sessionId: string; initialR
                   updateCode(v || "", isLocal);
                 }}
                 onMount={(editor: any, monaco: any) => {
+                  // Disable syntax validation and type checking squigglies (prevent red line errors)
+                  if (monaco && monaco.languages && monaco.languages.typescript) {
+                    monaco.languages.typescript.javascriptDefaults.setDiagnosticsOptions({
+                      noSemanticValidation: true,
+                      noSyntaxValidation: true,
+                    });
+                    monaco.languages.typescript.typescriptDefaults.setDiagnosticsOptions({
+                      noSemanticValidation: true,
+                      noSyntaxValidation: true,
+                    });
+                  }
                   editor.onDidChangeCursorPosition((e: any) => {
                     broadcastCursor({ lineNumber: e.position.lineNumber, column: e.position.column });
                   });
