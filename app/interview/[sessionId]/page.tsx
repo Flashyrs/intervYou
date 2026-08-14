@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
-import { CheckCircle2, Code2, PenSquare } from "lucide-react";
+import { CheckCircle2, Code2, PenSquare, RotateCcw } from "lucide-react";
 import { useSession, signIn } from "next-auth/react";
 import VideoCall from "@/components/VideoCall";
 import { useInterviewState } from "@/hooks/useInterviewState";
@@ -18,12 +18,14 @@ import { AuthModal } from "@/components/interview/AuthModal";
 import { getScreenShareChannel, getWebRtcChannel } from "@/lib/sessionChannels";
 import { WhiteboardPanel } from "@/components/interview/WhiteboardPanel";
 import { DiagnosticsOverlay } from "@/components/DiagnosticsOverlay";
+import { useToast } from "@/components/Toast";
 
 const MonacoEditor: any = dynamic(() => import("@monaco-editor/react"), { ssr: false });
 
 export default function InterviewPage() {
   const { sessionId } = useParams() as { sessionId: string };
   const router = useRouter();
+  const { push } = useToast();
   const { status: authStatus, data: session } = useSession();
   const [accessState, setAccessState] = useState<"checking" | "ready" | "ended" | "forbidden">("checking");
   const [accessRole, setAccessRole] = useState<"interviewer" | "interviewee" | null>(null);
@@ -192,9 +194,10 @@ function InterviewRoom({ sessionId, initialRole }: { sessionId: string; initialR
   } = useInterviewState(sessionId, initialRole);
 
   const { isDarkMode, toggleTheme: toggleDarkMode } = useTheme();
+  const { push } = useToast();
 
   // Yjs CRDT sync for code editor — P2P via y-webrtc, avoids Supabase 10 msg/s limit
-  const { bindEditor, applyLocalEdit } = useYjsEditor(
+  const { bindEditor, applyLocalEdit, forceSync } = useYjsEditor(
     sessionId,
     language,
     code,
@@ -390,6 +393,24 @@ function InterviewRoom({ sessionId, initialRole }: { sessionId: string; initialR
                 <PenSquare className="w-3.5 h-3.5" />
                 Whiteboard
               </button>
+              {workspaceMode === "editor" && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    forceSync();
+                    push({ message: "Swapped editor sync to Supabase fallback!", type: "success" });
+                  }}
+                  className={`inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-semibold border transition shadow-sm ${
+                    isDarkMode
+                      ? "bg-zinc-800 text-amber-400 border-zinc-700 hover:bg-zinc-700"
+                      : "bg-amber-50/50 text-amber-700 border-amber-200 hover:bg-amber-100/80"
+                  }`}
+                  title="Force swap sync connection to Supabase backup if P2P WebRTC experiences lag"
+                >
+                  <RotateCcw className="w-3 h-3" />
+                  Sync Editor
+                </button>
+              )}
             </div>
             <div className="flex items-center gap-2">
               <h2 className={`text-[11px] font-bold uppercase tracking-wider flex items-center gap-2 ${isDarkMode ? 'text-zinc-400' : 'text-gray-500'}`}>

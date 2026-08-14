@@ -25,6 +25,9 @@ export function useYjsEditor(
   const isApplyingRemoteRef = useRef(false);
   const lastSyncedCodeRef = useRef(initialCode);
 
+  const controlChannelRef = useRef<any>(null);
+  const triggerSupabaseFallbackRef = useRef<(() => void) | null>(null);
+
   // Track language changes
   currentLanguageRef.current = language;
 
@@ -44,6 +47,7 @@ export function useYjsEditor(
       // Set up control channel to coordinate WebRTC fallback desync
       if (supabase) {
         controlChannel = supabase.channel(`control-${roomName}`);
+        controlChannelRef.current = controlChannel;
         controlChannel.on("broadcast", { event: "force-fallback" }, () => {
           if (destroyed) return;
           console.log("[useYjsEditor] Received force-fallback broadcast. Swapping to Supabase...");
@@ -75,6 +79,8 @@ export function useYjsEditor(
         }
       };
 
+      triggerSupabaseFallbackRef.current = triggerSupabaseFallback;
+
       const startWebrtcOrSupabase = async () => {
         const signalingUrlsStr = process.env.NEXT_PUBLIC_WEBRTC_SIGNALING_URLS;
         const signalingUrls = signalingUrlsStr
@@ -105,25 +111,6 @@ export function useYjsEditor(
             }
           });
           providerRef.current = provider;
-
-          // Fallback Timer: if no peer connection exists after 4 seconds, migrate to Supabase
-          setTimeout(() => {
-            if (destroyed) return;
-            const webrtcConnected = providerRef.current && 
-                                    (providerRef.current.room?.webrtcConns?.size > 0);
-
-            if (!webrtcConnected) {
-              console.log("[useYjsEditor] P2P WebRTC peer not found. Broadcasting force-fallback...");
-              if (controlChannel) {
-                controlChannel.send({
-                  type: "broadcast",
-                  event: "force-fallback",
-                  payload: {}
-                });
-              }
-              triggerSupabaseFallback();
-            }
-          }, 4000);
 
         } catch (err) {
           console.error("[useYjsEditor] Failed to load WebRTC, falling back to Supabase Realtime:", err);
@@ -186,6 +173,18 @@ export function useYjsEditor(
       providerRef.current = null;
     };
   }, [roomName]); // Re-create when room (session+language) changes
+
+  const forceSync = useCallback(() => {
+    console.log("[useYjsEditor] Force fallback triggered by user...");
+    if (controlChannelRef.current) {
+      controlChannelRef.current.send({
+        type: "broadcast",
+        event: "force-fallback",
+        payload: {}
+      }).catch(console.error);
+    }
+    triggerSupabaseFallbackRef.current?.();
+  }, []);
 
   // Bind Monaco editor to Yjs
   const bindEditor = useCallback(
@@ -259,6 +258,7 @@ export function useYjsEditor(
     bindEditor,
     applyLocalEdit,
     getCurrentCode,
+    forceSync,
     provider: providerRef,
     ydoc: ydocRef,
   };
