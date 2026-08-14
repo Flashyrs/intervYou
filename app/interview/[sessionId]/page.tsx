@@ -396,7 +396,7 @@ function InterviewRoom({ sessionId, initialRole }: { sessionId: string; initialR
                 <PenSquare className="w-3.5 h-3.5" />
                 Whiteboard
               </button>
-              {workspaceMode === "editor" && (
+              {workspaceMode === "editor" && role === "interviewer" && (
                 <button
                   type="button"
                   onClick={() => {
