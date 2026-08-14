@@ -653,7 +653,8 @@ export function useInterviewState(sessionId: string, initialRole: Role) {
             driverMap: {},
             lastOutput: null,
             timerState: { active: false, startTimestamp: null, accumulated: 0 },
-            workspaceMode: "editor"
+            workspaceMode: "editor",
+            editorSyncFallback: false
         };
 
         setProblemId(newProblemId);
@@ -666,6 +667,7 @@ export function useInterviewState(sessionId: string, initialRole: Role) {
         setExecutionResult(null);
         setTimerState(resetPatch.timerState);
         setWorkspaceMode("editor");
+        setEditorSyncFallback(false);
 
         broadcast(resetPatch);
         persist(resetPatch);
